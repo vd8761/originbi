@@ -43,11 +43,26 @@ interface SelectOption {
     description?: string;
 }
 
+interface IatRule {
+    programIds?: string[];
+    departmentDegreeIds?: string[];
+    departmentIds?: string[];
+    studentBoards?: string[];
+}
+
+interface IatRuleConfig {
+    rules?: IatRule[];
+}
+
 export default function SettingsManagement() {
     const [settingsGrouped, setSettingsGrouped] = useState<Record<string, SettingItem[]>>({});
     const [activeCategory, setActiveCategory] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [programOptions, setProgramOptions] = useState<SelectOption[]>([]);
+    const [departmentOptions, setDepartmentOptions] = useState<SelectOption[]>([]);
+    const [departmentDegreeOptions, setDepartmentDegreeOptions] = useState<SelectOption[]>([]);
+    const [iatOptionsLoading, setIatOptionsLoading] = useState(false);
     
     // Track modifications to only save what changed
     const [modifiedSettings, setModifiedSettings] = useState<Record<string, any>>({});
@@ -69,7 +84,47 @@ export default function SettingsManagement() {
     // Setup initial fetch
     useEffect(() => {
         fetchSettings();
+        fetchIatReferenceOptions();
     }, []);
+
+    const fetchIatReferenceOptions = async () => {
+        try {
+            setIatOptionsLoading(true);
+            const [programsRes, departmentsRes, departmentDegreesRes] = await Promise.all([
+                api.get('/admin/programs?is_active=true'),
+                api.get('/admin/departments?is_active=true'),
+                api.get('/admin/departments/degrees'),
+            ]);
+            const normalizeList = (body: any) => Array.isArray(body) ? body : (body?.data || []);
+            const programs = normalizeList(programsRes.data);
+            const departments = normalizeList(departmentsRes.data);
+            const departmentDegrees = normalizeList(departmentDegreesRes.data);
+
+            setProgramOptions(programs.map((program: any) => ({
+                value: String(program.id),
+                label: program.name || program.code || `Program ${program.id}`,
+                description: program.code,
+            })));
+            setDepartmentOptions(departments.map((department: any) => ({
+                value: String(department.id),
+                label: department.name || department.short_name || `Department ${department.id}`,
+                description: department.short_name,
+            })));
+            setDepartmentDegreeOptions(departmentDegrees.map((degree: any) => {
+                const departmentName = degree.department?.name || degree.department_name || degree.departmentName || degree.department?.shortName;
+                const degreeName = degree.degree?.name || degree.degree_name || degree.degreeName || degree.name;
+                return {
+                    value: String(degree.id),
+                    label: [departmentName, degreeName].filter(Boolean).join(' - ') || `Department Degree ${degree.id}`,
+                    description: degree.degree?.short_name || degree.degree_short_name || degree.short_name,
+                };
+            }));
+        } catch (error) {
+            console.error("Failed to load IAT reference options", error);
+        } finally {
+            setIatOptionsLoading(false);
+        }
+    };
 
     const fetchSettings = async (showLoading = true) => {
         try {
@@ -284,7 +339,7 @@ export default function SettingsManagement() {
                 );
             }
 
-            if (item.category === 'metaphor' && item.key === 'claude_report_model') {
+            if ((item.category === 'metaphor' || item.category === 'iat') && item.key === 'claude_report_model') {
                 return (
                     <ClaudeModelSelect
                         value={String(item.value || '')}
@@ -294,7 +349,7 @@ export default function SettingsManagement() {
                 );
             }
 
-            if (item.category === 'metaphor' && item.key === 'report_skill_markdown') {
+            if ((item.category === 'metaphor' || item.category === 'iat') && item.key === 'report_skill_markdown') {
                 return (
                     <div className="flex items-center justify-end">
                         <button
@@ -381,6 +436,21 @@ export default function SettingsManagement() {
                     <LanguagesEditor
                         value={Array.isArray(item.value) ? item.value : []}
                         isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            if (item.category === 'iat' && item.key === 'level2_replacement_rules') {
+                const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
+                return (
+                    <IatRulesEditor
+                        value={value}
+                        isReadonly={item.isReadonly}
+                        programOptions={programOptions}
+                        departmentOptions={departmentOptions}
+                        departmentDegreeOptions={departmentDegreeOptions}
+                        loading={iatOptionsLoading}
                         onChange={(next) => handleValueChange(item.category, item.key, next)}
                     />
                 );
@@ -535,11 +605,16 @@ export default function SettingsManagement() {
 
                                         // Wide editors (e.g. the distribution table) render full-width,
                                         // stacked below the label — not squeezed into the side input column.
-                                        const isFullWidth = item.valueType === 'json'
+                                        // The Claude/Gemini model pickers pair a dropdown with a Refresh
+                                        // button, which gets clipped in the narrow side column — give them
+                                        // the full-width treatment too.
+                                        const isModelSelect = (item.category === 'metaphor' || item.category === 'iat')
+                                            && (item.key === 'claude_report_model' || item.key === 'gemini_model');
+                                        const isFullWidth = isModelSelect || (item.valueType === 'json'
                                             && (
                                                 (item.category === 'assessment' && item.key === 'open_question_distribution')
                                                 || (item.category === 'metaphor' && (item.key === 'stt_provider' || item.key === 'supported_languages'))
-                                            );
+                                            ));
 
                                         return (
                                         <div key={item.id} className={`${isFullWidth ? 'flex flex-col gap-4' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-6'} pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
@@ -1356,6 +1431,262 @@ const MarkdownPreview = ({ markdown }: { markdown: string }) => {
         </div>
     );
 };
+
+const SCHOOL_BOARD_OPTIONS: SelectOption[] = [
+    { value: 'CBSE', label: 'CBSE' },
+    { value: 'ICSE', label: 'ICSE' },
+    { value: 'State Board', label: 'State Board' },
+    { value: 'IB', label: 'IB' },
+    { value: 'IGCSE', label: 'IGCSE' },
+    { value: 'Other', label: 'Other' },
+];
+
+function IatRulesEditor({
+    value,
+    isReadonly,
+    programOptions,
+    departmentOptions,
+    departmentDegreeOptions,
+    loading,
+    onChange,
+}: {
+    value: IatRuleConfig;
+    isReadonly: boolean;
+    programOptions: SelectOption[];
+    departmentOptions: SelectOption[];
+    departmentDegreeOptions: SelectOption[];
+    loading: boolean;
+    onChange: (next: IatRuleConfig) => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const rules = Array.isArray(value?.rules) ? value.rules : [];
+
+    const normalizeRule = (rule: IatRule): IatRule => ({
+        programIds: (rule.programIds || []).map(String),
+        departmentDegreeIds: (rule.departmentDegreeIds || []).map(String),
+        departmentIds: (rule.departmentIds || []).map(String),
+        studentBoards: (rule.studentBoards || []).map(String),
+    });
+
+    const updateRule = (index: number, patch: Partial<IatRule>) => {
+        const nextRules = rules.map((rule, idx) =>
+            idx === index ? { ...normalizeRule(rule), ...patch } : normalizeRule(rule),
+        );
+        onChange({ rules: nextRules });
+    };
+
+    const addRule = () => {
+        onChange({
+            rules: [
+                ...rules.map(normalizeRule),
+                { programIds: [], departmentDegreeIds: [], departmentIds: [], studentBoards: [] },
+            ],
+        });
+    };
+
+    const removeRule = (index: number) => {
+        onChange({ rules: rules.filter((_, idx) => idx !== index).map(normalizeRule) });
+    };
+
+    const editor = (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm" onMouseDown={() => setIsOpen(false)}>
+            <div
+                className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#19211C]"
+                onMouseDown={(event) => event.stopPropagation()}
+            >
+                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 dark:border-white/10 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">IAT Gen</p>
+                        <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">Level 2 replacement routing</h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+                            Empty selections match all values in that field. A student matches when the program matches and at least one selected department, department-degree, or board condition matches.
+                        </p>
+                        {loading && (
+                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading program and department options...</p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={isReadonly}
+                            onClick={addRule}
+                            className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 disabled:opacity-40"
+                        >
+                            Add rule
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsOpen(false)}
+                            className="rounded-xl px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                    {rules.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                            No IAT Gen replacement rules configured.
+                        </div>
+                    ) : (
+                        <div className="space-y-5">
+                            {rules.map((rawRule, index) => {
+                                const rule = normalizeRule(rawRule);
+                                return (
+                                    <div key={index} className="rounded-xl border border-gray-200 p-5 dark:border-white/10">
+                                        <div className="mb-5 flex items-center justify-between gap-3">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Rule {index + 1}</p>
+                                            <button
+                                                type="button"
+                                                disabled={isReadonly}
+                                                onClick={() => removeRule(index)}
+                                                className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-500/10"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                            <MultiCheckboxGroup
+                                                label="Programs"
+                                                emptyLabel="All programs"
+                                                values={rule.programIds || []}
+                                                options={programOptions}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { programIds: next })}
+                                            />
+                                            <MultiCheckboxGroup
+                                                label="Department / Degree"
+                                                emptyLabel="All department-degree rows"
+                                                values={rule.departmentDegreeIds || []}
+                                                options={departmentDegreeOptions}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { departmentDegreeIds: next })}
+                                            />
+                                            <MultiCheckboxGroup
+                                                label="Departments"
+                                                emptyLabel="All departments"
+                                                values={rule.departmentIds || []}
+                                                options={departmentOptions}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { departmentIds: next })}
+                                            />
+                                            <MultiCheckboxGroup
+                                                label="Boards"
+                                                emptyLabel="All boards"
+                                                values={rule.studentBoards || []}
+                                                options={SCHOOL_BOARD_OPTIONS}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { studentBoards: next })}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 border-t border-gray-200 px-6 py-4 dark:border-white/10">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Close this popup, then use Save Changes to persist the setting.</p>
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(false)}
+                        className="rounded-xl bg-brand-green px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col items-start gap-2">
+            <button
+                type="button"
+                disabled={isReadonly}
+                onClick={() => setIsOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-green/40 disabled:opacity-40"
+            >
+                Configure rules
+            </button>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                {rules.length === 0 ? 'No rules configured' : `${rules.length} rule${rules.length === 1 ? '' : 's'} configured`}
+            </p>
+            {isOpen ? ReactDOM.createPortal(editor, document.body) : null}
+        </div>
+    );
+}
+
+function MultiCheckboxGroup({
+    label,
+    emptyLabel,
+    values,
+    options,
+    disabled,
+    onChange,
+}: {
+    label: string;
+    emptyLabel: string;
+    values: string[];
+    options: SelectOption[];
+    disabled?: boolean;
+    onChange: (next: string[]) => void;
+}) {
+    const selected = new Set(values.map(String));
+    const toggle = (value: string) => {
+        if (selected.has(value)) {
+            onChange(values.filter((item) => String(item) !== value));
+        } else {
+            onChange([...values, value]);
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
+                <button
+                    type="button"
+                    disabled={disabled || values.length === 0}
+                    onClick={() => onChange([])}
+                    className="text-xs font-medium text-brand-green disabled:text-gray-400"
+                >
+                    {values.length === 0 ? emptyLabel : 'Clear'}
+                </button>
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-black/10">
+                {options.length === 0 ? (
+                    <p className="px-2 py-3 text-xs text-gray-400">No options available.</p>
+                ) : (
+                    <div className="space-y-1">
+                        {options.map((option) => (
+                            <label
+                                key={option.value}
+                                className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
+                            >
+                                <input
+                                    type="checkbox"
+                                    disabled={disabled}
+                                    checked={selected.has(option.value)}
+                                    onChange={() => toggle(option.value)}
+                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-green focus:ring-brand-green disabled:opacity-40"
+                                />
+                                <span className="min-w-0">
+                                    <span className="block truncate text-gray-800 dark:text-gray-100">{option.label}</span>
+                                    {option.description && (
+                                        <span className="block truncate text-xs text-gray-400">{option.description}</span>
+                                    )}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 interface LangRow { code: string; label: string; native: string }
 

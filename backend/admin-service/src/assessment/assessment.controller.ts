@@ -123,6 +123,16 @@ export class AssessmentController {
     return this.assessmentService.retryMetaphorReport(Number(attemptId));
   }
 
+  @Get('sessions/:id/iat-report')
+  async getIatReport(@Param('id') id: string) {
+    return this.assessmentService.findIatReport(Number(id));
+  }
+
+  @Post('iat/:attemptId/report/retry')
+  async retryIatReport(@Param('attemptId') attemptId: string) {
+    return this.assessmentService.retryIatReport(Number(attemptId));
+  }
+
   @Get('metaphor/:attemptId/report/pdf')
   async downloadMetaphorReportPdf(
     @Param('attemptId') attemptId: string,

@@ -470,6 +470,30 @@ button { font-family: inherit; }
 .voice-status span { font-size: 18px; font-weight: 700; }
 .voice-status span.is-live { color: var(--green-500); }
 .voice-status b { font-size: 17px; color: var(--fg-1); font-variant-numeric: tabular-nums; }
+
+/* Explicit "Stop Transcription" control (shown while listening) */
+.stop-transcription-btn {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px 0 2px;
+  height: 46px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #ef4444 55%, transparent);
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), transform 0.09s linear;
+}
+.stop-transcription-btn:hover { background: color-mix(in srgb, #ef4444 22%, transparent); }
+.stop-transcription-btn:active { transform: scale(0.98); }
+.stop-transcription-btn svg { width: 15px; height: 15px; }
+
 .transcript__head {
   display: flex;
   align-items: center;

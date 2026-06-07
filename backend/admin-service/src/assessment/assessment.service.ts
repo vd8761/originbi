@@ -742,6 +742,133 @@ export class AssessmentService {
     return { success: true, queued: true };
   }
 
+  async findIatReport(sessionId: number) {
+    const attemptRows = await this.dataSource.query(
+      `SELECT aa.id, aa.status, aa.started_at, aa.completed_at, aa.metadata
+       FROM assessment_attempts aa
+       JOIN assessment_levels al ON al.id = aa.assessment_level_id
+       WHERE aa.assessment_session_id = $1
+         AND al.level_number = 2
+         AND (
+           aa.metadata->>'assessment_kind' = 'IAT_GEN'
+           OR EXISTS (
+             SELECT 1 FROM iat_attempt_modules iam
+             WHERE iam.assessment_attempt_id = aa.id
+           )
+         )
+       ORDER BY aa.id DESC
+       LIMIT 1`,
+      [sessionId],
+    );
+
+    if (!attemptRows?.length) {
+      return {
+        attempt: null,
+        total: 0,
+        completed: 0,
+        modules: [],
+        job: null,
+        report: null,
+      };
+    }
+
+    const attemptId = Number(attemptRows[0].id);
+    const modules = await this.dataSource.query(
+      `SELECT iam.id,
+              iam.module_order AS "order",
+              iam.status,
+              iam.compatible_average_ms AS "compatibleAverageMs",
+              iam.incompatible_average_ms AS "incompatibleAverageMs",
+              iam.speed_gap_ms AS "speedGapMs",
+              iam.pattern_label AS "pattern",
+              iam.slowest_words AS "slowestWords",
+              iam.error_words AS "errorWords",
+              iam.error_rate AS "errorRate",
+              im.code,
+              im.name,
+              im.display_name AS "displayName"
+       FROM iat_attempt_modules iam
+       JOIN iat_modules im ON im.id = iam.module_id
+       WHERE iam.assessment_attempt_id = $1
+       ORDER BY iam.module_order ASC`,
+      [attemptId],
+    );
+
+    const jobRows = await this.dataSource.query(
+      `SELECT id,
+              status,
+              retry_count AS "retryCount",
+              max_retries AS "maxRetries",
+              next_retry_at AS "nextRetryAt",
+              last_error AS "lastError",
+              started_at AS "startedAt",
+              completed_at AS "completedAt",
+              updated_at AS "updatedAt"
+       FROM iat_report_jobs
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const reportRows = await this.dataSource.query(
+      `SELECT id,
+              status,
+              model,
+              report_text AS "reportText",
+              bias_map AS "biasMap",
+              error,
+              generated_at AS "generatedAt",
+              updated_at AS "updatedAt"
+       FROM iat_reports
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const total = modules.length || 6;
+    const completed = modules.filter((m: any) => m.status === 'COMPLETED').length;
+    return {
+      attempt: {
+        id: attemptId,
+        status: attemptRows[0].status,
+        startedAt: attemptRows[0].started_at,
+        completedAt: attemptRows[0].completed_at,
+      },
+      total,
+      completed,
+      modules,
+      job: jobRows[0] || null,
+      report: reportRows[0] || null,
+    };
+  }
+
+  async retryIatReport(attemptId: number) {
+    const existingReport = await this.dataSource.query(
+      `SELECT id FROM iat_reports WHERE assessment_attempt_id = $1 AND status = 'DONE' LIMIT 1`,
+      [attemptId],
+    );
+    if (existingReport?.length) {
+      return { success: false, reason: 'report_exists' };
+    }
+
+    await this.dataSource.query(
+      `INSERT INTO iat_report_jobs
+         (assessment_attempt_id, status, retry_count, max_retries, next_retry_at, last_error, created_at, updated_at)
+       VALUES ($1, 'PENDING', 0, 5, NULL, NULL, NOW(), NOW())
+       ON CONFLICT (assessment_attempt_id)
+       DO UPDATE SET status = 'PENDING',
+                     retry_count = 0,
+                     next_retry_at = NULL,
+                     last_error = NULL,
+                     started_at = NULL,
+                     completed_at = NULL,
+                     updated_at = NOW()`,
+      [attemptId],
+    );
+
+    return { success: true, queued: true };
+  }
+
   async generateMetaphorReportPdf(attemptId: number): Promise<Buffer> {
     const reportRows = await this.dataSource.query(
       `SELECT markdown, model, generated_at AS "generatedAt"

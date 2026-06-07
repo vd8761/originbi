@@ -43,6 +43,7 @@ import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service
 import { SmsService, SmsTemplate } from '../sms/sms.service';
 import { SubscriptionService } from './subscription.service';
 import { MetaphorGenerationService } from '../metaphor/metaphor-generation.service';
+import { IatEligibilityService } from '../iat/iat-eligibility.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -50,6 +51,7 @@ export interface AssessmentProgressItem {
   description: string;
   status: string;
   levelNumber?: number;
+  assessmentKind?: 'ACI' | 'IAT_GEN' | 'METAPHOR' | 'DISC' | string;
   completedQuestions: number;
   totalQuestions: number;
   unlockTime: Date | null;
@@ -97,6 +99,7 @@ export class StudentService {
     private readonly smsService: SmsService,
     private readonly subscriptionService: SubscriptionService,
     private readonly metaphorGeneration: MetaphorGenerationService,
+    private readonly iatEligibility: IatEligibilityService,
   ) {}
 
   /**
@@ -603,14 +606,43 @@ export class StudentService {
     let previousAttempt: AssessmentAttempt | null = null;
 
     for (const attempt of attempts) {
-      const answeredCount = await this.answerRepo.count({
+      const level = attempt.assessmentLevel;
+      let assessmentKind: string =
+        String(attempt.metadata?.assessment_kind || '').toUpperCase() || '';
+      if (!assessmentKind) {
+        if (level?.levelNumber === 1 || level?.patternType === 'DISC') {
+          assessmentKind = 'DISC';
+        } else if (
+          level?.levelNumber === 3 ||
+          level?.name?.toLowerCase().includes('metaphor') ||
+          String(level?.patternType || '').toUpperCase() === 'METAPHOR'
+        ) {
+          assessmentKind = 'METAPHOR';
+        } else if (level?.levelNumber === 2 || String(level?.patternType || '').toUpperCase() === 'ACI') {
+          assessmentKind = await this.iatEligibility.getAssessmentKindForRegistration(
+            attempt.registrationId,
+          );
+        }
+      }
+
+      let answeredCount = await this.answerRepo.count({
         where: { assessmentAttemptId: attempt.id, status: 'ANSWERED' },
       });
-      const totalCount = await this.answerRepo.count({
+      let totalCount = await this.answerRepo.count({
         where: { assessmentAttemptId: attempt.id },
       });
 
-      const level = attempt.assessmentLevel;
+      if (assessmentKind === 'IAT_GEN') {
+        const rows = await this.sessionRepo.query(
+          `SELECT COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE status = 'COMPLETED')::int AS completed
+           FROM iat_attempt_modules
+           WHERE assessment_attempt_id = $1`,
+          [attempt.id],
+        );
+        totalCount = Number(rows?.[0]?.total || 6);
+        answeredCount = Number(rows?.[0]?.completed || 0);
+      }
       let status = attempt.status;
       let unlockTime: Date | null = null;
 
@@ -644,14 +676,20 @@ export class StudentService {
 
       progressData.push({
         id: attempt.id,
-        stepName: level?.name || `Level ${level?.levelNumber}`,
+        stepName:
+          assessmentKind === 'IAT_GEN'
+            ? 'Level 2 - IAT Gen'
+            : level?.name || `Level ${level?.levelNumber}`,
         description: level?.description || '',
         status: status,
         levelNumber: level?.levelNumber,
+        assessmentKind,
         completedQuestions: answeredCount,
         totalQuestions:
           totalCount > 0
             ? totalCount
+            : assessmentKind === 'IAT_GEN'
+              ? 6
             : level?.levelNumber === 2 ||
                 level?.name.includes('ACI') ||
                 level?.patternType === 'ACI'

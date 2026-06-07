@@ -87,6 +87,16 @@ export { MetaphorReport } from './metaphor-report.entity';
 export { MetaphorReportJob } from './metaphor-report-job.entity';
 export { AiUsageLog } from './ai-usage-log.entity';
 
+// Level 2 — IAT Gen
+export { IatModule } from './iat-module.entity';
+export { IatStimulus } from './iat-stimulus.entity';
+export { IatIntakeProfile } from './iat-intake-profile.entity';
+export { IatAttemptModule } from './iat-attempt-module.entity';
+export { IatTrial } from './iat-trial.entity';
+export { IatKeypress } from './iat-keypress.entity';
+export { IatReport } from './iat-report.entity';
+export { IatReportJob } from './iat-report-job.entity';
+
 // ============================================
 // Usage in services:
 //

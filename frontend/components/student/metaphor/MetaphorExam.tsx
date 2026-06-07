@@ -334,8 +334,14 @@ export default function MetaphorExam({
                                 <span key={i} style={{ height: `${Math.max(10, amp * 100)}%`, opacity: 0.34 + amp * 0.58 }} />
                             ))}
                         </div>
-                        <button className="mic-fab" onClick={toggleSpeak} disabled={blocked} title={listening ? "Stop speaking" : "Start speaking"} aria-label={listening ? "Stop speaking" : "Start speaking"}>
-                            {listening ? <StopIcon /> : <MicIcon />}
+                        <button
+                            className="mic-fab"
+                            onClick={() => { if (!listening) void speech.start(); }}
+                            disabled={blocked}
+                            title={listening ? "Listening…" : "Start speaking"}
+                            aria-label={listening ? "Listening" : "Start speaking"}
+                        >
+                            <MicIcon />
                         </button>
                         <div className="mic-float__spectrogram mic-float__spectrogram--right" aria-hidden="true">
                             {spectrumBars.slice(spectrumSplit).map((amp, i) => (
@@ -347,6 +353,17 @@ export default function MetaphorExam({
                         <span className={listening ? "is-live" : ""}>{listening ? "Listening..." : "Tap mic to speak"}</span>
                         <b>{fmtTime(recordingSeconds)}</b>
                     </div>
+
+                    {listening && (
+                        <button
+                            className="stop-transcription-btn"
+                            onClick={() => speech.stop()}
+                            title="Stop transcription"
+                            aria-label="Stop transcription"
+                        >
+                            <StopIcon /><span>Stop Transcription</span>
+                        </button>
+                    )}
 
                     <div className={`transcript transcript--floating ${listening ? "is-live" : ""} ${hasTranscript ? "has-text" : ""}`}>
                         <div className="transcript__head">

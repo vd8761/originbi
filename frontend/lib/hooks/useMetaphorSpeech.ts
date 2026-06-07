@@ -115,6 +115,12 @@ export function useMetaphorSpeech(opts: UseMetaphorSpeechOptions): UseMetaphorSp
         const timeData = new Uint8Array(analyser.fftSize);
         const barCount = 32;
         const wavePointCount = EMPTY_WAVEFORM.length;
+        // The analyser eases the data every animation frame (~60fps) into refs,
+        // but pushing that into React state 60x/sec re-renders the whole exam
+        // and makes the wave stutter. Publish to React at ~15fps instead and let
+        // the CSS transition on the bars interpolate smoothly between updates.
+        let frame = 0;
+        const PUBLISH_EVERY = 4;
         const draw = () => {
             analyser.getByteFrequencyData(freqData);
             analyser.getByteTimeDomainData(timeData);
@@ -161,9 +167,12 @@ export function useMetaphorSpeech(opts: UseMetaphorSpeechOptions): UseMetaphorSp
             smoothSpectrumRef.current = smoothedSpectrum;
             smoothWaveformRef.current = smoothedWave;
             smoothLevelRef.current = smoothedLevel;
-            setAudioLevel(smoothedLevel);
-            setSpectrum(smoothedSpectrum);
-            setWaveform(smoothedWave);
+            if (frame % PUBLISH_EVERY === 0) {
+                setAudioLevel(smoothedLevel);
+                setSpectrum(smoothedSpectrum);
+                setWaveform(smoothedWave);
+            }
+            frame += 1;
             analyserRafRef.current = requestAnimationFrame(draw);
         };
         draw();

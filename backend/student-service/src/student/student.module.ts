@@ -29,6 +29,7 @@ import {
 } from '@originbi/shared-entities';
 import { SettingsModule } from '../settings/settings.module';
 import { MetaphorModule } from '../metaphor/metaphor.module';
+import { IatModule } from '../iat/iat.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { MetaphorModule } from '../metaphor/metaphor.module';
     HttpModule,
     SettingsModule,
     MetaphorModule,
+    IatModule,
   ],
   controllers: [StudentController, SubscriptionController],
   providers: [StudentService, SubscriptionService, StudentProcessor],

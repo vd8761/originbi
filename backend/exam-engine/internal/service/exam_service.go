@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -20,6 +21,24 @@ type ExamService struct{}
 
 func NewExamService() *ExamService {
 	return &ExamService{}
+}
+
+type iatReplacementRules struct {
+	Rules []iatReplacementRule `json:"rules"`
+}
+
+type iatReplacementRule struct {
+	ProgramIDs          []interface{} `json:"programIds"`
+	DepartmentDegreeIDs []interface{} `json:"departmentDegreeIds"`
+	DepartmentIDs       []interface{} `json:"departmentIds"`
+	StudentBoards       []string      `json:"studentBoards"`
+}
+
+type iatRegistrationScope struct {
+	ProgramID          int64
+	DepartmentDegreeID *int64
+	DepartmentID       *int64
+	StudentBoard       string
 }
 
 func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]models.AssessmentAnswer, error) {
@@ -93,6 +112,12 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 	if len(answers) == 0 && attempt.AssessmentLevelID != nil {
 		var level models.AssessmentLevel
 		if err := db.First(&level, *attempt.AssessmentLevelID).Error; err == nil && (level.LevelNumber == 2 || level.Name == "Level 2") {
+			if s.isIATGenLevel2Attempt(db, attempt) {
+				fmt.Printf("[GetExamQuestions - IAT] Attempt %d is configured for IAT Gen; skipping ACI self-healing generation.\n", attempt.ID)
+				s.markAttemptAsIATGen(db, attempt.ID)
+				return answers, nil
+			}
+
 			fmt.Printf("[GetExamQuestions - Fallback] No questions found for Attempt %d (Level 2). Attempting self-healing generation...\n", attempt.ID)
 
 			// Extract necessary metadata from session
@@ -660,6 +685,12 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 
 					// Generate Questions for Next Level (Trait Based for Level 2)
 					if nextLevel.LevelNumber == 2 && traitID != nil {
+						if s.isIATGenLevel2Attempt(tx, nextAttempt) {
+							fmt.Printf("[SubmitAnswer] Level 2 Attempt %d configured for IAT Gen. Skipping ACI generation.\n", nextAttempt.ID)
+							s.markAttemptAsIATGen(tx, nextAttempt.ID)
+							return nil
+						}
+
 						// 1. Fetch Session/Registration Metadata for board info
 						var session models.AssessmentSession
 						var studentBoard string = ""
@@ -981,6 +1012,118 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 	}
 
 	return nil
+}
+
+func (s *ExamService) isIATGenLevel2Attempt(db *gorm.DB, attempt models.AssessmentAttempt) bool {
+	var enabled bool
+	if err := db.Raw(
+		`SELECT COALESCE(value_boolean, false)
+		 FROM originbi_settings
+		 WHERE category = 'iat' AND setting_key = 'enabled'
+		 LIMIT 1`,
+	).Scan(&enabled).Error; err != nil || !enabled {
+		return false
+	}
+
+	var rulesBytes []byte
+	if err := db.Raw(
+		`SELECT COALESCE(value_json, '{"rules":[]}'::jsonb)
+		 FROM originbi_settings
+		 WHERE category = 'iat' AND setting_key = 'level2_replacement_rules'
+		 LIMIT 1`,
+	).Scan(&rulesBytes).Error; err != nil || len(rulesBytes) == 0 {
+		return false
+	}
+
+	var rules iatReplacementRules
+	if err := json.Unmarshal(rulesBytes, &rules); err != nil || len(rules.Rules) == 0 {
+		return false
+	}
+
+	var scope iatRegistrationScope
+	if err := db.Raw(
+		`SELECT r.program_id,
+		        r.department_degree_id,
+		        dd.department_id,
+		        COALESCE(r.student_board, '') AS student_board
+		 FROM registrations r
+		 LEFT JOIN department_degrees dd ON dd.id = r.department_degree_id
+		 WHERE r.id = ?
+		 LIMIT 1`,
+		attempt.RegistrationID,
+	).Scan(&scope).Error; err != nil {
+		return false
+	}
+
+	for _, rule := range rules.Rules {
+		if !iatIDListMatches(rule.ProgramIDs, scope.ProgramID) {
+			continue
+		}
+		hasSpecificScope := len(rule.DepartmentDegreeIDs) > 0 || len(rule.DepartmentIDs) > 0 || len(rule.StudentBoards) > 0
+		if !hasSpecificScope {
+			return true
+		}
+		if scope.DepartmentDegreeID != nil && iatIDListMatches(rule.DepartmentDegreeIDs, *scope.DepartmentDegreeID) {
+			return true
+		}
+		if scope.DepartmentID != nil && iatIDListMatches(rule.DepartmentIDs, *scope.DepartmentID) {
+			return true
+		}
+		for _, board := range rule.StudentBoards {
+			if stringsEqualFoldTrim(board, scope.StudentBoard) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func (s *ExamService) markAttemptAsIATGen(db *gorm.DB, attemptID int64) {
+	var attempt models.AssessmentAttempt
+	if err := db.First(&attempt, attemptID).Error; err != nil {
+		return
+	}
+	meta := map[string]interface{}{}
+	if attempt.Metadata != "" && attempt.Metadata != "{}" {
+		_ = json.Unmarshal([]byte(attempt.Metadata), &meta)
+	}
+	meta["assessment_kind"] = "IAT_GEN"
+	bytes, _ := json.Marshal(meta)
+	db.Model(&models.AssessmentAttempt{}).Where("id = ?", attemptID).Update("metadata", string(bytes))
+	db.Exec("DELETE FROM assessment_answers WHERE assessment_attempt_id = ?", attemptID)
+}
+
+func iatIDListMatches(values []interface{}, actual int64) bool {
+	if len(values) == 0 {
+		return true
+	}
+	actualString := fmt.Sprintf("%d", actual)
+	for _, value := range values {
+		switch v := value.(type) {
+		case float64:
+			if int64(v) == actual {
+				return true
+			}
+		case int:
+			if int64(v) == actual {
+				return true
+			}
+		case int64:
+			if v == actual {
+				return true
+			}
+		case string:
+			if v == actualString {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stringsEqualFoldTrim(a string, b string) bool {
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 func (s *ExamService) IsLastLevel(attemptID int64) (bool, error) {

@@ -9,6 +9,7 @@ import { ReportModule } from './report/report.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { SmsModule } from './sms/sms.module';
 import { MetaphorModule } from './metaphor/metaphor.module';
+import { IatModule } from './iat/iat.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { MetaphorModule } from './metaphor/metaphor.module';
     WhatsappModule,
     SmsModule,
     MetaphorModule,
+    IatModule,
   ],
 })
 export class AppModule {}

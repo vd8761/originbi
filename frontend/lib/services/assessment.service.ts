@@ -91,6 +91,48 @@ export interface MetaphorReportStatus {
     } | null;
 }
 
+export interface IatReportStatus {
+    attempt: { id: number; status: string; startedAt?: string; completedAt?: string } | null;
+    total: number;
+    completed: number;
+    modules: Array<{
+        id: number;
+        order: number;
+        status: string;
+        compatibleAverageMs: string | null;
+        incompatibleAverageMs: string | null;
+        speedGapMs: string | null;
+        pattern: string | null;
+        slowestWords: string[];
+        errorWords: string[];
+        errorRate: string | null;
+        code: string;
+        name: string;
+        displayName: string;
+    }>;
+    job: {
+        id: number;
+        status: string;
+        retryCount: number;
+        maxRetries: number;
+        nextRetryAt: string | null;
+        lastError: string | null;
+        startedAt: string | null;
+        completedAt: string | null;
+        updatedAt: string | null;
+    } | null;
+    report: {
+        id: number;
+        status: string;
+        model: string | null;
+        reportText: string | null;
+        biasMap: any[];
+        error: string | null;
+        generatedAt: string | null;
+        updatedAt: string | null;
+    } | null;
+}
+
 export const assessmentService = {
     async getSessions(
         page: number,
@@ -265,6 +307,32 @@ export const assessmentService = {
             },
         });
         if (!res.ok) throw new Error("Failed to retry metaphor report");
+        return res.json();
+    },
+
+    async getIatReport(sessionId: string | number): Promise<IatReportStatus> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/sessions/${sessionId}/iat-report`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to fetch IAT report");
+        return res.json();
+    },
+
+    async retryIatReport(attemptId: string | number): Promise<{ success: boolean; queued?: boolean; reason?: string }> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/iat/${attemptId}/report/retry`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok) throw new Error("Failed to retry IAT report");
         return res.json();
     },
 

@@ -1,6 +1,6 @@
 
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { AssessmentSession, MetaphorReportStatus } from '../../lib/services/assessment.service';
+import { AssessmentSession, IatReportStatus, MetaphorReportStatus } from '../../lib/services/assessment.service';
 import { assessmentService } from '../../lib/services/assessment.service';
 import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import {
@@ -19,6 +19,7 @@ import {
 } from '../icons';
 import SurveyAnswersView, { SurveyAnswersData } from './SurveyAnswersView';
 import MetaphorReportPanel from './MetaphorReportPanel';
+import IatReportPanel from './IatReportPanel';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession;
@@ -50,6 +51,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const [metaphorData, setMetaphorData] = useState<MetaphorReportStatus | null>(null);
     const [metaphorLoading, setMetaphorLoading] = useState(false);
     const [metaphorRetrying, setMetaphorRetrying] = useState(false);
+    const [iatData, setIatData] = useState<IatReportStatus | null>(null);
+    const [iatLoading, setIatLoading] = useState(false);
+    const [iatRetrying, setIatRetrying] = useState(false);
 
     // Download State
     const [downloading, setDownloading] = useState(false);
@@ -76,6 +80,20 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             setMetaphorData(null);
         } finally {
             if (showLoading) setMetaphorLoading(false);
+        }
+    }, [initialSession?.id]);
+
+    const fetchIatReport = useCallback(async (showLoading = false) => {
+        if (!initialSession?.id) return;
+        try {
+            if (showLoading) setIatLoading(true);
+            const data = await assessmentService.getIatReport(initialSession.id);
+            setIatData(data);
+        } catch (error) {
+            console.error("Failed to fetch IAT Gen report", error);
+            setIatData(null);
+        } finally {
+            if (showLoading) setIatLoading(false);
         }
     }, [initialSession?.id]);
 
@@ -120,7 +138,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         };
         fetchSurvey();
         fetchMetaphorReport(true);
-    }, [initialSession, fetchMetaphorReport]);
+        fetchIatReport(true);
+    }, [initialSession, fetchMetaphorReport, fetchIatReport]);
 
     useEffect(() => {
         const jobStatus = metaphorData?.job?.status;
@@ -134,6 +153,19 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         }, 8000);
         return () => window.clearInterval(timer);
     }, [fetchMetaphorReport, metaphorData?.attempt, metaphorData?.job?.status, metaphorData?.readyForReport, metaphorData?.report]);
+
+    useEffect(() => {
+        const jobStatus = iatData?.job?.status;
+        const shouldPoll =
+            !!iatData?.attempt &&
+            !iatData?.report &&
+            (jobStatus === 'PENDING' || jobStatus === 'PROCESSING');
+        if (!shouldPoll) return;
+        const timer = window.setInterval(() => {
+            void fetchIatReport(false);
+        }, 8000);
+        return () => window.clearInterval(timer);
+    }, [fetchIatReport, iatData?.attempt, iatData?.job?.status, iatData?.report]);
 
     const hasSurvey = (surveyData?.total ?? 0) > 0;
 
@@ -703,6 +735,20 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         }
     };
 
+    const handleRetryIatReport = async () => {
+        if (!iatData?.attempt?.id) return;
+        try {
+            setIatRetrying(true);
+            await assessmentService.retryIatReport(iatData.attempt.id);
+            await fetchIatReport(false);
+        } catch (error) {
+            console.error("Failed to retry IAT Gen report", error);
+            alert("Failed to retry IAT Gen report generation.");
+        } finally {
+            setIatRetrying(false);
+        }
+    };
+
     const renderMetaphorReport = (levelAttempt?: any, levelData?: any) => {
         return (
             <MetaphorReportPanel
@@ -713,6 +759,19 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                 formatDate={formatDate}
                 stats={renderStatsBar(levelAttempt, levelData)}
                 displayData={displayData}
+            />
+        );
+    };
+
+    const renderIatReport = (levelAttempt?: any, levelData?: any) => {
+        return (
+            <IatReportPanel
+                data={iatData}
+                loading={iatLoading}
+                retrying={iatRetrying}
+                onRetry={handleRetryIatReport}
+                formatDate={formatDate}
+                stats={renderStatsBar(levelAttempt, levelData)}
             />
         );
     };
@@ -745,6 +804,21 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     };
 
 
+    // Level 2 ("ACI") may instead be the IATGen variant for a given candidate.
+    const getLevelTabLabel = (lvl: any): string => {
+        const lvlNumber = Number(lvl?.levelNumber || lvl?.level_number || 0);
+        if (lvlNumber !== 2) return lvl?.name;
+        const lvlAttempt = session?.attempts?.find((a: any) =>
+            String(a.assessmentLevelId) === String(lvl?.id) ||
+            (a.assessmentLevel && String(a.assessmentLevel.id) === String(lvl?.id))
+        );
+        const kind = String(
+            lvlAttempt?.metadata?.assessment_kind || lvlAttempt?.metadata?.assessmentKind || ''
+        ).toUpperCase();
+        const isIatLevel2 = kind === 'IAT_GEN' || Boolean(iatData?.attempt);
+        return isIatLevel2 ? 'IATGen' : lvl?.name;
+    };
+
     const renderOverallReport = () => {
         // Identify levels and attempts for the overall report view
         const discLevel = levels.find(l => l.pattern_type === 'DISC' || l.patternType === 'DISC' || l.name.toLowerCase().includes('disc') || l.name === 'Behavioral Insight');
@@ -762,6 +836,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
         const discAttempt = getAttemptForLevel(discLevel);
         const aciAttempt = getAttemptForLevel(aciLevel);
+        const aciKind = String(aciAttempt?.metadata?.assessment_kind || aciAttempt?.metadata?.assessmentKind || '').toUpperCase();
+        const hasIatLevel2 = aciKind === 'IAT_GEN' || Boolean(iatData?.attempt);
 
         return (
             <div className="flex flex-col">
@@ -793,7 +869,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             return (
                                 <>
                                     {renderLevelReport('DISC', discData.breakdown, discData.compatibility, discAttempt, discLevel, true)}
-                                    {renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
+                                    {hasIatLevel2
+                                        ? renderIatReport(aciAttempt, aciLevel)
+                                        : renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
                                 </>
                             );
                         })()}
@@ -843,6 +921,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                         const tabIndex = idx + 1;
                         const accessible = isTabAccessible(tabIndex);
                         const isActive = activeTab === tabIndex;
+                        const tabLabel = getLevelTabLabel(lvl);
                         return (
                             <div
                                 key={lvl.id}
@@ -854,7 +933,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                         : 'text-gray-400 dark:text-white/50 cursor-not-allowed'
                                     }`}
                             >
-                                {lvl.name}
+                                {tabLabel}
                                 {isActive ? (
                                     <span className='bg-brand-green rounded-full p-[1px]'><CheckIcon className="w-2 h-2 text-black" /></span>
                                 ) : (
@@ -933,11 +1012,15 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     const levelName = String(level?.name || attempt?.assessmentLevel?.name || '').toLowerCase();
                     const patternType = String(level?.pattern_type || level?.patternType || attempt?.assessmentLevel?.patternType || '').toLowerCase();
                     const levelNumber = Number(level?.levelNumber || level?.level_number || attempt?.assessmentLevel?.levelNumber || 0);
+                    const assessmentKind = String(attempt?.metadata?.assessment_kind || attempt?.metadata?.assessmentKind || '').toUpperCase();
+                    const isIat = levelNumber === 2 && (assessmentKind === 'IAT_GEN' || Boolean(iatData?.attempt));
                     const isMetaphor = patternType === 'metaphor' || levelName.includes('metaphor') || levelNumber === 3;
                     const isDisc = patternType === 'disc' || levelName.includes('disc') || levelName === 'behavioral insight';
                     const isAci = patternType === 'aci' || levelName.includes('aci') || levelName.includes('agile');
 
-                    if (isMetaphor) {
+                    if (isIat) {
+                        return renderIatReport(attempt, level);
+                    } else if (isMetaphor) {
                         return renderMetaphorReport(attempt, level);
                     } else if (isDisc) {
                         const { breakdown, compatibility } = getDiscData(attempt);
