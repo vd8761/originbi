@@ -29,7 +29,11 @@ export async function fetchGroupAssessmentData(
     // report stays scoped to one (group, program) cohort.
     const params: (string | number)[] = [groupId];
     let programFilter = '';
-    if (programId !== undefined && programId !== null && `${programId}` !== '') {
+    if (
+      programId !== undefined &&
+      programId !== null &&
+      `${programId}` !== ''
+    ) {
       params.push(programId);
       programFilter = ` AND s.program_id = $${params.length}`;
     }

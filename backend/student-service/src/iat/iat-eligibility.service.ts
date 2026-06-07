@@ -12,6 +12,14 @@ interface IatRule {
   studentBoards?: string[];
 }
 
+interface RegistrationEligibilityRow {
+  id: number;
+  programId: number | string | null;
+  departmentDegreeId: number | string | null;
+  departmentId: number | string | null;
+  studentBoard: string | null;
+}
+
 @Injectable()
 export class IatEligibilityService {
   private readonly logger = new Logger(IatEligibilityService.name);
@@ -21,7 +29,9 @@ export class IatEligibilityService {
     private readonly settingRepo: Repository<OriginbiSetting>,
   ) {}
 
-  async getAssessmentKindForRegistration(registrationId: number): Promise<'ACI' | 'IAT_GEN'> {
+  async getAssessmentKindForRegistration(
+    registrationId: number,
+  ): Promise<'ACI' | 'IAT_GEN'> {
     const enabled = Boolean(await this.readSetting('enabled', false));
     if (!enabled) return 'ACI';
 
@@ -32,7 +42,7 @@ export class IatEligibilityService {
     const rules = Array.isArray(rulesConfig?.rules) ? rulesConfig.rules : [];
     if (rules.length === 0) return 'ACI';
 
-    const rows = await this.settingRepo.manager.query(
+    const rows = (await this.settingRepo.manager.query(
       `SELECT r.id,
               r.program_id AS "programId",
               r.department_degree_id AS "departmentDegreeId",
@@ -43,7 +53,7 @@ export class IatEligibilityService {
        WHERE r.id = $1
        LIMIT 1`,
       [registrationId],
-    );
+    )) as unknown as RegistrationEligibilityRow[];
     const row = rows?.[0];
     if (!row) return 'ACI';
 
@@ -51,24 +61,33 @@ export class IatEligibilityService {
     return match ? IAT_ASSESSMENT_KIND : 'ACI';
   }
 
-  async isIatRegistration(registrationOrId: Registration | number | string): Promise<boolean> {
+  async isIatRegistration(
+    registrationOrId: Registration | number | string,
+  ): Promise<boolean> {
     const raw =
-      typeof registrationOrId === 'number' || typeof registrationOrId === 'string'
+      typeof registrationOrId === 'number' ||
+      typeof registrationOrId === 'string'
         ? registrationOrId
-        : (registrationOrId as Registration)?.id;
+        : registrationOrId?.id;
     const id = Number(raw);
     if (!Number.isFinite(id) || id <= 0) return false;
-    return (await this.getAssessmentKindForRegistration(id)) === IAT_ASSESSMENT_KIND;
+    return (
+      (await this.getAssessmentKindForRegistration(id)) === IAT_ASSESSMENT_KIND
+    );
   }
 
-  private matchesRule(rule: IatRule, row: any): boolean {
+  private matchesRule(rule: IatRule, row: RegistrationEligibilityRow): boolean {
     const programMatch = this.idListMatches(rule.programIds, row.programId);
     if (!programMatch) return false;
 
     const degreeIds = this.normalizeIds(rule.departmentDegreeIds);
     const departmentIds = this.normalizeIds(rule.departmentIds);
     const boards = (rule.studentBoards || [])
-      .map((board) => String(board || '').trim().toLowerCase())
+      .map((board) =>
+        String(board || '')
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean);
 
     const hasSpecificScope =
@@ -76,17 +95,26 @@ export class IatEligibilityService {
     if (!hasSpecificScope) return true;
 
     const degreeMatch =
-      degreeIds.length > 0 && degreeIds.includes(String(row.departmentDegreeId || ''));
+      degreeIds.length > 0 &&
+      degreeIds.includes(String(row.departmentDegreeId || ''));
     const departmentMatch =
-      departmentIds.length > 0 && departmentIds.includes(String(row.departmentId || ''));
+      departmentIds.length > 0 &&
+      departmentIds.includes(String(row.departmentId || ''));
     const boardMatch =
       boards.length > 0 &&
-      boards.includes(String(row.studentBoard || '').trim().toLowerCase());
+      boards.includes(
+        String(row.studentBoard || '')
+          .trim()
+          .toLowerCase(),
+      );
 
     return degreeMatch || departmentMatch || boardMatch;
   }
 
-  private idListMatches(values: Array<number | string> | undefined, actual: any): boolean {
+  private idListMatches(
+    values: Array<number | string> | undefined,
+    actual: number | string | null | undefined,
+  ): boolean {
     const ids = this.normalizeIds(values);
     return ids.length === 0 || ids.includes(String(actual || ''));
   }
@@ -102,7 +130,7 @@ export class IatEligibilityService {
       const row = await this.settingRepo.findOne({
         where: { category: 'iat', settingKey: key },
       });
-      const value = row?.value;
+      const value = row?.value as unknown;
       return value === undefined || value === null ? fallback : (value as T);
     } catch (err) {
       this.logger.warn(

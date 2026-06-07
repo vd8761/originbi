@@ -13,7 +13,9 @@ import { METAPHOR_TRANSCRIBE_QUEUE } from './metaphor.constants';
 import { MetaphorTranscriptionService } from './metaphor-transcription.service';
 
 @Injectable()
-export class MetaphorTranscriptionProcessor implements OnModuleInit, OnModuleDestroy {
+export class MetaphorTranscriptionProcessor
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(MetaphorTranscriptionProcessor.name);
   private sweepTimer: ReturnType<typeof setInterval> | null = null;
   private readonly SWEEP_INTERVAL_MS = 5 * 60 * 1000;
@@ -32,7 +34,10 @@ export class MetaphorTranscriptionProcessor implements OnModuleInit, OnModuleDes
       { batchSize: 1 },
     );
     this.logger.log(`${METAPHOR_TRANSCRIBE_QUEUE} worker registered`);
-    this.sweepTimer = setInterval(() => void this.sweep(), this.SWEEP_INTERVAL_MS);
+    this.sweepTimer = setInterval(
+      () => void this.sweep(),
+      this.SWEEP_INTERVAL_MS,
+    );
     setTimeout(() => void this.sweep(), 30000);
   }
 
@@ -44,7 +49,9 @@ export class MetaphorTranscriptionProcessor implements OnModuleInit, OnModuleDes
     await this.pgBoss.boss.send(METAPHOR_TRANSCRIBE_QUEUE, { attemptId });
   }
 
-  private async handle(jobs: PgBoss.Job<{ attemptId: number }>[]): Promise<void> {
+  private async handle(
+    jobs: PgBoss.Job<{ attemptId: number }>[],
+  ): Promise<void> {
     for (const job of jobs) {
       const attemptId = Number(job.data?.attemptId);
       this.logger.log(`Transcribing attempt ${attemptId} (job ${job.id})`);
@@ -65,7 +72,9 @@ export class MetaphorTranscriptionProcessor implements OnModuleInit, OnModuleDes
         take: 50,
       });
       if (stuck.length === 0) return;
-      this.logger.log(`Sweep: re-enqueuing ${stuck.length} pending transcription job(s)`);
+      this.logger.log(
+        `Sweep: re-enqueuing ${stuck.length} pending transcription job(s)`,
+      );
       for (const j of stuck) {
         await this.enqueue(Number(j.assessmentAttemptId));
       }

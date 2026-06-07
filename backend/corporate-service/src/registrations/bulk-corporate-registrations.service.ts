@@ -614,14 +614,15 @@ export class BulkCorporateRegistrationsService {
         // A. Create/Find Group
         let group: Groups | null = null;
         if (batch.groupName) {
-          group = allGroups.find(
-            (g) =>
-              this.normalizeString(g.name) ===
-                this.normalizeString(batch.groupName) ||
-              (g.code &&
-                this.normalizeString(g.code) ===
-                  this.normalizeString(batch.groupName)),
-          ) || null;
+          group =
+            allGroups.find(
+              (g) =>
+                this.normalizeString(g.name) ===
+                  this.normalizeString(batch.groupName) ||
+                (g.code &&
+                  this.normalizeString(g.code) ===
+                    this.normalizeString(batch.groupName)),
+            ) || null;
           try {
             // If group doesn't exist in map but was passed, Create it ONLY if we are sure?
             // Actually corporateRegistrationsService.registerCandidate handles group creation per row.
@@ -1397,7 +1398,15 @@ export class BulkCorporateRegistrationsService {
           row['school_stream'] ||
           ''
         ).toLowerCase();
-        const validStreams = ['science', 'pcmb', 'pcb', 'pcm', 'pcbz', 'commerce', 'humanities'];
+        const validStreams = [
+          'science',
+          'pcmb',
+          'pcb',
+          'pcm',
+          'pcbz',
+          'commerce',
+          'humanities',
+        ];
         if (!stream) return 'Stream is required for HSC students';
         if (!validStreams.includes(stream))
           return 'Stream must be PCMB, PCB, PCM, PCBZ, Science, Commerce, or Humanities for HSC';

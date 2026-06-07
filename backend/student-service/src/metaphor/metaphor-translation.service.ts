@@ -13,6 +13,21 @@ import { MetaphorReportService } from './metaphor-report.service';
 
 const DEFAULT_MODEL = 'gemini-2.0-flash';
 
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+}
+
 /**
  * Translates a Level-3 attempt's answers to English in one batched Gemini call,
  * stores the English text, and logs token usage. Idempotent per attempt: only
@@ -39,7 +54,10 @@ export class MetaphorTranslationService {
    * queue retries; the job row reflects PROCESSING/DONE/FAILED. */
   async translateAttempt(attemptId: number): Promise<void> {
     const job = await this.ensureJob(attemptId);
-    await this.jobRepo.update(job.id, { status: 'PROCESSING', lastError: null });
+    await this.jobRepo.update(job.id, {
+      status: 'PROCESSING',
+      lastError: null,
+    });
 
     const pending = await this.answerRepo.find({
       where: { assessmentAttemptId: attemptId, translationStatus: 'PENDING' },
@@ -66,8 +84,9 @@ export class MetaphorTranslationService {
     }
 
     const model =
-      String((await this.readSetting('gemini_model', DEFAULT_MODEL)) || '').trim() ||
-      DEFAULT_MODEL;
+      String(
+        (await this.readSetting('gemini_model', DEFAULT_MODEL)) || '',
+      ).trim() || DEFAULT_MODEL;
 
     const items = pending.map((a) => ({
       id: a.id,
@@ -101,19 +120,31 @@ export class MetaphorTranslationService {
           { timeout: 120000 },
         ),
       );
-      const data: any = res.data;
+      const data = res.data as GeminiResponse;
       respText = String(
         data?.candidates?.[0]?.content?.parts?.[0]?.text || '',
       ).trim();
-      const usageMetadata = data?.usageMetadata || {};
+      const usageMetadata = data.usageMetadata || {};
       usage = {
         inputTokens: Number(usageMetadata.promptTokenCount || 0),
         outputTokens: Number(usageMetadata.candidatesTokenCount || 0),
         totalTokens: Number(usageMetadata.totalTokenCount || 0),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as {
+        response?: {
+          data?: { error?: { message?: string } };
+        };
+        message?: string;
+      };
+      const fallback =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : 'Unknown error';
       const msg = `Gemini translation API call failed: ${
-        err?.response?.data?.error?.message || err?.message || err
+        apiErr?.response?.data?.error?.message || apiErr?.message || fallback
       }`;
       await this.jobRepo.update(job.id, { status: 'FAILED', lastError: msg });
       throw new Error(msg);
@@ -133,8 +164,11 @@ export class MetaphorTranslationService {
 
     let parsed: { id: number; en: string }[];
     try {
-      const clean = respText.replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-      parsed = JSON.parse(clean);
+      const clean = respText
+        .replace(/^```(json)?/i, '')
+        .replace(/```$/, '')
+        .trim();
+      parsed = JSON.parse(clean) as { id: number; en: string }[];
       if (!Array.isArray(parsed)) throw new Error('not an array');
     } catch (e) {
       const msg = `Failed to parse Gemini translation JSON response: ${
@@ -178,7 +212,9 @@ export class MetaphorTranslationService {
       lastError: null,
     });
     await this.reports.enqueueIfReady(attemptId);
-    this.logger.log(`[Metaphor] Translated ${done} answers for attempt ${attemptId}.`);
+    this.logger.log(
+      `[Metaphor] Translated ${done} answers for attempt ${attemptId}.`,
+    );
   }
 
   private async readSetting<T>(key: string, fallback: T): Promise<T> {
@@ -186,7 +222,7 @@ export class MetaphorTranslationService {
       const row = await this.settingRepo.findOne({
         where: { category: 'metaphor', settingKey: key },
       });
-      const v = row?.value;
+      const v = row?.value as unknown;
       return v === null || v === undefined ? fallback : (v as T);
     } catch {
       return fallback;

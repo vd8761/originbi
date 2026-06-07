@@ -422,18 +422,12 @@ export class BaseReport {
    */
   protected resolveLogoPath(): string | null {
     const candidates = [
-      path.resolve(
-        process.cwd(),
-        'public/assets/images/Origin-BI-Logo-01.png',
-      ),
+      path.resolve(process.cwd(), 'public/assets/images/Origin-BI-Logo-01.png'),
       path.resolve(
         process.cwd(),
         '../../backend/student-service/public/assets/images/Origin-BI-Logo-01.png',
       ),
-      path.resolve(
-        process.cwd(),
-        'public/assets/images/Origin-BI-logo.png',
-      ),
+      path.resolve(process.cwd(), 'public/assets/images/Origin-BI-logo.png'),
     ];
     return candidates.find((c) => fs.existsSync(c)) ?? null;
   }

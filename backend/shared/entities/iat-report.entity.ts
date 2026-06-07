@@ -41,10 +41,10 @@ export class IatReport {
   reportText?: string | null;
 
   @Column({ name: 'report_input', type: 'jsonb', default: () => `'{}'` })
-  reportInput: any;
+  reportInput: Record<string, unknown>;
 
   @Column({ name: 'bias_map', type: 'jsonb', default: () => `'[]'` })
-  biasMap: any[];
+  biasMap: unknown[];
 
   @Column({ type: 'text', nullable: true })
   error?: string | null;

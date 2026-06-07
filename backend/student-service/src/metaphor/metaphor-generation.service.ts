@@ -30,14 +30,17 @@ export interface MetaphorAttemptCtx {
 export class MetaphorGenerationService {
   private readonly logger = new Logger(MetaphorGenerationService.name);
 
-  async generate(attempt: MetaphorAttemptCtx, manager: EntityManager): Promise<void> {
+  async generate(
+    attempt: MetaphorAttemptCtx,
+    manager: EntityManager,
+  ): Promise<void> {
     // How many questions to show (admin setting, default 20).
     let count = 20;
     try {
       const setting = await manager.findOne(OriginbiSetting, {
         where: { category: 'metaphor', settingKey: 'question_count' },
       });
-      const v = setting?.value;
+      const v = setting?.value as unknown;
       if (typeof v === 'number' && v > 0) count = Math.floor(v);
     } catch {
       /* default 20 */

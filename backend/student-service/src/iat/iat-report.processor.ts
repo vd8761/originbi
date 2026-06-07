@@ -32,7 +32,10 @@ export class IatReportProcessor implements OnModuleInit, OnModuleDestroy {
       { batchSize: 1 },
     );
     this.logger.log(`${IAT_REPORT_QUEUE} worker registered`);
-    this.sweepTimer = setInterval(() => void this.sweep(), this.SWEEP_INTERVAL_MS);
+    this.sweepTimer = setInterval(
+      () => void this.sweep(),
+      this.SWEEP_INTERVAL_MS,
+    );
     setTimeout(() => void this.sweep(), 30000);
   }
 
@@ -56,7 +59,9 @@ export class IatReportProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       const due = await this.jobRepo
         .createQueryBuilder('j')
-        .where('j.status IN (:...statuses)', { statuses: ['PENDING', 'FAILED'] })
+        .where('j.status IN (:...statuses)', {
+          statuses: ['PENDING', 'FAILED'],
+        })
         .andWhere('j.retry_count < j.max_retries')
         .andWhere('(j.next_retry_at IS NULL OR j.next_retry_at <= NOW())')
         .take(50)

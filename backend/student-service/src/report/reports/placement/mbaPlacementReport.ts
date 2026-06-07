@@ -1,21 +1,14 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return */
 // reports/placement/mbaPlacementReport.ts
 
 import * as fs from 'fs';
 import { BaseReport } from '../BaseReport';
-import {
-  MBAPlacementData,
-  MBAStudentRow,
-} from '../../types/placementTypes';
+import { MBAPlacementData, MBAStudentRow } from '../../types/placementTypes';
 import {
   DISC_COLORS,
   DISC_TEXT_COLORS,
   TABLE_STYLES,
 } from './placementConstants';
-import {
-  FIT_BANDS,
-  MBA_PLACEMENT_CONTENT,
-} from './mbaPlacementConstants';
+import { FIT_BANDS, MBA_PLACEMENT_CONTENT } from './mbaPlacementConstants';
 import {
   BEHAVIORAL_ORIENTATION,
   DiscTrait,
@@ -95,9 +88,8 @@ export class MBAPlacementReport extends BaseReport {
       const primaryTrait = (
         validTraits.has(code[0] as DiscTrait) ? code[0] : 'D'
       ) as DiscTrait;
-      const secondaryChar = code[1] && validTraits.has(code[1] as DiscTrait)
-        ? code[1]
-        : '';
+      const secondaryChar =
+        code[1] && validTraits.has(code[1] as DiscTrait) ? code[1] : '';
 
       const behavioralOrientation =
         BEHAVIORAL_ORIENTATION[`${primaryTrait}${secondaryChar}`] ||
@@ -221,7 +213,10 @@ export class MBAPlacementReport extends BaseReport {
       'en-GB',
       { day: 'numeric', month: 'long', year: 'numeric' },
     );
-    this.doc.font(this.FONT_REGULAR).fontSize(16).text(dateString, 35, footerY + 25);
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(16)
+      .text(dateString, 35, footerY + 25);
 
     // Right-aligned degree + department name
     this.doc.font(this.FONT_SORA_BOLD).fontSize(22);
@@ -353,7 +348,9 @@ export class MBAPlacementReport extends BaseReport {
     // specialization is a colored header (its own accent), with the best-fit
     // headcount in a single row beneath.
     this.doc.moveDown(0.5);
-    const specHeaders = SPECIALIZATION_ORDER.map((c) => SPECIALIZATIONS[c].name);
+    const specHeaders = SPECIALIZATION_ORDER.map(
+      (c) => SPECIALIZATIONS[c].name,
+    );
     const specHeaderColors = SPECIALIZATION_ORDER.map(
       (c) => this.SPEC_HEADER_COLOR[c],
     );
@@ -538,16 +535,23 @@ export class MBAPlacementReport extends BaseReport {
     this.table(
       ['S.No', 'Student', 'Best-Fit Specialization', 'Fit Level', 'Score'],
       rows,
-      this.shortlistTableOptions(['center', 'left', 'left', 'center', 'center']),
+      this.shortlistTableOptions([
+        'center',
+        'left',
+        'left',
+        'center',
+        'center',
+      ]),
     );
   }
 
   private shortlistTableOptions(rowAlign: ('left' | 'center')[]) {
     // Column widths derived from the column count: the "Student" column (index 1)
     // fills remaining space, every other column fits its content.
-    const colWidths = rowAlign.map((_, i) =>
-      i === 1 ? 'fill' : 'fit',
-    ) as ('fit' | 'fill')[];
+    const colWidths = rowAlign.map((_, i) => (i === 1 ? 'fill' : 'fit')) as (
+      | 'fit'
+      | 'fill'
+    )[];
     return {
       headerFontSize: 8,
       fontSize: 9,
@@ -631,9 +635,7 @@ export class MBAPlacementReport extends BaseReport {
     C: 'Analytical',
   };
 
-  private countByTrait(
-    students: ScoredStudent[],
-  ): Record<DiscTrait, number> {
+  private countByTrait(students: ScoredStudent[]): Record<DiscTrait, number> {
     const counts: Record<DiscTrait, number> = { D: 0, I: 0, S: 0, C: 0 };
     students.forEach((s) => (counts[s.primaryTrait] += 1));
     return counts;

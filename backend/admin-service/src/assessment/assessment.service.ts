@@ -577,7 +577,8 @@ export class AssessmentService {
     }
 
     const answers = rows.map((r: any) => {
-      const selId = r.selected_option_id != null ? String(r.selected_option_id) : null;
+      const selId =
+        r.selected_option_id != null ? String(r.selected_option_id) : null;
       return {
         sequence: r.seq,
         questionId: Number(r.question_id),
@@ -697,7 +698,9 @@ export class AssessmentService {
       total > 0 &&
       answers.every((a: any) => {
         if (a.status === 'NOT_ANSWERED') return true;
-        return a.translationStatus === 'DONE' && String(a.englishText || '').trim();
+        return (
+          a.translationStatus === 'DONE' && String(a.englishText || '').trim()
+        );
       });
 
     return {
@@ -826,7 +829,9 @@ export class AssessmentService {
     );
 
     const total = modules.length || 6;
-    const completed = modules.filter((m: any) => m.status === 'COMPLETED').length;
+    const completed = modules.filter(
+      (m: any) => m.status === 'COMPLETED',
+    ).length;
     return {
       attempt: {
         id: attemptId,
@@ -910,9 +915,11 @@ export class AssessmentService {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', reject);
 
-      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const pageWidth =
+        doc.page.width - doc.page.margins.left - doc.page.margins.right;
       const ensureSpace = (height = 80) => {
-        if (doc.y + height > doc.page.height - doc.page.margins.bottom) doc.addPage();
+        if (doc.y + height > doc.page.height - doc.page.margins.bottom)
+          doc.addPage();
       };
       const cleanInline = (value: string) =>
         value
@@ -921,7 +928,11 @@ export class AssessmentService {
           .replace(/`([^`]+)`/g, '$1')
           .replace(/\[(.*?)\]\((.*?)\)/g, '$1');
 
-      doc.font('Helvetica-Bold').fontSize(18).fillColor('#111827').text('Metaphor Claude Report');
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(18)
+        .fillColor('#111827')
+        .text('Metaphor Claude Report');
       doc.moveDown(0.4);
       doc
         .font('Helvetica')
@@ -929,7 +940,11 @@ export class AssessmentService {
         .fillColor('#6b7280')
         .text(`Attempt ID: ${attemptId}`)
         .text(reportRows[0].model ? `Model: ${reportRows[0].model}` : '')
-        .text(reportRows[0].generatedAt ? `Generated: ${new Date(reportRows[0].generatedAt).toLocaleString('en-GB')}` : '');
+        .text(
+          reportRows[0].generatedAt
+            ? `Generated: ${new Date(reportRows[0].generatedAt).toLocaleString('en-GB')}`
+            : '',
+        );
       doc.moveDown(1);
 
       String(reportRows[0].markdown)
@@ -943,57 +958,112 @@ export class AssessmentService {
           ensureSpace();
           if (line.startsWith('# ')) {
             doc.moveDown(0.45);
-            doc.font('Helvetica-Bold').fontSize(16).fillColor('#111827').text(cleanInline(line.slice(2)), { width: pageWidth });
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(16)
+              .fillColor('#111827')
+              .text(cleanInline(line.slice(2)), { width: pageWidth });
           } else if (line.startsWith('## ')) {
             doc.moveDown(0.4);
-            doc.font('Helvetica-Bold').fontSize(14).fillColor('#111827').text(cleanInline(line.slice(3)), { width: pageWidth });
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(14)
+              .fillColor('#111827')
+              .text(cleanInline(line.slice(3)), { width: pageWidth });
           } else if (line.startsWith('### ')) {
             doc.moveDown(0.3);
-            doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827').text(cleanInline(line.slice(4)), { width: pageWidth });
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(12)
+              .fillColor('#111827')
+              .text(cleanInline(line.slice(4)), { width: pageWidth });
           } else if (/^\d+\.\s+/.test(line)) {
-            doc.font('Helvetica').fontSize(10.5).fillColor('#111827').text(cleanInline(line), {
-              width: pageWidth,
-              indent: 16,
-              lineGap: 3,
-            });
+            doc
+              .font('Helvetica')
+              .fontSize(10.5)
+              .fillColor('#111827')
+              .text(cleanInline(line), {
+                width: pageWidth,
+                indent: 16,
+                lineGap: 3,
+              });
           } else if (/^[-*]\s+/.test(line)) {
-            doc.font('Helvetica').fontSize(10.5).fillColor('#111827').text(`- ${cleanInline(line.slice(2))}`, {
-              width: pageWidth,
-              indent: 16,
-              lineGap: 3,
-            });
+            doc
+              .font('Helvetica')
+              .fontSize(10.5)
+              .fillColor('#111827')
+              .text(`- ${cleanInline(line.slice(2))}`, {
+                width: pageWidth,
+                indent: 16,
+                lineGap: 3,
+              });
           } else {
-            doc.font('Helvetica').fontSize(10.5).fillColor('#111827').text(cleanInline(line), {
-              width: pageWidth,
-              lineGap: 3,
-            });
+            doc
+              .font('Helvetica')
+              .fontSize(10.5)
+              .fillColor('#111827')
+              .text(cleanInline(line), {
+                width: pageWidth,
+                lineGap: 3,
+              });
           }
         });
 
       if (answerRows?.length) {
         doc.addPage();
-        doc.font('Helvetica-Bold').fontSize(16).fillColor('#111827').text('Question Transcript Appendix');
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(16)
+          .fillColor('#111827')
+          .text('Question Transcript Appendix');
         doc.moveDown(0.8);
         for (const answer of answerRows) {
           ensureSpace(140);
-          doc.font('Helvetica-Bold').fontSize(11).fillColor('#111827').text(`Question ${answer.sequence}`);
-          doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(cleanInline(String(answer.questionEn || 'Metaphor question')), {
-            width: pageWidth,
-            lineGap: 2,
-          });
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(11)
+            .fillColor('#111827')
+            .text(`Question ${answer.sequence}`);
+          doc
+            .font('Helvetica')
+            .fontSize(9.5)
+            .fillColor('#374151')
+            .text(
+              cleanInline(String(answer.questionEn || 'Metaphor question')),
+              {
+                width: pageWidth,
+                lineGap: 2,
+              },
+            );
           doc.moveDown(0.25);
-          doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#111827').text('Transcript');
-          doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(String(answer.finalTranscript || '[No answer submitted]'), {
-            width: pageWidth,
-            lineGap: 2,
-          });
-          if (answer.englishText) {
-            doc.moveDown(0.25);
-            doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#111827').text('English Translation');
-            doc.font('Helvetica').fontSize(9.5).fillColor('#374151').text(String(answer.englishText), {
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(9.5)
+            .fillColor('#111827')
+            .text('Transcript');
+          doc
+            .font('Helvetica')
+            .fontSize(9.5)
+            .fillColor('#374151')
+            .text(String(answer.finalTranscript || '[No answer submitted]'), {
               width: pageWidth,
               lineGap: 2,
             });
+          if (answer.englishText) {
+            doc.moveDown(0.25);
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(9.5)
+              .fillColor('#111827')
+              .text('English Translation');
+            doc
+              .font('Helvetica')
+              .fontSize(9.5)
+              .fillColor('#374151')
+              .text(String(answer.englishText), {
+                width: pageWidth,
+                lineGap: 2,
+              });
           }
           doc.moveDown(0.8);
         }
@@ -1212,9 +1282,10 @@ export class AssessmentService {
             deptName.toUpperCase().startsWith(degreeName.toUpperCase());
           return {
             id: Number(s.id),
-            name: startsWithDegree || !degreeName
-              ? deptName
-              : `${degreeName} ${deptName}`,
+            name:
+              startsWithDegree || !degreeName
+                ? deptName
+                : `${degreeName} ${deptName}`,
             total: Number(s.total),
             completed: Number(s.completed),
           };
@@ -1581,10 +1652,7 @@ export class AssessmentService {
         .where('s.user_id = :userId', { userId: registration.userId })
         .andWhere('s.program_id = :programId', { programId: ga.programId })
         .andWhere('s.group_assessment_id IS NULL')
-        .orderBy(
-          `CASE WHEN s.status = 'NOT_STARTED' THEN 0 ELSE 1 END`,
-          'ASC',
-        )
+        .orderBy(`CASE WHEN s.status = 'NOT_STARTED' THEN 0 ELSE 1 END`, 'ASC')
         .addOrderBy('s.created_at', 'DESC')
         .getOne();
 

@@ -32,7 +32,10 @@ export class MetaphorReportProcessor implements OnModuleInit, OnModuleDestroy {
       { batchSize: 1 },
     );
     this.logger.log(`${METAPHOR_REPORT_QUEUE} worker registered`);
-    this.sweepTimer = setInterval(() => void this.sweep(), this.SWEEP_INTERVAL_MS);
+    this.sweepTimer = setInterval(
+      () => void this.sweep(),
+      this.SWEEP_INTERVAL_MS,
+    );
     setTimeout(() => void this.sweep(), 30000);
   }
 
@@ -40,7 +43,9 @@ export class MetaphorReportProcessor implements OnModuleInit, OnModuleDestroy {
     if (this.sweepTimer) clearInterval(this.sweepTimer);
   }
 
-  private async handle(jobs: PgBoss.Job<{ attemptId: number }>[]): Promise<void> {
+  private async handle(
+    jobs: PgBoss.Job<{ attemptId: number }>[],
+  ): Promise<void> {
     for (const job of jobs) {
       const attemptId = Number(job.data?.attemptId);
       try {
@@ -56,7 +61,9 @@ export class MetaphorReportProcessor implements OnModuleInit, OnModuleDestroy {
     try {
       const due = await this.jobRepo
         .createQueryBuilder('j')
-        .where('j.status IN (:...statuses)', { statuses: ['PENDING', 'FAILED'] })
+        .where('j.status IN (:...statuses)', {
+          statuses: ['PENDING', 'FAILED'],
+        })
         .andWhere('j.retry_count < j.max_retries')
         .andWhere('(j.next_retry_at IS NULL OR j.next_retry_at <= NOW())')
         .take(50)

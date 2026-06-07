@@ -17,6 +17,21 @@ import { METAPHOR_TRANSLATE_QUEUE } from './metaphor.constants';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
 const MAX_TRANSCRIPTION_RETRIES = 5;
 
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+}
+
 @Injectable()
 export class MetaphorTranscriptionService {
   private readonly logger = new Logger(MetaphorTranscriptionService.name);
@@ -38,14 +53,19 @@ export class MetaphorTranscriptionService {
 
   async transcribeAttempt(attemptId: number): Promise<void> {
     const job = await this.ensureJob(attemptId);
-    await this.jobRepo.update(job.id, { status: 'PROCESSING', lastError: null });
+    await this.jobRepo.update(job.id, {
+      status: 'PROCESSING',
+      lastError: null,
+    });
 
     const pending = await this.answerRepo
       .createQueryBuilder('a')
       .where('a.assessment_attempt_id = :attemptId', { attemptId })
       .andWhere('a.transcription_status = :status', { status: 'PENDING' })
       .andWhere('a.audio_storage_key IS NOT NULL')
-      .andWhere('(a.transcription_next_retry_at IS NULL OR a.transcription_next_retry_at <= NOW())')
+      .andWhere(
+        '(a.transcription_next_retry_at IS NULL OR a.transcription_next_retry_at <= NOW())',
+      )
       .orderBy('a.question_sequence', 'ASC')
       .getMany();
 
@@ -55,7 +75,7 @@ export class MetaphorTranscriptionService {
     }
 
     const apiKey =
-      String(await this.readSetting('gemini_api_key', '') || '').trim() ||
+      String((await this.readSetting('gemini_api_key', '')) || '').trim() ||
       this.config.get<string>('GEMINI_API_KEY') ||
       '';
     if (!apiKey) {
@@ -65,8 +85,9 @@ export class MetaphorTranscriptionService {
     }
 
     const model =
-      String(await this.readSetting('gemini_model', DEFAULT_GEMINI_MODEL) || '').trim() ||
-      DEFAULT_GEMINI_MODEL;
+      String(
+        (await this.readSetting('gemini_model', DEFAULT_GEMINI_MODEL)) || '',
+      ).trim() || DEFAULT_GEMINI_MODEL;
 
     for (const answer of pending) {
       await this.answerRepo.update(answer.id, {
@@ -131,7 +152,9 @@ export class MetaphorTranscriptionService {
         });
         const retryCount = Number(answer.transcriptionRetryCount || 0) + 1;
         if (retryCount >= MAX_TRANSCRIPTION_RETRIES) {
-          const fallback = String(answer.answerTextWeb || answer.answerTextOriginal || '').trim();
+          const fallback = String(
+            answer.answerTextWeb || answer.answerTextOriginal || '',
+          ).trim();
           let deletedAudio = false;
           if (answer.audioStorageKey) {
             try {
@@ -162,7 +185,9 @@ export class MetaphorTranscriptionService {
             transcriptionError: message,
             transcriptionSource: answer.transcriptionSource || 'web',
             transcriptionRetryCount: retryCount,
-            transcriptionNextRetryAt: new Date(Date.now() + this.backoffMs(retryCount)),
+            transcriptionNextRetryAt: new Date(
+              Date.now() + this.backoffMs(retryCount),
+            ),
             transcriptionLastAttemptAt: new Date(),
           });
         }
@@ -214,13 +239,13 @@ export class MetaphorTranscriptionService {
       ),
     );
 
-    const data: any = res.data;
+    const data = res.data as GeminiResponse;
     const transcript = String(
       data?.candidates?.[0]?.content?.parts?.[0]?.text || '',
     ).trim();
     if (!transcript) throw new Error('Gemini returned an empty transcript.');
 
-    const usage = data?.usageMetadata || {};
+    const usage = data.usageMetadata || {};
     return {
       transcript,
       usage: {
@@ -231,7 +256,10 @@ export class MetaphorTranscriptionService {
     };
   }
 
-  private async completeIfTerminal(attemptId: number, jobId: number): Promise<void> {
+  private async completeIfTerminal(
+    attemptId: number,
+    jobId: number,
+  ): Promise<void> {
     const total = await this.answerRepo.count({
       where: {
         assessmentAttemptId: attemptId,
@@ -256,7 +284,10 @@ export class MetaphorTranscriptionService {
       total,
       transcribed,
       status: retryable > 0 ? 'PENDING' : 'DONE',
-      lastError: retryable > 0 ? `${retryable} answer(s) still need transcription.` : null,
+      lastError:
+        retryable > 0
+          ? `${retryable} answer(s) still need transcription.`
+          : null,
     });
 
     if (retryable > 0) {
@@ -274,14 +305,16 @@ export class MetaphorTranscriptionService {
       const row = await this.settingRepo.findOne({
         where: { category: 'metaphor', settingKey: key },
       });
-      const v = row?.value;
+      const v = row?.value as unknown;
       return v === null || v === undefined ? fallback : (v as T);
     } catch {
       return fallback;
     }
   }
 
-  private async ensureJob(attemptId: number): Promise<MetaphorTranscriptionJob> {
+  private async ensureJob(
+    attemptId: number,
+  ): Promise<MetaphorTranscriptionJob> {
     let job = await this.jobRepo.findOne({
       where: { assessmentAttemptId: attemptId },
     });
@@ -304,11 +337,20 @@ export class MetaphorTranscriptionService {
 
   private errorMessage(err: unknown): string {
     if (!err) return 'Unknown error';
-    const anyErr = err as any;
+    const anyErr = err as {
+      response?: { data?: { error?: { message?: string }; message?: string } };
+      message?: string;
+    };
     const apiMessage =
       anyErr?.response?.data?.error?.message ||
       anyErr?.response?.data?.message ||
       anyErr?.message;
-    return String(apiMessage || err).slice(0, 2000);
+    const fallback =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+          ? err
+          : 'Unknown error';
+    return String(apiMessage || fallback).slice(0, 2000);
   }
 }

@@ -39,7 +39,10 @@ export class MetaphorProcessor implements OnModuleInit, OnModuleDestroy {
       { batchSize: 1 },
     );
     this.logger.log(`${METAPHOR_TRANSLATE_QUEUE} worker registered`);
-    this.sweepTimer = setInterval(() => void this.sweep(), this.SWEEP_INTERVAL_MS);
+    this.sweepTimer = setInterval(
+      () => void this.sweep(),
+      this.SWEEP_INTERVAL_MS,
+    );
     // initial sweep shortly after boot
     setTimeout(() => void this.sweep(), 30000);
   }
@@ -53,7 +56,9 @@ export class MetaphorProcessor implements OnModuleInit, OnModuleDestroy {
     await this.pgBoss.boss.send(METAPHOR_TRANSLATE_QUEUE, { attemptId });
   }
 
-  private async handle(jobs: PgBoss.Job<{ attemptId: number }>[]): Promise<void> {
+  private async handle(
+    jobs: PgBoss.Job<{ attemptId: number }>[],
+  ): Promise<void> {
     for (const job of jobs) {
       const attemptId = Number(job.data?.attemptId);
       this.logger.log(`Translating attempt ${attemptId} (job ${job.id})`);
@@ -75,7 +80,9 @@ export class MetaphorProcessor implements OnModuleInit, OnModuleDestroy {
         take: 50,
       });
       if (stuck.length === 0) return;
-      this.logger.log(`Sweep: re-enqueuing ${stuck.length} pending translation job(s)`);
+      this.logger.log(
+        `Sweep: re-enqueuing ${stuck.length} pending translation job(s)`,
+      );
       for (const j of stuck) {
         await this.enqueue(Number(j.assessmentAttemptId));
       }

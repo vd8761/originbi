@@ -177,11 +177,16 @@ export class CollegeShortReport extends BaseReport {
       .font(this.FONT_SORA_BOLD)
       .fontSize(18)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text(this.data.report_title || 'Origin BI ClarityFit', titleLeft, y + 14, {
-        width: w * 0.55 - (titleLeft - x),
-        lineBreak: false,
-        ellipsis: true,
-      });
+      .text(
+        this.data.report_title || 'Origin BI ClarityFit',
+        titleLeft,
+        y + 14,
+        {
+          width: w * 0.55 - (titleLeft - x),
+          lineBreak: false,
+          ellipsis: true,
+        },
+      );
 
     const metaX = x + w * 0.58;
     const metaW = w * 0.42;

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgileScore, CollegeData } from '../../types/types';
@@ -142,7 +141,7 @@ export class CollegeMBAShortReport extends BaseReport {
     y = this.drawHeroRecommendationCard(y + 14);
     y = this.drawReadinessProfile(y + 16);
     y = this.drawWhyRecommendation(y + 14);
-    y = this.drawSpecializationRanking(y + 16);
+    this.drawSpecializationRanking(y + 16);
 
     this.drawFooterStrip(1);
   }
@@ -747,7 +746,13 @@ export class CollegeMBAShortReport extends BaseReport {
 
     let leftY = itemsY;
     strengths.forEach((k) => {
-      leftY = drawItem(x, leftY, READINESS_LABEL[k], strengthExplain[k], '#2E7D32');
+      leftY = drawItem(
+        x,
+        leftY,
+        READINESS_LABEL[k],
+        strengthExplain[k],
+        '#2E7D32',
+      );
     });
 
     let rightY = itemsY;
@@ -837,7 +842,10 @@ export class CollegeMBAShortReport extends BaseReport {
       .fontSize(18)
       .heightOfString(top?.name || '-');
     const descH = top?.description
-      ? this.doc.font(this.FONT_REGULAR).fontSize(9.5).heightOfString(top.description, { width: textW })
+      ? this.doc
+          .font(this.FONT_REGULAR)
+          .fontSize(9.5)
+          .heightOfString(top.description, { width: textW })
       : 0;
     const stackH = eyebrowH + 4 + nameH + (descH ? 4 + descH : 0);
     const stackTop = heroY + (heroH - stackH) / 2;
@@ -899,7 +907,9 @@ export class CollegeMBAShortReport extends BaseReport {
 
         // Fill + thin border
         this.doc.save();
-        this.doc.roundedRect(cardX, cardY, cardW, cardH, 6).fill(spec.accentSoft);
+        this.doc
+          .roundedRect(cardX, cardY, cardW, cardH, 6)
+          .fill(spec.accentSoft);
         this.doc.restore();
         this.doc
           .lineWidth(0.6)
@@ -1146,13 +1156,25 @@ export class CollegeMBAShortReport extends BaseReport {
     const tickEnd = tickStart + tickLen;
     this.doc.lineWidth(ringW * 0.9);
     // Top
-    this.doc.moveTo(cx, cy - tickStart).lineTo(cx, cy - tickEnd).stroke();
+    this.doc
+      .moveTo(cx, cy - tickStart)
+      .lineTo(cx, cy - tickEnd)
+      .stroke();
     // Bottom
-    this.doc.moveTo(cx, cy + tickStart).lineTo(cx, cy + tickEnd).stroke();
+    this.doc
+      .moveTo(cx, cy + tickStart)
+      .lineTo(cx, cy + tickEnd)
+      .stroke();
     // Left
-    this.doc.moveTo(cx - tickStart, cy).lineTo(cx - tickEnd, cy).stroke();
+    this.doc
+      .moveTo(cx - tickStart, cy)
+      .lineTo(cx - tickEnd, cy)
+      .stroke();
     // Right
-    this.doc.moveTo(cx + tickStart, cy).lineTo(cx + tickEnd, cy).stroke();
+    this.doc
+      .moveTo(cx + tickStart, cy)
+      .lineTo(cx + tickEnd, cy)
+      .stroke();
 
     this.doc.restore();
     // Reset opacity for subsequent draws.

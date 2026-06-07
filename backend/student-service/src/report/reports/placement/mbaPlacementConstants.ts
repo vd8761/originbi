@@ -35,7 +35,8 @@ export const MBA_PLACEMENT_CONTENT = {
   testimonials: [
     {
       text: 'Grouping our MBA students by specialization fit instead of generic personality types changed how we run placements. We finally knew which students to push toward finance roles versus marketing roles - and why.',
-      author: '- Mr. Rajendran K, Placement Officer, PERI Institute of Technology',
+      author:
+        '- Mr. Rajendran K, Placement Officer, PERI Institute of Technology',
     },
     {
       text: 'The deploy-ready and grooming lists let us plan our recruiter outreach and our pre-placement coaching in one sitting, instead of two separate exercises.',
@@ -87,25 +88,26 @@ Follow us: @OriginBI on LinkedIn | Instagram | X (Twitter)</p>`,
 };
 
 /** The four fit-level bands surfaced in the readiness distribution table, in order. */
-export const FIT_BANDS: { level: FitLevel; color: string; meaning: string }[] = [
-  {
-    level: 'Excellent Fit',
-    color: '#e2f0d9',
-    meaning: 'Deploy-ready - prioritize for top-tier drives',
-  },
-  {
-    level: 'Good Fit',
-    color: '#dbeafe',
-    meaning: 'Ready with light coaching',
-  },
-  {
-    level: 'Moderate Fit',
-    color: '#fff2cc',
-    meaning: 'Groom before high-pressure interviews',
-  },
-  {
-    level: 'Low Fit',
-    color: '#f8d7da',
-    meaning: 'Needs focused skill building',
-  },
-];
+export const FIT_BANDS: { level: FitLevel; color: string; meaning: string }[] =
+  [
+    {
+      level: 'Excellent Fit',
+      color: '#e2f0d9',
+      meaning: 'Deploy-ready - prioritize for top-tier drives',
+    },
+    {
+      level: 'Good Fit',
+      color: '#dbeafe',
+      meaning: 'Ready with light coaching',
+    },
+    {
+      level: 'Moderate Fit',
+      color: '#fff2cc',
+      meaning: 'Groom before high-pressure interviews',
+    },
+    {
+      level: 'Low Fit',
+      color: '#f8d7da',
+      meaning: 'Needs focused skill building',
+    },
+  ];

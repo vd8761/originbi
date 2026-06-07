@@ -26,8 +26,24 @@ export interface MetaphorConfig {
   durationOverride: boolean;
   durationMinutes: number;
   audioTranscriptionEnabled: boolean;
-  supportedLanguages: any[];
-  sttProvider: { provider: string; params?: any };
+  supportedLanguages: unknown[];
+  sttProvider: { provider: string; params?: Record<string, unknown> };
+}
+
+interface MetaphorQuestionRow {
+  answer_id: number | string;
+  seq: number | null;
+  status: string;
+  spoken_language: string | null;
+  answer_text: string | null;
+  question_id: number | string;
+  image_url: string | null;
+  image_desc_en: string | null;
+  image_desc_ta: string | null;
+  context_en: string | null;
+  context_ta: string | null;
+  question_en: string | null;
+  question_ta: string | null;
 }
 
 @Injectable()
@@ -99,8 +115,8 @@ export class MetaphorService {
       const row = await this.settingRepo.findOne({
         where: { category: 'metaphor', settingKey: key },
       });
-      const v = row?.value;
-      return v === null || v === undefined ? fallback : (v as T);
+      const value = row?.value as unknown;
+      return value === null || value === undefined ? fallback : (value as T);
     } catch {
       return fallback;
     }
@@ -110,26 +126,35 @@ export class MetaphorService {
     return {
       questionCount: Number(await this.readSetting('question_count', 20)),
       allowTyping: Boolean(await this.readSetting('allow_typing', false)),
-      durationOverride: Boolean(await this.readSetting('duration_override', false)),
+      durationOverride: Boolean(
+        await this.readSetting('duration_override', false),
+      ),
       durationMinutes: Number(await this.readSetting('duration_minutes', 20)),
       audioTranscriptionEnabled: Boolean(
         await this.readSetting('audio_transcription_enabled', true),
       ),
-      supportedLanguages: await this.readSetting<any[]>('supported_languages', []),
-      sttProvider: await this.readSetting<{ provider: string; params?: any }>(
-        'stt_provider',
-        { provider: 'web_speech', params: {} },
+      supportedLanguages: await this.readSetting<unknown[]>(
+        'supported_languages',
+        [],
       ),
+      sttProvider: await this.readSetting<{
+        provider: string;
+        params?: Record<string, unknown>;
+      }>('stt_provider', { provider: 'web_speech', params: {} }),
     };
   }
 
   /** STT config for the browser. Cloud providers get a short-lived token minted
    *  server-side (added per-provider); web_speech needs none. */
-  async getSttConfig(): Promise<{ provider: string; params: any; token: string | null }> {
-    const cfg = await this.readSetting<{ provider: string; params?: any }>(
-      'stt_provider',
-      { provider: 'web_speech', params: {} },
-    );
+  async getSttConfig(): Promise<{
+    provider: string;
+    params: Record<string, unknown>;
+    token: string | null;
+  }> {
+    const cfg = await this.readSetting<{
+      provider: string;
+      params?: Record<string, unknown>;
+    }>('stt_provider', { provider: 'web_speech', params: {} });
     // TODO(provider): mint ephemeral token for elevenlabs/azure/etc using the
     // server-side 'stt_secret' setting. web_speech needs no token.
     return { provider: cfg.provider, params: cfg.params || {}, token: null };
@@ -155,27 +180,33 @@ export class MetaphorService {
 
   /** The candidate's generated questions for an attempt + page config. Resumable. */
   async getQuestionsForAttempt(attemptId: number) {
-    let rows = await this.dataSource.query(this.QUESTIONS_SQL, [attemptId]);
+    let rows = (await this.dataSource.query(this.QUESTIONS_SQL, [
+      attemptId,
+    ])) as unknown as MetaphorQuestionRow[];
 
     // Lazy generation: if this Level-3 attempt has no questions yet (e.g. the
     // level was enabled AFTER registration and the exam-engine created the
     // attempt on the fly), generate them now, then re-query.
     if (!rows || rows.length === 0) {
-      const attempt = await this.attemptRepo.findOne({ where: { id: attemptId } });
+      const attempt = await this.attemptRepo.findOne({
+        where: { id: attemptId },
+      });
       if (attempt) {
         try {
           await this.generation.generate(
             {
-              id: Number((attempt as any).id),
-              assessmentSessionId: (attempt as any).assessmentSessionId ?? null,
-              userId: (attempt as any).userId ?? null,
-              registrationId: (attempt as any).registrationId ?? null,
-              programId: (attempt as any).programId ?? null,
-              assessmentLevelId: (attempt as any).assessmentLevelId ?? null,
+              id: Number(attempt.id),
+              assessmentSessionId: attempt.assessmentSessionId ?? null,
+              userId: attempt.userId ?? null,
+              registrationId: attempt.registrationId ?? null,
+              programId: attempt.programId ?? null,
+              assessmentLevelId: attempt.assessmentLevelId ?? null,
             },
             this.dataSource.manager,
           );
-          rows = await this.dataSource.query(this.QUESTIONS_SQL, [attemptId]);
+          rows = (await this.dataSource.query(this.QUESTIONS_SQL, [
+            attemptId,
+          ])) as unknown as MetaphorQuestionRow[];
         } catch (e) {
           this.logger.warn(
             `[Metaphor] lazy generation failed for attempt ${attemptId}: ${
@@ -189,11 +220,13 @@ export class MetaphorService {
     return this.buildQuestionsResponse(rows);
   }
 
-  private async buildQuestionsResponse(rows: any[]) {
+  private async buildQuestionsResponse(rows: MetaphorQuestionRow[]) {
     const config = await this.getConfig();
     // Images are stored as a relative path ("/assets/images/<set>.<q>.webp");
     // the origin is admin-configurable so the whole library can be repointed.
-    const imageBase = String(await this.readSetting('image_base_url', '')).replace(/\/+$/, '');
+    const imageBase = String(
+      await this.readSetting('image_base_url', ''),
+    ).replace(/\/+$/, '');
     const buildImageUrl = (p: string | null): string | null => {
       if (!p) return null;
       if (/^https?:\/\//i.test(p)) return p; // already absolute
@@ -203,7 +236,7 @@ export class MetaphorService {
     return {
       config,
       total: rows.length,
-      questions: rows.map((r: any) => ({
+      questions: rows.map((r) => ({
         answerId: Number(r.answer_id),
         questionId: Number(r.question_id),
         sequence: r.seq,
@@ -294,11 +327,13 @@ export class MetaphorService {
   /** Finish the Level 3 attempt: mark complete + queue translation (PENDING job;
    *  the worker sweep picks it up). */
   async finishAttempt(attemptId: number) {
-    const attempt = await this.attemptRepo.findOne({ where: { id: attemptId } });
+    const attempt = await this.attemptRepo.findOne({
+      where: { id: attemptId },
+    });
     if (!attempt) throw new BadRequestException('Attempt not found.');
 
     attempt.status = 'COMPLETED';
-    (attempt as any).completedAt = new Date();
+    attempt.completedAt = new Date();
     await this.attemptRepo.save(attempt);
     await this.completeSessionIfAllMandatoryAttemptsDone(attempt);
 
@@ -362,7 +397,7 @@ export class MetaphorService {
   private async completeSessionIfAllMandatoryAttemptsDone(
     attempt: AssessmentAttempt,
   ): Promise<void> {
-    const sessionId = Number((attempt as any).assessmentSessionId);
+    const sessionId = Number(attempt.assessmentSessionId);
     if (!sessionId) return;
 
     const mandatoryLevels = await this.levelRepo.find({
@@ -375,7 +410,7 @@ export class MetaphorService {
       where: { assessmentSessionId: sessionId },
     });
     const attemptsByLevelId = new Map(
-      attempts.map((row) => [Number((row as any).assessmentLevelId), row]),
+      attempts.map((row) => [Number(row.assessmentLevelId), row]),
     );
 
     const allMandatoryAttemptsDone = mandatoryLevelIds.every((levelId) => {
@@ -384,7 +419,9 @@ export class MetaphorService {
     });
     if (!allMandatoryAttemptsDone) return;
 
-    const session = await this.sessionRepo.findOne({ where: { id: sessionId } });
+    const session = await this.sessionRepo.findOne({
+      where: { id: sessionId },
+    });
     if (!session || session.status === 'COMPLETED') return;
 
     session.status = 'COMPLETED';

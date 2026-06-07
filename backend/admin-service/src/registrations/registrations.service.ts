@@ -166,11 +166,34 @@ export class RegistrationsService {
 
   private normalizeSchoolStream(
     stream?: string | null,
-  ): 'PCMB' | 'PCB' | 'PCM' | 'PCBZ' | 'SCIENCE' | 'COMMERCE' | 'HUMANITIES' | null {
+  ):
+    | 'PCMB'
+    | 'PCB'
+    | 'PCM'
+    | 'PCBZ'
+    | 'SCIENCE'
+    | 'COMMERCE'
+    | 'HUMANITIES'
+    | null {
     if (!stream) return null;
     const v = stream.trim().toUpperCase();
-    return ['PCMB', 'PCB', 'PCM', 'PCBZ', 'SCIENCE', 'COMMERCE', 'HUMANITIES'].includes(v)
-      ? (v as 'PCMB' | 'PCB' | 'PCM' | 'PCBZ' | 'SCIENCE' | 'COMMERCE' | 'HUMANITIES')
+    return [
+      'PCMB',
+      'PCB',
+      'PCM',
+      'PCBZ',
+      'SCIENCE',
+      'COMMERCE',
+      'HUMANITIES',
+    ].includes(v)
+      ? (v as
+          | 'PCMB'
+          | 'PCB'
+          | 'PCM'
+          | 'PCBZ'
+          | 'SCIENCE'
+          | 'COMMERCE'
+          | 'HUMANITIES')
       : null;
   }
 
@@ -739,7 +762,7 @@ export class RegistrationsService {
           'dd.degreeTypeId = deg.id',
         )
         .where('r.isDeleted = false');
-      
+
       if (tab === 'tech') {
         qb.andWhere('r.isTechAssessment IN (1, 2)');
       } else if (tab === 'both') {

@@ -49,7 +49,9 @@ export class ReportController {
     }
 
     const reportTypeOverride: 'standard' | 'mba' | undefined =
-      reportType === 'standard' || reportType === 'mba' ? reportType : undefined;
+      reportType === 'standard' || reportType === 'mba'
+        ? reportType
+        : undefined;
 
     logger.info(
       `[API] Start Placement Report: Group ${groupId}, Dept ${deptDegreeId}, Override=${reportTypeOverride ?? 'auto'}`,

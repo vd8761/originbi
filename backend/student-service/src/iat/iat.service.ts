@@ -85,7 +85,9 @@ export class IatService {
     const intake = await this.getOrCreateIntake(attempt);
     const modules = await this.getAttemptModules(attemptId);
     const currentModule =
-      modules.find((m) => m.status !== 'COMPLETED') || modules[modules.length - 1] || null;
+      modules.find((m) => m.status !== 'COMPLETED') ||
+      modules[modules.length - 1] ||
+      null;
 
     const trials = currentModule
       ? await this.trialRepo.find({
@@ -122,7 +124,8 @@ export class IatService {
     intake.gender = dto.gender ?? intake.gender;
     intake.hometownTier = dto.hometownTier ?? intake.hometownTier;
     intake.collegeTier = dto.collegeTier ?? intake.collegeTier;
-    intake.undergraduateStream = dto.undergraduateStream ?? intake.undergraduateStream;
+    intake.undergraduateStream =
+      dto.undergraduateStream ?? intake.undergraduateStream;
     intake.workExperienceYears =
       dto.workExperienceYears === undefined
         ? intake.workExperienceYears
@@ -137,15 +140,23 @@ export class IatService {
       return { success: true, saved: 0 };
     }
 
-    const trialIds = [...new Set(events.map((event) => Number(event.trialId)).filter(Boolean))];
+    const trialIds = [
+      ...new Set(events.map((event) => Number(event.trialId)).filter(Boolean)),
+    ];
     const trials = await this.trialRepo
       .createQueryBuilder('t')
       .where('t.id IN (:...trialIds)', { trialIds })
-      .andWhere('t.assessment_attempt_id = :attemptId', { attemptId: attempt.id })
+      .andWhere('t.assessment_attempt_id = :attemptId', {
+        attemptId: attempt.id,
+      })
       .getMany();
-    const trialsById = new Map(trials.map((trial) => [Number(trial.id), trial]));
+    const trialsById = new Map(
+      trials.map((trial) => [Number(trial.id), trial]),
+    );
     if (trialsById.size !== trialIds.length) {
-      throw new BadRequestException('One or more IAT trials do not belong to this attempt.');
+      throw new BadRequestException(
+        'One or more IAT trials do not belong to this attempt.',
+      );
     }
 
     const keypresses: Partial<IatKeypress>[] = [];
@@ -154,7 +165,10 @@ export class IatService {
       if (!trial) continue;
       const key = String(event.keyPressed || '').toUpperCase();
       if (key !== 'E' && key !== 'I') continue;
-      const responseTimeMs = Math.max(0, Math.round(Number(event.responseTimeMs) || 0));
+      const responseTimeMs = Math.max(
+        0,
+        Math.round(Number(event.responseTimeMs) || 0),
+      );
       const isCorrect = key === String(trial.expectedKey || '').toUpperCase();
       keypresses.push({
         iatTrialId: Number(trial.id),
@@ -175,7 +189,9 @@ export class IatService {
       if (isCorrect) {
         trial.responseTimeMs = responseTimeMs;
         trial.status = 'ANSWERED';
-        trial.answeredAt = event.answeredAt ? new Date(event.answeredAt) : new Date();
+        trial.answeredAt = event.answeredAt
+          ? new Date(event.answeredAt)
+          : new Date();
       }
     }
 
@@ -193,13 +209,17 @@ export class IatService {
     if (!attemptModule) throw new BadRequestException('IAT module not found.');
 
     const trials = await this.trialRepo.find({
-      where: { assessmentAttemptId: attemptId, iatAttemptModuleId: attemptModuleId },
+      where: {
+        assessmentAttemptId: attemptId,
+        iatAttemptModuleId: attemptModuleId,
+      },
       order: { trialSequence: 'ASC' },
     });
     // Guide 4.2: drop the first 2 trials of each block FIRST (warm-ups, by
     // original sequence), THEN remove out-of-range / unanswered response times.
     const blockTrials = trials.filter(
-      (trial) => trial.blockType === 'COMPATIBLE' || trial.blockType === 'INCOMPATIBLE',
+      (trial) =>
+        trial.blockType === 'COMPATIBLE' || trial.blockType === 'INCOMPATIBLE',
     );
     const afterWarmup = this.dropWarmupsByBlock(blockTrials, 2);
     const cleaned = afterWarmup.filter(
@@ -208,25 +228,38 @@ export class IatService {
         Number(trial.responseTimeMs || 0) >= 150 &&
         Number(trial.responseTimeMs || 0) <= 3000,
     );
-    const compatible = cleaned.filter((trial) => trial.blockType === 'COMPATIBLE');
-    const incompatible = cleaned.filter((trial) => trial.blockType === 'INCOMPATIBLE');
-    const compatibleAverage = this.average(compatible.map((trial) => Number(trial.responseTimeMs || 0)));
+    const compatible = cleaned.filter(
+      (trial) => trial.blockType === 'COMPATIBLE',
+    );
+    const incompatible = cleaned.filter(
+      (trial) => trial.blockType === 'INCOMPATIBLE',
+    );
+    const compatibleAverage = this.average(
+      compatible.map((trial) => Number(trial.responseTimeMs || 0)),
+    );
     const incompatibleAverage = this.average(
       incompatible.map((trial) => Number(trial.responseTimeMs || 0)),
     );
     const gap = incompatibleAverage - compatibleAverage;
     const pattern = gap > 300 ? 'strong' : gap > 150 ? 'moderate' : 'low';
     const slowestWords = [...incompatible]
-      .sort((a, b) => Number(b.responseTimeMs || 0) - Number(a.responseTimeMs || 0))
+      .sort(
+        (a, b) => Number(b.responseTimeMs || 0) - Number(a.responseTimeMs || 0),
+      )
       .slice(0, 3)
       .map((trial) => trial.wordShown);
     const errorTrials = trials.filter(
       (trial) =>
         trial.firstKeyPressed &&
-        String(trial.firstKeyPressed).toUpperCase() !== String(trial.expectedKey).toUpperCase(),
+        String(trial.firstKeyPressed).toUpperCase() !==
+          String(trial.expectedKey).toUpperCase(),
     );
-    const errorWords = [...new Set(errorTrials.map((trial) => trial.wordShown))];
-    const answered = trials.filter((trial) => trial.status === 'ANSWERED').length;
+    const errorWords = [
+      ...new Set(errorTrials.map((trial) => trial.wordShown)),
+    ];
+    const answered = trials.filter(
+      (trial) => trial.status === 'ANSWERED',
+    ).length;
     const errorRate = answered > 0 ? (errorTrials.length / answered) * 100 : 0;
 
     attemptModule.compatibleAverageMs = compatibleAverage.toFixed(2);
@@ -266,7 +299,9 @@ export class IatService {
       await runner.query('SELECT pg_advisory_lock($1)', [attemptId]);
       return await this.finishAttemptLocked(attemptId);
     } finally {
-      await runner.query('SELECT pg_advisory_unlock($1)', [attemptId]).catch(() => undefined);
+      await runner
+        .query('SELECT pg_advisory_unlock($1)', [attemptId])
+        .catch(() => undefined);
       await runner.release();
     }
   }
@@ -283,9 +318,13 @@ export class IatService {
     }
 
     const modules = await this.getAttemptModules(attemptId);
-    const incomplete = modules.filter((module) => module.status !== 'COMPLETED');
+    const incomplete = modules.filter(
+      (module) => module.status !== 'COMPLETED',
+    );
     if (incomplete.length > 0) {
-      throw new BadRequestException('Complete all IAT modules before finishing.');
+      throw new BadRequestException(
+        'Complete all IAT modules before finishing.',
+      );
     }
 
     const scoreMap = this.buildScoreMap(modules);
@@ -315,7 +354,9 @@ export class IatService {
   }
 
   private async enqueueReport(attemptId: number, reset = false) {
-    let job = await this.jobRepo.findOne({ where: { assessmentAttemptId: attemptId } });
+    let job = await this.jobRepo.findOne({
+      where: { assessmentAttemptId: attemptId },
+    });
     if (!job) {
       try {
         job = await this.jobRepo.save(
@@ -330,7 +371,9 @@ export class IatService {
         // A concurrent finishAttempt may have created the job first; re-read it
         // and fall through to the update path instead of failing the request.
         if ((err as { code?: string })?.code !== '23505') throw err;
-        job = await this.jobRepo.findOne({ where: { assessmentAttemptId: attemptId } });
+        job = await this.jobRepo.findOne({
+          where: { assessmentAttemptId: attemptId },
+        });
       }
     }
     if (job && (reset || job.status !== 'PROCESSING')) {
@@ -343,41 +386,65 @@ export class IatService {
     await this.pgBoss.boss.send(IAT_REPORT_QUEUE, { attemptId });
   }
 
-  private async assertIatAttempt(attemptId: number): Promise<AssessmentAttempt> {
+  private async assertIatAttempt(
+    attemptId: number,
+  ): Promise<AssessmentAttempt> {
     const attempt = await this.attemptRepo.findOne({
       where: { id: attemptId },
       relations: ['assessmentLevel'],
     });
-    if (!attempt) throw new BadRequestException('Assessment attempt not found.');
+    if (!attempt)
+      throw new BadRequestException('Assessment attempt not found.');
     const level = attempt.assessmentLevel;
     const isLevel2 =
       level?.levelNumber === 2 ||
       level?.name?.includes('Level 2') ||
       String(level?.patternType || '').toUpperCase() === 'ACI';
-    if (!isLevel2) throw new BadRequestException('IAT Gen only applies to Level 2 attempts.');
+    if (!isLevel2)
+      throw new BadRequestException(
+        'IAT Gen only applies to Level 2 attempts.',
+      );
 
-    const metadataKind = String(attempt.metadata?.assessment_kind || '').toUpperCase();
+    const metadataAssessmentKind = attempt.metadata?.assessment_kind;
+    const metadataKind =
+      typeof metadataAssessmentKind === 'string'
+        ? metadataAssessmentKind.toUpperCase()
+        : '';
     if (metadataKind === IAT_ASSESSMENT_KIND) return attempt;
 
-    const isEligible = await this.eligibility.isIatRegistration(attempt.registrationId);
+    const isEligible = await this.eligibility.isIatRegistration(
+      attempt.registrationId,
+    );
     if (!isEligible) {
-      throw new BadRequestException('This Level 2 attempt is configured for ACI, not IAT Gen.');
+      throw new BadRequestException(
+        'This Level 2 attempt is configured for ACI, not IAT Gen.',
+      );
     }
 
-    attempt.metadata = { ...(attempt.metadata || {}), assessment_kind: IAT_ASSESSMENT_KIND };
+    attempt.metadata = {
+      ...(attempt.metadata || {}),
+      assessment_kind: IAT_ASSESSMENT_KIND,
+    };
     await this.attemptRepo.save(attempt);
     return attempt;
   }
 
   private async ensureAttemptStarted(attempt: AssessmentAttempt) {
-    if (attempt.status === 'NOT_STARTED' || attempt.status === 'NOT_YET_STARTED') {
+    if (
+      attempt.status === 'NOT_STARTED' ||
+      attempt.status === 'NOT_YET_STARTED'
+    ) {
       attempt.status = 'IN_PROGRESS';
       attempt.startedAt = new Date();
       await this.attemptRepo.save(attempt);
       const session = await this.sessionRepo.findOne({
         where: { id: attempt.assessmentSessionId },
       });
-      if (session && (session.status === 'NOT_STARTED' || session.status === 'NOT_YET_STARTED')) {
+      if (
+        session &&
+        (session.status === 'NOT_STARTED' ||
+          session.status === 'NOT_YET_STARTED')
+      ) {
         session.status = 'IN_PROGRESS';
         session.startedAt = new Date();
         await this.sessionRepo.save(session);
@@ -395,7 +462,8 @@ export class IatService {
       where: { isActive: true, isDeleted: false },
       order: { moduleOrder: 'ASC' },
     });
-    if (!modules.length) throw new BadRequestException('No active IAT modules configured.');
+    if (!modules.length)
+      throw new BadRequestException('No active IAT modules configured.');
 
     const stimuli = await this.stimulusRepo.find({
       where: { isActive: true, isDeleted: false },
@@ -403,7 +471,8 @@ export class IatService {
     });
     const stimuliByModule = new Map<number, IatStimulus[]>();
     for (const stimulus of stimuli) {
-      const moduleStimuli = stimuliByModule.get(Number(stimulus.moduleId)) || [];
+      const moduleStimuli =
+        stimuliByModule.get(Number(stimulus.moduleId)) || [];
       moduleStimuli.push(stimulus);
       stimuliByModule.set(Number(stimulus.moduleId), moduleStimuli);
     }
@@ -414,28 +483,34 @@ export class IatService {
       // the load effect in dev) both pass the count===0 guard above and both
       // try to insert, tripping uq_iat_attempt_module and rolling back one of
       // the requests. The advisory lock is released automatically at COMMIT.
-      await manager.query('SELECT pg_advisory_xact_lock($1)', [Number(attempt.id)]);
+      await manager.query('SELECT pg_advisory_xact_lock($1)', [
+        Number(attempt.id),
+      ]);
 
       // Re-check inside the lock: if another request already created the
       // modules while we waited, there is nothing to do.
-      const alreadyCreated = await manager.getRepository(IatAttemptModule).count({
-        where: { assessmentAttemptId: attempt.id },
-      });
+      const alreadyCreated = await manager
+        .getRepository(IatAttemptModule)
+        .count({
+          where: { assessmentAttemptId: attempt.id },
+        });
       if (alreadyCreated > 0) return;
 
       for (const module of modules) {
-        const attemptModule = await manager.getRepository(IatAttemptModule).save({
-          assessmentAttemptId: attempt.id,
-          assessmentSessionId: attempt.assessmentSessionId,
-          userId: attempt.userId,
-          registrationId: attempt.registrationId,
-          programId: attempt.programId,
-          assessmentLevelId: attempt.assessmentLevelId,
-          moduleId: Number(module.id),
-          moduleOrder: module.moduleOrder,
-          status: module.moduleOrder === 1 ? 'IN_PROGRESS' : 'NOT_STARTED',
-          startedAt: module.moduleOrder === 1 ? new Date() : null,
-        });
+        const attemptModule = await manager
+          .getRepository(IatAttemptModule)
+          .save({
+            assessmentAttemptId: attempt.id,
+            assessmentSessionId: attempt.assessmentSessionId,
+            userId: attempt.userId,
+            registrationId: attempt.registrationId,
+            programId: attempt.programId,
+            assessmentLevelId: attempt.assessmentLevelId,
+            moduleId: Number(module.id),
+            moduleOrder: module.moduleOrder,
+            status: module.moduleOrder === 1 ? 'IN_PROGRESS' : 'NOT_STARTED',
+            startedAt: module.moduleOrder === 1 ? new Date() : null,
+          });
         const trials = this.buildTrialsForModule(
           attempt,
           attemptModule,
@@ -471,8 +546,14 @@ export class IatService {
       rightLabel: string,
     ) => {
       const blockStimuli = [
-        ...this.stimuliForKeys(byConcept, leftKeys).map((s) => ({ s, key: 'E' })),
-        ...this.stimuliForKeys(byConcept, rightKeys).map((s) => ({ s, key: 'I' })),
+        ...this.stimuliForKeys(byConcept, leftKeys).map((s) => ({
+          s,
+          key: 'E',
+        })),
+        ...this.stimuliForKeys(byConcept, rightKeys).map((s) => ({
+          s,
+          key: 'I',
+        })),
       ];
       for (const item of this.shuffle(blockStimuli)) {
         rows.push({
@@ -524,8 +605,22 @@ export class IatService {
 
     const leftConcept = this.title(module.leftConceptKey);
     const rightConcept = this.title(module.rightConceptKey);
-    addStimuli(1, 'PRACTICE_LEFT_RIGHT', [module.leftConceptKey], [], leftConcept, rightConcept);
-    addStimuli(2, 'PRACTICE_LEFT_RIGHT', [], [module.rightConceptKey], leftConcept, rightConcept);
+    addStimuli(
+      1,
+      'PRACTICE_LEFT_RIGHT',
+      [module.leftConceptKey],
+      [],
+      leftConcept,
+      rightConcept,
+    );
+    addStimuli(
+      2,
+      'PRACTICE_LEFT_RIGHT',
+      [],
+      [module.rightConceptKey],
+      leftConcept,
+      rightConcept,
+    );
     addWords(3, 'SELF_OTHER', IAT_SELF_WORDS, IAT_OTHER_WORDS, 'Self', 'Other');
     addStimuli(
       4,
@@ -535,7 +630,14 @@ export class IatService {
       this.labelForKeys(module.compatibleLeftKeys || []),
       this.labelForKeys(module.compatibleRightKeys || []),
     );
-    addStimuli(5, 'SWITCH', [module.rightConceptKey], [module.leftConceptKey], rightConcept, leftConcept);
+    addStimuli(
+      5,
+      'SWITCH',
+      [module.rightConceptKey],
+      [module.leftConceptKey],
+      rightConcept,
+      leftConcept,
+    );
     addStimuli(
       6,
       'INCOMPATIBLE',
@@ -547,7 +649,10 @@ export class IatService {
     return rows;
   }
 
-  private stimuliForKeys(byConcept: Map<string, IatStimulus[]>, keys: string[]): IatStimulus[] {
+  private stimuliForKeys(
+    byConcept: Map<string, IatStimulus[]>,
+    keys: string[],
+  ): IatStimulus[] {
     return keys.flatMap((key) => byConcept.get(key) || []);
   }
 
@@ -569,7 +674,9 @@ export class IatService {
     return clean.reduce((sum, value) => sum + value, 0) / clean.length;
   }
 
-  private async getAttemptModules(attemptId: number): Promise<IatAttemptModule[]> {
+  private async getAttemptModules(
+    attemptId: number,
+  ): Promise<IatAttemptModule[]> {
     return this.attemptModuleRepo.find({
       where: { assessmentAttemptId: attemptId },
       relations: ['module'],
@@ -577,7 +684,9 @@ export class IatService {
     });
   }
 
-  private async getOrCreateIntake(attempt: AssessmentAttempt): Promise<IatIntakeProfile> {
+  private async getOrCreateIntake(
+    attempt: AssessmentAttempt,
+  ): Promise<IatIntakeProfile> {
     const existing = await this.intakeRepo.findOne({
       where: { assessmentAttemptId: attempt.id },
     });
@@ -612,29 +721,36 @@ export class IatService {
   }
 
   private buildScoreMap(modules: IatAttemptModule[]) {
-    return modules.reduce((acc, module) => {
-      const code = module.module?.code || String(module.moduleId);
-      acc[code] = {
-        pattern: module.patternLabel,
-        speedGapMs: Number(module.speedGapMs || 0),
-        compatibleAverageMs: Number(module.compatibleAverageMs || 0),
-        incompatibleAverageMs: Number(module.incompatibleAverageMs || 0),
-        slowestWords: module.slowestWords || [],
-        errorWords: module.errorWords || [],
-        errorRate: Number(module.errorRate || 0),
-      };
-      return acc;
-    }, {} as Record<string, any>);
+    return modules.reduce(
+      (acc, module) => {
+        const code = module.module?.code || String(module.moduleId);
+        acc[code] = {
+          pattern: module.patternLabel,
+          speedGapMs: Number(module.speedGapMs || 0),
+          compatibleAverageMs: Number(module.compatibleAverageMs || 0),
+          incompatibleAverageMs: Number(module.incompatibleAverageMs || 0),
+          slowestWords: module.slowestWords || [],
+          errorWords: module.errorWords || [],
+          errorRate: Number(module.errorRate || 0),
+        };
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
   }
 
-  private async createOrUnlockNextMandatoryLevel(attempt: AssessmentAttempt): Promise<void> {
+  private async createOrUnlockNextMandatoryLevel(
+    attempt: AssessmentAttempt,
+  ): Promise<void> {
     const currentLevel = await this.levelRepo.findOne({
       where: { id: attempt.assessmentLevelId },
     });
     if (!currentLevel) return;
     const nextLevel = await this.levelRepo
       .createQueryBuilder('level')
-      .where('level.level_number > :levelNumber', { levelNumber: currentLevel.levelNumber })
+      .where('level.level_number > :levelNumber', {
+        levelNumber: currentLevel.levelNumber,
+      })
       .andWhere('level.is_mandatory = true')
       .orderBy('level.level_number', 'ASC')
       .getOne();
@@ -659,23 +775,33 @@ export class IatService {
       );
     }
     const unlockAt = new Date();
-    unlockAt.setHours(unlockAt.getHours() + Number(nextLevel.unlockAfterHours || 0));
-    const expiresAt = new Date(unlockAt);
-    expiresAt.setHours(
-      expiresAt.getHours() + Number((nextLevel as any).startWithinHours || 72),
+    unlockAt.setHours(
+      unlockAt.getHours() + Number(nextLevel.unlockAfterHours || 0),
     );
+    const expiresAt = new Date(unlockAt);
+    const startWithinHours = Number(
+      (nextLevel as AssessmentLevel & { startWithinHours?: number | null })
+        .startWithinHours || 72,
+    );
+    expiresAt.setHours(expiresAt.getHours() + startWithinHours);
     nextAttempt.unlockAt = unlockAt;
     nextAttempt.expiresAt = expiresAt;
     await this.attemptRepo.save(nextAttempt);
   }
 
-  private async completeSessionIfAllMandatoryAttemptsDone(attempt: AssessmentAttempt) {
-    const mandatoryLevels = await this.levelRepo.find({ where: { isMandatory: true } });
+  private async completeSessionIfAllMandatoryAttemptsDone(
+    attempt: AssessmentAttempt,
+  ) {
+    const mandatoryLevels = await this.levelRepo.find({
+      where: { isMandatory: true },
+    });
     if (!mandatoryLevels.length) return;
     const attempts = await this.attemptRepo.find({
       where: { assessmentSessionId: attempt.assessmentSessionId },
     });
-    const byLevel = new Map(attempts.map((row) => [Number(row.assessmentLevelId), row]));
+    const byLevel = new Map(
+      attempts.map((row) => [Number(row.assessmentLevelId), row]),
+    );
     const done = mandatoryLevels.every(
       (level) => byLevel.get(Number(level.id))?.status === 'COMPLETED',
     );
@@ -707,7 +833,10 @@ export class IatService {
       hometownTier: intake.hometownTier,
       collegeTier: intake.collegeTier,
       undergraduateStream: intake.undergraduateStream,
-      workExperienceYears: intake.workExperienceYears === null ? null : Number(intake.workExperienceYears),
+      workExperienceYears:
+        intake.workExperienceYears === null
+          ? null
+          : Number(intake.workExperienceYears),
     };
   }
 

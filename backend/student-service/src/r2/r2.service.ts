@@ -7,6 +7,10 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 
+type ObjectBodyStream = AsyncIterable<Buffer | Uint8Array | string> & {
+  transformToByteArray?: () => Promise<Uint8Array>;
+};
+
 @Injectable()
 export class R2Service {
   private readonly logger = new Logger(R2Service.name);
@@ -31,9 +35,15 @@ export class R2Service {
     });
   }
 
-  async uploadBuffer(key: string, buffer: Buffer, mimeType: string): Promise<void> {
+  async uploadBuffer(
+    key: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<void> {
     this.assertConfigured();
-    this.logger.log(`Uploading metaphor audio to R2: ${key} (${buffer.length} bytes)`);
+    this.logger.log(
+      `Uploading metaphor audio to R2: ${key} (${buffer.length} bytes)`,
+    );
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucketName,
@@ -52,10 +62,11 @@ export class R2Service {
         Key: key,
       }),
     );
-    const body = res.Body as any;
+    const body = res.Body as ObjectBodyStream | undefined;
     if (!body) return Buffer.alloc(0);
     if (typeof body.transformToByteArray === 'function') {
-      return Buffer.from(await body.transformToByteArray());
+      const bytes = await body.transformToByteArray();
+      return Buffer.from(bytes);
     }
     const chunks: Buffer[] = [];
     for await (const chunk of body) {

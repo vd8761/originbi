@@ -74,7 +74,9 @@ export class SettingsService {
     error?: string;
   }> {
     const apiKey =
-      String((await this.getValue<string>('metaphor', 'gemini_api_key')) || '').trim() ||
+      String(
+        (await this.getValue<string>('metaphor', 'gemini_api_key')) || '',
+      ).trim() ||
       process.env.GEMINI_API_KEY ||
       '';
 
@@ -87,15 +89,19 @@ export class SettingsService {
 
     try {
       const res = await firstValueFrom(
-        this.http.get('https://generativelanguage.googleapis.com/v1beta/models', {
-          params: { key: apiKey },
-          timeout: 30000,
-        }),
+        this.http.get(
+          'https://generativelanguage.googleapis.com/v1beta/models',
+          {
+            params: { key: apiKey },
+            timeout: 30000,
+          },
+        ),
       );
       const models = ((res as any).data?.models || [])
-        .filter((model: any) =>
-          Array.isArray(model.supportedGenerationMethods) &&
-          model.supportedGenerationMethods.includes('generateContent'),
+        .filter(
+          (model: any) =>
+            Array.isArray(model.supportedGenerationMethods) &&
+            model.supportedGenerationMethods.includes('generateContent'),
         )
         .map((model: any) => {
           const name = String(model.name || '').replace(/^models\//, '');
@@ -125,7 +131,9 @@ export class SettingsService {
     error?: string;
   }> {
     const apiKey =
-      String((await this.getValue<string>('metaphor', 'claude_api_key')) || '').trim() ||
+      String(
+        (await this.getValue<string>('metaphor', 'claude_api_key')) || '',
+      ).trim() ||
       process.env.ANTHROPIC_API_KEY ||
       '';
 
@@ -154,11 +162,16 @@ export class SettingsService {
       const models = rows
         .map((model: any) => {
           const id = String(model.id || model.name || '').trim();
-          const displayName = String(model.display_name || model.displayName || id).trim();
+          const displayName = String(
+            model.display_name || model.displayName || id,
+          ).trim();
           return {
             value: id,
-            label: displayName && displayName !== id ? `${displayName} (${id})` : id,
-            description: model.created_at ? `Created ${model.created_at}` : undefined,
+            label:
+              displayName && displayName !== id ? `${displayName} (${id})` : id,
+            description: model.created_at
+              ? `Created ${model.created_at}`
+              : undefined,
           };
         })
         .filter((model: any) => model.value.startsWith('claude-'))

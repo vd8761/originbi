@@ -19,6 +19,23 @@ import { IAT_REPORT_QUEUE } from './iat.constants';
 const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const DEFAULT_MAX_RETRIES = 5;
 
+interface ClaudeTextPart {
+  type?: string;
+  text?: string;
+}
+
+interface ClaudeMessageResponse {
+  content?: ClaudeTextPart[];
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+}
+
+interface RegistrationMetaRow {
+  groupId: number | null;
+}
+
 @Injectable()
 export class IatReportService {
   private readonly logger = new Logger(IatReportService.name);
@@ -44,14 +61,17 @@ export class IatReportService {
     private readonly pgBoss: PgBossService,
   ) {}
 
-  async enqueue(attemptId: number): Promise<{ queued: boolean; reason?: string }> {
+  async enqueue(
+    attemptId: number,
+  ): Promise<{ queued: boolean; reason?: string }> {
     const report = await this.reportRepo.findOne({
       where: { assessmentAttemptId: attemptId, status: 'DONE' },
     });
     if (report) return { queued: false, reason: 'report_exists' };
 
     const job = await this.ensureJob(attemptId);
-    if (job.status === 'PROCESSING') return { queued: false, reason: 'processing' };
+    if (job.status === 'PROCESSING')
+      return { queued: false, reason: 'processing' };
     if (job.status === 'FAILED' && job.retryCount >= job.maxRetries) {
       return { queued: false, reason: 'retry_exhausted' };
     }
@@ -87,7 +107,8 @@ export class IatReportService {
     if (!payload.ready) {
       await this.jobRepo.update(job.id, {
         status: 'PENDING',
-        lastError: payload.reason || 'IAT attempt is not ready for report generation.',
+        lastError:
+          payload.reason || 'IAT attempt is not ready for report generation.',
       });
       return;
     }
@@ -104,16 +125,23 @@ export class IatReportService {
       '';
     if (!apiKey) {
       await this.markFailure(job, 'Claude API key is not configured.');
-      await this.upsertFailedReport(attemptId, payload.input, 'Claude API key is not configured.');
+      await this.upsertFailedReport(
+        attemptId,
+        payload.input,
+        'Claude API key is not configured.',
+      );
       throw new Error('Claude API key is not configured.');
     }
 
     const model =
-      String((await this.readSetting('claude_report_model', DEFAULT_CLAUDE_MODEL)) || '').trim() ||
-      DEFAULT_CLAUDE_MODEL;
+      String(
+        (await this.readSetting('claude_report_model', DEFAULT_CLAUDE_MODEL)) ||
+          '',
+      ).trim() || DEFAULT_CLAUDE_MODEL;
     const skill =
-      String((await this.readSetting('report_skill_markdown', '')) || '').trim() ||
-      this.defaultSkillPrompt();
+      String(
+        (await this.readSetting('report_skill_markdown', '')) || '',
+      ).trim() || this.defaultSkillPrompt();
 
     try {
       const res = await firstValueFrom(
@@ -141,10 +169,11 @@ export class IatReportService {
         ),
       );
 
-      const data: any = res.data;
-      const text = (data?.content || [])
-        .filter((part: any) => part?.type === 'text')
-        .map((part: any) => String(part.text || ''))
+      const data = res.data as ClaudeMessageResponse;
+      const content = Array.isArray(data.content) ? data.content : [];
+      const text = content
+        .filter((part) => part.type === 'text')
+        .map((part) => String(part.text || ''))
         .join('\n')
         .trim();
       if (!text) throw new Error('Claude returned an empty IAT report.');
@@ -153,8 +182,9 @@ export class IatReportService {
       // this attempt (assessment_attempt_id is UNIQUE). Update it in place so a
       // retry can succeed instead of tripping the unique constraint forever.
       const reportRow =
-        (await this.reportRepo.findOne({ where: { assessmentAttemptId: attemptId } })) ||
-        this.reportRepo.create({ assessmentAttemptId: attemptId });
+        (await this.reportRepo.findOne({
+          where: { assessmentAttemptId: attemptId },
+        })) || this.reportRepo.create({ assessmentAttemptId: attemptId });
       reportRow.assessmentSessionId = payload.attempt.assessmentSessionId;
       reportRow.userId = payload.attempt.userId;
       reportRow.registrationId = payload.attempt.registrationId;
@@ -169,16 +199,17 @@ export class IatReportService {
       reportRow.generatedAt = new Date();
       await this.reportRepo.save(reportRow);
 
-      const usage = data?.usage || {};
+      const usage = data.usage || {};
       await this.usageRepo.insert({
         purpose: 'iat_report_generation',
         assessmentAttemptId: attemptId,
         model,
         inputTokens: Number(usage.input_tokens || 0),
         outputTokens: Number(usage.output_tokens || 0),
-        totalTokens: Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0),
+        totalTokens:
+          Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0),
         questionCount: payload.modules.length,
-        questionIds: payload.modules.map((m: any) => m.id),
+        questionIds: payload.modules.map((m) => m.id),
         status: 'DONE',
       });
 
@@ -188,7 +219,9 @@ export class IatReportService {
         lastError: null,
         nextRetryAt: null,
       });
-      this.logger.log(`[IAT] Claude report generated for attempt ${attemptId}.`);
+      this.logger.log(
+        `[IAT] Claude report generated for attempt ${attemptId}.`,
+      );
     } catch (err) {
       const message = this.errorMessage(err);
       await this.usageRepo.insert({
@@ -199,7 +232,7 @@ export class IatReportService {
         outputTokens: 0,
         totalTokens: 0,
         questionCount: payload.modules.length,
-        questionIds: payload.modules.map((m: any) => m.id),
+        questionIds: payload.modules.map((m) => m.id),
         status: 'FAILED',
         error: message,
       });
@@ -224,16 +257,21 @@ export class IatReportService {
   }
 
   private async buildReportPayload(attemptId: number) {
-    const attempt = await this.attemptRepo.findOne({ where: { id: attemptId } });
-    if (!attempt) return { ready: false, reason: 'Attempt not found.' } as const;
+    const attempt = await this.attemptRepo.findOne({
+      where: { id: attemptId },
+    });
+    if (!attempt)
+      return { ready: false, reason: 'Attempt not found.' } as const;
     const modules = await this.moduleRepo.find({
       where: { assessmentAttemptId: attemptId },
       relations: ['module'],
       order: { moduleOrder: 'ASC' },
     });
-    if (!modules.length) return { ready: false, reason: 'No IAT modules found.' } as const;
+    if (!modules.length)
+      return { ready: false, reason: 'No IAT modules found.' } as const;
     const incomplete = modules.filter((m) => m.status !== 'COMPLETED');
-    if (incomplete.length) return { ready: false, reason: 'IAT modules are incomplete.' } as const;
+    if (incomplete.length)
+      return { ready: false, reason: 'IAT modules are incomplete.' } as const;
 
     const intake = await this.intakeRepo.findOne({
       where: { assessmentAttemptId: attemptId },
@@ -241,12 +279,20 @@ export class IatReportService {
     const registration = await this.registrationRepo.findOne({
       where: { id: attempt.registrationId },
     });
-    const registrationMetaRows = await this.registrationRepo.query(
+    const registrationMetaRows = (await this.registrationRepo.query(
       `SELECT group_id AS "groupId" FROM registrations WHERE id = $1 LIMIT 1`,
       [attempt.registrationId],
-    );
+    )) as unknown as RegistrationMetaRow[];
 
-    const areas: Record<string, any> = {};
+    const areas: Record<
+      string,
+      {
+        pattern: string;
+        slowed_on: string;
+        slowest_words: string[];
+        error_words: string[];
+      }
+    > = {};
     for (const module of modules) {
       const code = module.module?.code || String(module.moduleId);
       areas[code] = {
@@ -299,19 +345,25 @@ export class IatReportService {
     } as const;
   }
 
-  private async upsertFailedReport(attemptId: number, input: any, message: string) {
-    let report = await this.reportRepo.findOne({ where: { assessmentAttemptId: attemptId } });
+  private async upsertFailedReport(
+    attemptId: number,
+    input: unknown,
+    message: string,
+  ) {
+    let report = await this.reportRepo.findOne({
+      where: { assessmentAttemptId: attemptId },
+    });
     if (!report) {
       report = this.reportRepo.create({
         assessmentAttemptId: attemptId,
         status: 'FAILED',
-        reportInput: input || {},
+        reportInput: this.reportInput(input),
         biasMap: [],
         error: message,
       });
     } else if (report.status !== 'DONE') {
       report.status = 'FAILED';
-      report.reportInput = input || report.reportInput || {};
+      report.reportInput = this.reportInput(input || report.reportInput || {});
       report.error = message;
     }
     if (report.status !== 'DONE') await this.reportRepo.save(report);
@@ -324,7 +376,9 @@ export class IatReportService {
     await this.jobRepo.update(job.id, {
       status: 'FAILED',
       retryCount,
-      nextRetryAt: exhausted ? null : new Date(Date.now() + this.backoffMs(retryCount)),
+      nextRetryAt: exhausted
+        ? null
+        : new Date(Date.now() + this.backoffMs(retryCount)),
       lastError: message,
     });
   }
@@ -359,7 +413,7 @@ export class IatReportService {
       const row = await this.settingRepo.findOne({
         where: { category: 'iat', settingKey: key },
       });
-      const value = row?.value;
+      const value = row?.value as unknown;
       return value === null || value === undefined ? fallback : (value as T);
     } catch {
       return fallback;
@@ -372,14 +426,29 @@ export class IatReportService {
   }
 
   private errorMessage(err: unknown): string {
-    const anyErr = err as any;
+    const anyErr = err as {
+      response?: { data?: { error?: { message?: string }; message?: string } };
+      message?: string;
+    };
+    const fallback =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+          ? err
+          : 'Unknown error';
     return String(
       anyErr?.response?.data?.error?.message ||
         anyErr?.response?.data?.message ||
         anyErr?.message ||
-        err ||
-        'Unknown error',
+        fallback,
     ).slice(0, 2000);
+  }
+
+  private reportInput(input: unknown): Record<string, unknown> {
+    if (input && typeof input === 'object' && !Array.isArray(input)) {
+      return input as Record<string, unknown>;
+    }
+    return {};
   }
 
   private defaultSkillPrompt(): string {

@@ -51,7 +51,7 @@ export interface AssessmentProgressItem {
   description: string;
   status: string;
   levelNumber?: number;
-  assessmentKind?: 'ACI' | 'IAT_GEN' | 'METAPHOR' | 'DISC' | string;
+  assessmentKind?: string;
   completedQuestions: number;
   totalQuestions: number;
   unlockTime: Date | null;
@@ -607,8 +607,11 @@ export class StudentService {
 
     for (const attempt of attempts) {
       const level = attempt.assessmentLevel;
+      const metadataAssessmentKind = attempt.metadata?.assessment_kind;
       let assessmentKind: string =
-        String(attempt.metadata?.assessment_kind || '').toUpperCase() || '';
+        (typeof metadataAssessmentKind === 'string'
+          ? metadataAssessmentKind.toUpperCase()
+          : '') || '';
       if (!assessmentKind) {
         if (level?.levelNumber === 1 || level?.patternType === 'DISC') {
           assessmentKind = 'DISC';
@@ -618,10 +621,14 @@ export class StudentService {
           String(level?.patternType || '').toUpperCase() === 'METAPHOR'
         ) {
           assessmentKind = 'METAPHOR';
-        } else if (level?.levelNumber === 2 || String(level?.patternType || '').toUpperCase() === 'ACI') {
-          assessmentKind = await this.iatEligibility.getAssessmentKindForRegistration(
-            attempt.registrationId,
-          );
+        } else if (
+          level?.levelNumber === 2 ||
+          String(level?.patternType || '').toUpperCase() === 'ACI'
+        ) {
+          assessmentKind =
+            await this.iatEligibility.getAssessmentKindForRegistration(
+              attempt.registrationId,
+            );
         }
       }
 
@@ -690,11 +697,11 @@ export class StudentService {
             ? totalCount
             : assessmentKind === 'IAT_GEN'
               ? 6
-            : level?.levelNumber === 2 ||
-                level?.name.includes('ACI') ||
-                level?.patternType === 'ACI'
-              ? 25
-              : 60,
+              : level?.levelNumber === 2 ||
+                  level?.name.includes('ACI') ||
+                  level?.patternType === 'ACI'
+                ? 25
+                : 60,
         unlockTime: unlockTime,
         dateCompleted: attempt.completedAt || attempt.updatedAt,
         attemptId: attempt.id, // Ensure attemptId is passed
@@ -1801,7 +1808,10 @@ export class StudentService {
         }
         qParams.push(count);
         qSql += ` ORDER BY RANDOM() LIMIT $${qParams.length}`;
-        const rows = await this.answerRepo.query(qSql, qParams);
+        const rows = (await this.answerRepo.query(
+          qSql,
+          qParams,
+        )) as unknown as Array<{ id: number }>;
         picked.push(...rows);
         continue;
       }
@@ -1821,7 +1831,10 @@ export class StudentService {
       params.push(count);
       sql += ` LIMIT $${params.length}`;
 
-      const rows = await this.answerRepo.query(sql, params);
+      const rows = (await this.answerRepo.query(
+        sql,
+        params,
+      )) as unknown as Array<{ id: number }>;
       picked.push(...rows);
     }
 

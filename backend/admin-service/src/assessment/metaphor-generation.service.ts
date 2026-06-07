@@ -25,7 +25,10 @@ export interface MetaphorAttemptCtx {
 export class MetaphorGenerationService {
   private readonly logger = new Logger(MetaphorGenerationService.name);
 
-  async generate(attempt: MetaphorAttemptCtx, manager: EntityManager): Promise<void> {
+  async generate(
+    attempt: MetaphorAttemptCtx,
+    manager: EntityManager,
+  ): Promise<void> {
     let count = 20;
     try {
       const setting = await manager.findOne(OriginbiSetting, {

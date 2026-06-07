@@ -16,6 +16,19 @@ import { METAPHOR_REPORT_QUEUE } from './metaphor.constants';
 const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 const DEFAULT_MAX_RETRIES = 5;
 
+interface ClaudeTextPart {
+  type?: string;
+  text?: string;
+}
+
+interface ClaudeMessageResponse {
+  content?: ClaudeTextPart[];
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+}
+
 type ReadinessAnswer = {
   sequence: number | null;
   status: string;
@@ -42,7 +55,9 @@ export class MetaphorReportService {
     private readonly pgBoss: PgBossService,
   ) {}
 
-  async enqueueIfReady(attemptId: number): Promise<{ queued: boolean; reason?: string }> {
+  async enqueueIfReady(
+    attemptId: number,
+  ): Promise<{ queued: boolean; reason?: string }> {
     const existingReport = await this.reportRepo.findOne({
       where: { assessmentAttemptId: attemptId },
     });
@@ -91,7 +106,9 @@ export class MetaphorReportService {
     if (!readiness.ready) {
       await this.jobRepo.update(job.id, {
         status: 'PENDING',
-        lastError: readiness.reason || 'Metaphor answers are not ready for report generation.',
+        lastError:
+          readiness.reason ||
+          'Metaphor answers are not ready for report generation.',
       });
       return;
     }
@@ -112,9 +129,13 @@ export class MetaphorReportService {
     }
 
     const model =
-      String((await this.readSetting('claude_report_model', DEFAULT_CLAUDE_MODEL)) || '').trim() ||
-      DEFAULT_CLAUDE_MODEL;
-    const skill = String((await this.readSetting('report_skill_markdown', '')) || '').trim();
+      String(
+        (await this.readSetting('claude_report_model', DEFAULT_CLAUDE_MODEL)) ||
+          '',
+      ).trim() || DEFAULT_CLAUDE_MODEL;
+    const skill = String(
+      (await this.readSetting('report_skill_markdown', '')) || '',
+    ).trim();
     const prompt = this.buildUserPrompt(readiness.answers);
 
     try {
@@ -124,7 +145,9 @@ export class MetaphorReportService {
           {
             model,
             max_tokens: 4096,
-            system: skill || 'Generate a concise admin Markdown report from the supplied assessment answers.',
+            system:
+              skill ||
+              'Generate a concise admin Markdown report from the supplied assessment answers.',
             messages: [{ role: 'user', content: prompt }],
           },
           {
@@ -138,10 +161,11 @@ export class MetaphorReportService {
         ),
       );
 
-      const data: any = res.data;
-      const markdown = (data?.content || [])
-        .filter((part: any) => part?.type === 'text')
-        .map((part: any) => String(part.text || ''))
+      const data = res.data as ClaudeMessageResponse;
+      const content = Array.isArray(data.content) ? data.content : [];
+      const markdown = content
+        .filter((part) => part.type === 'text')
+        .map((part) => String(part.text || ''))
         .join('\n')
         .trim();
       if (!markdown) throw new Error('Claude returned an empty report.');
@@ -159,14 +183,15 @@ export class MetaphorReportService {
         }),
       );
 
-      const usage = data?.usage || {};
+      const usage = data.usage || {};
       await this.usageRepo.insert({
         purpose: 'metaphor_report',
         assessmentAttemptId: attemptId,
         model,
         inputTokens: Number(usage.input_tokens || 0),
         outputTokens: Number(usage.output_tokens || 0),
-        totalTokens: Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0),
+        totalTokens:
+          Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0),
         questionCount: readiness.answers.length,
         questionIds: readiness.rawAnswers.map((a) => a.id),
         status: 'DONE',
@@ -178,7 +203,9 @@ export class MetaphorReportService {
         lastError: null,
         nextRetryAt: null,
       });
-      this.logger.log(`[Metaphor] Claude report generated for attempt ${attemptId}.`);
+      this.logger.log(
+        `[Metaphor] Claude report generated for attempt ${attemptId}.`,
+      );
     } catch (err) {
       const message = this.errorMessage(err);
       await this.usageRepo.insert({
@@ -260,7 +287,8 @@ export class MetaphorReportService {
       const text =
         answer.status === 'NOT_ANSWERED'
           ? '[No answer submitted]'
-          : String(answer.answerTextEn || '').trim() || '[No translated answer available]';
+          : String(answer.answerTextEn || '').trim() ||
+            '[No translated answer available]';
       return `Answer ${n}: ${text}`;
     });
 
@@ -273,11 +301,16 @@ export class MetaphorReportService {
     ].join('\n');
   }
 
-  private async markFailure(job: MetaphorReportJob, message: string): Promise<void> {
+  private async markFailure(
+    job: MetaphorReportJob,
+    message: string,
+  ): Promise<void> {
     const retryCount = Number(job.retryCount || 0) + 1;
     const maxRetries = Number(job.maxRetries || DEFAULT_MAX_RETRIES);
     const exhausted = retryCount >= maxRetries;
-    const nextRetryAt = exhausted ? null : new Date(Date.now() + this.backoffMs(retryCount));
+    const nextRetryAt = exhausted
+      ? null
+      : new Date(Date.now() + this.backoffMs(retryCount));
     await this.jobRepo.update(job.id, {
       status: 'FAILED',
       retryCount,
@@ -296,7 +329,7 @@ export class MetaphorReportService {
       const row = await this.settingRepo.findOne({
         where: { category: 'metaphor', settingKey: key },
       });
-      const v = row?.value;
+      const v = row?.value as unknown;
       return v === null || v === undefined ? fallback : (v as T);
     } catch {
       return fallback;
@@ -304,7 +337,9 @@ export class MetaphorReportService {
   }
 
   private async ensureJob(attemptId: number): Promise<MetaphorReportJob> {
-    let job = await this.jobRepo.findOne({ where: { assessmentAttemptId: attemptId } });
+    let job = await this.jobRepo.findOne({
+      where: { assessmentAttemptId: attemptId },
+    });
     if (!job) {
       job = await this.jobRepo.save(
         this.jobRepo.create({
@@ -319,13 +354,21 @@ export class MetaphorReportService {
   }
 
   private errorMessage(err: unknown): string {
-    const anyErr = err as any;
+    const anyErr = err as {
+      response?: { data?: { error?: { message?: string }; message?: string } };
+      message?: string;
+    };
+    const fallback =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+          ? err
+          : 'Unknown error';
     return String(
       anyErr?.response?.data?.error?.message ||
         anyErr?.response?.data?.message ||
         anyErr?.message ||
-        err ||
-        'Unknown error',
+        fallback,
     ).slice(0, 2000);
   }
 }

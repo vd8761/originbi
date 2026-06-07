@@ -521,7 +521,10 @@ export class AssessmentGenerationService {
     ];
     try {
       const setting = await manager.findOne(OriginbiSetting, {
-        where: { category: 'assessment', settingKey: 'open_question_distribution' },
+        where: {
+          category: 'assessment',
+          settingKey: 'open_question_distribution',
+        },
       });
       const value = setting?.value as OpenQuestionGroup[] | undefined;
       if (Array.isArray(value) && value.length > 0) {
