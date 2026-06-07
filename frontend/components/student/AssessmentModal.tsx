@@ -55,6 +55,7 @@ interface AssessmentData {
   completedQuestions: number;
   status: 'completed' | 'in-progress' | 'locked' | 'not-started';
   duration?: string;
+  assessmentKind?: string;
 }
 
 interface AssessmentModalProps {
@@ -91,6 +92,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
 
   const isContinue = assessment.status === 'in-progress';
   const progress = Math.round((assessment.completedQuestions / assessment.totalQuestions) * 100);
+  const isIatGen = assessment.assessmentKind === 'IAT_GEN';
 
   // Extract number from duration string (e.g. "60 minutes" -> "60")
   const durationVal = assessment.duration ? String(assessment.duration).replace(/minutes?/i, '').trim() : '30';
@@ -152,116 +154,82 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
               </div>
             </div>
 
-            <h2 className="text-[clamp(16px,2.2vw,24px)] font-semibold text-brand-text-light-primary dark:text-white mb-1 leading-tight tracking-tight">{assessment.title}</h2>
+            <h2 className="text-[clamp(18px,2vw,28px)] font-semibold text-brand-text-light-primary dark:text-white mb-2 leading-tight tracking-tight">{assessment.title}</h2>
 
-            <p className="text-brand-text-light-secondary dark:text-gray-400 text-[clamp(10px,0.9vw,13px)] leading-relaxed mb-3.5">
+            <p className="text-brand-text-light-secondary dark:text-gray-400 text-[clamp(11px,0.9vw,14px)] leading-relaxed mb-5">
               {assessment.description}
             </p>
 
             {/* Meta Info Box */}
-            <div className="bg-brand-light-primary dark:bg-white/5 rounded-xl p-2.5 sm:p-4 flex flex-row items-center justify-around gap-2 sm:gap-6 border border-brand-light-tertiary dark:border-white/5 mb-3.5">
+            <div className="bg-brand-light-primary dark:bg-white/5 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-6 border border-brand-light-tertiary dark:border-white/5 mb-5">
 
               {/* Questions */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-center sm:justify-start">
-                <div className={`w-7 h-7 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
-                  <CustomQuestionIcon className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-3 flex-1 w-full sm:w-auto">
+                <div className={`w-8 h-8 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
+                  <CustomQuestionIcon className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-[10px] sm:text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
+                <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
                   {t.contains} <strong className="text-brand-text-light-primary dark:text-white font-bold">{assessment.totalQuestions} {t.questions}</strong>
                 </span>
               </div>
 
-              <div className="w-px h-6 sm:h-8 bg-brand-light-tertiary dark:bg-white/10 block"></div>
+              <div className="w-full h-px sm:w-px sm:h-8 bg-brand-light-tertiary dark:bg-white/10 block"></div>
 
               {/* Time */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-center sm:justify-start">
-                <div className={`w-7 h-7 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
-                  <CustomTimeIcon className="w-4 h-4 text-white" />
+              <div className="flex items-center gap-3 flex-1 w-full sm:w-auto">
+                <div className={`w-8 h-8 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
+                  <CustomTimeIcon className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-[10px] sm:text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
+                <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
                   {t.averageTime} <strong className="text-brand-text-light-primary dark:text-white font-bold">{durationVal} {t.minutes}</strong>
                 </span>
               </div>
 
             </div>
 
-            <h4 className="text-brand-text-light-primary dark:text-white font-semibold mb-1 text-[clamp(11px,1vw,14px)]">{t.readCarefully}</h4>
-            <ul className="space-y-1 mb-3">
-              <li className="text-[clamp(9.5px,0.8vw,12px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-2.5">
+            <h4 className="text-brand-text-light-primary dark:text-white font-semibold mb-2 text-[clamp(12px,1vw,15px)]">{t.readCarefully}</h4>
+            <ul className="space-y-1.5 mb-2">
+              <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
-                {(assessment.id === '2' || /level\s*2|aci/i.test(assessment.title || '')) 
-                  ? (language === 'TAM' ? "இந்தத் தேர்வு ஒரு குறிப்பிட்ட கால அளவிலான சோதனை, எனவே இடைநிறுத்தம் செய்ய முடியாது." : "This is a timed block; pause is unavailable once started.")
-                  : t.point1}
+                {isIatGen ? "This is a timed reaction block. Pause is unavailable once started." : t.point1}
               </li>
-              <li className="text-[clamp(9.5px,0.8vw,12px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-2.5">
+              <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
                 {t.point2}
               </li>
-              <li className="text-[clamp(9.5px,0.8vw,12px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-2.5">
+              <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
                 {t.point3}
               </li>
             </ul>
 
-            {/* Keyboard Controls Helper for Level 2 */}
-            {(assessment.id === '2' || /level\s*2|aci/i.test(assessment.title || '')) && (
-              <>
-                {/* Desktop Keyboard controls view */}
-                <div className="hidden md:block mt-4 p-4 bg-brand-light-primary dark:bg-white/5 border border-brand-light-tertiary dark:border-white/10 rounded-2xl">
-                  <h5 className="text-[10.5px] font-bold text-brand-text-light-secondary dark:text-gray-400 mb-3 tracking-wider uppercase">
-                    {language === 'TAM' ? "விசைப்பலகை கட்டுப்பாடுகள்" : "Keyboard Controls"}
-                  </h5>
-                  <div className="flex flex-row justify-around items-center gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl border border-gray-300 dark:border-white/10 bg-gradient-to-b from-white to-gray-50 dark:from-white/10 dark:to-white/[0.02] shadow-[0_3px_0_#1A8A47] dark:shadow-[0_3px_0_#148A47] flex items-center justify-center font-black text-brand-green text-lg select-none">
-                        E
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-brand-text-light-primary dark:text-white">
-                          {language === 'TAM' ? "இடது தெரிவு" : "Left Option"}
-                        </span>
-                        <span className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">
-                          {language === 'TAM' ? "E விசையை அழுத்தவும்" : "Press E key"}
-                        </span>
-                      </div>
+            {isIatGen && (
+              <div className="mb-4 rounded-2xl border border-brand-light-tertiary bg-brand-light-primary p-4 dark:border-white/10 dark:bg-white/5">
+                <h5 className="mb-3 text-[10.5px] font-bold uppercase tracking-wider text-brand-text-light-secondary dark:text-gray-400">
+                  Keyboard Controls
+                </h5>
+                <div className="flex items-center justify-around gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 select-none items-center justify-center rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50 text-lg font-black text-brand-green shadow-[0_3px_0_#1A8A47] dark:border-white/10 dark:from-white/10 dark:to-white/[0.02]">
+                      E
                     </div>
-                    <div className="w-px h-8 bg-brand-light-tertiary dark:bg-white/10" />
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl border border-gray-300 dark:border-white/10 bg-gradient-to-b from-white to-gray-50 dark:from-white/10 dark:to-white/[0.02] shadow-[0_3px_0_#1A8A47] dark:shadow-[0_3px_0_#148A47] flex items-center justify-center font-black text-brand-green text-lg select-none">
-                        I
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-brand-text-light-primary dark:text-white">
-                          {language === 'TAM' ? "வலது தெரிவு" : "Right Option"}
-                        </span>
-                        <span className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">
-                          {language === 'TAM' ? "I விசையை அழுத்தவும்" : "Press I key"}
-                        </span>
-                      </div>
+                    <div>
+                      <p className="text-xs font-bold text-brand-text-light-primary dark:text-white">Left option</p>
+                      <p className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">Press E or tap the left card</p>
+                    </div>
+                  </div>
+                  <div className="h-8 w-px bg-brand-light-tertiary dark:bg-white/10" />
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 select-none items-center justify-center rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50 text-lg font-black text-brand-green shadow-[0_3px_0_#1A8A47] dark:border-white/10 dark:from-white/10 dark:to-white/[0.02]">
+                      I
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-brand-text-light-primary dark:text-white">Right option</p>
+                      <p className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">Press I or tap the right card</p>
                     </div>
                   </div>
                 </div>
-
-                {/* Mobile Touch controls view */}
-                <div className="block md:hidden mt-3 p-3 bg-brand-light-primary dark:bg-white/5 border border-brand-light-tertiary dark:border-white/10 rounded-xl">
-                  <h5 className="text-[9px] font-bold text-brand-text-light-secondary dark:text-gray-400 mb-1.5 tracking-wider uppercase">
-                    {language === 'TAM' ? "தொடு கட்டுப்பாடுகள்" : "Touch Controls"}
-                  </h5>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-brand-green/10 flex items-center justify-center text-brand-green text-sm select-none shrink-0">
-                      👆
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[11px] font-bold text-brand-text-light-primary dark:text-white">
-                        {language === 'TAM' ? "வகை அட்டைகளைத் தட்டவும்" : "Tap Category Cards"}
-                      </span>
-                      <span className="text-[9.5px] text-brand-text-light-secondary dark:text-gray-400 leading-normal">
-                        {language === 'TAM' ? "பதிலளிக்க இடது/வலது வகை அட்டைகளைத் தட்டவும்" : "Tap LEFT or RIGHT category cards directly to answer."}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </>
+              </div>
             )}
 
             {/* Progress Bar for Continue State */}

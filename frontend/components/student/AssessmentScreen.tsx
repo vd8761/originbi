@@ -590,6 +590,7 @@ export interface AssessmentData {
   dateCompleted?: string;
   unlockTime?: string;
   duration?: string;
+  assessmentKind?: string;
 }
 
 interface AssessmentCardProps extends AssessmentData {
@@ -1019,7 +1020,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         status: status,
         unlockTime: step.unlockTime,
         dateCompleted: step.dateCompleted,
-        duration: (step.levelNumber === 1 || step.stepName.includes('Level 1')) ? "60 minutes" : "45 minutes"
+        duration: step.assessmentKind === 'IAT_GEN'
+          ? "20 minutes"
+          : (step.levelNumber === 1 || step.stepName.includes('Level 1')) ? "60 minutes" : "45 minutes",
+        assessmentKind: step.assessmentKind,
       };
     });
   }, [fetchedSteps]);
@@ -1151,13 +1155,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       const isMetaphor =
         selectedAssessment.id === '3' ||
         /metaphor/i.test(selectedAssessment.title || '');
-      const isLevel2 =
-        selectedAssessment.id === '2' ||
-        /level\s*2|aci/i.test(selectedAssessment.title || '');
-      if (isMetaphor) {
+      const isIat = selectedAssessment.assessmentKind === 'IAT_GEN';
+      if (isIat) {
+        router.push(`/student/iat?attemptId=${selectedAssessment.attemptId}`);
+      } else if (isMetaphor) {
         router.push(`/student/metaphor?attemptId=${selectedAssessment.attemptId}`);
-      } else if (isLevel2) {
-        router.push(`/student/level2?attemptId=${selectedAssessment.attemptId}`);
       } else {
         router.push(`/student/assessment/start?attempt_id=${selectedAssessment.attemptId}`);
       }
