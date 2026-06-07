@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import PDFDocument from 'pdfkit';
 import {
   AssessmentSession,
   Program,
@@ -8,6 +9,7 @@ import {
   AssessmentAttempt,
   GroupAssessment,
   Groups,
+  Registration,
   AciTraitValueNote,
   AciTrait,
   AciValue,
@@ -15,9 +17,13 @@ import {
 import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
 import { DegreeType } from '../departments/degree-type.entity';
+import { AssessmentGenerationService } from './assessment-generation.service';
 
 @Injectable()
 export class AssessmentService {
+  private readonly logger = new Logger(AssessmentService.name);
+  private readonly ADMIN_USER_ID = 1;
+
   constructor(
     @InjectRepository(AssessmentSession)
     private readonly sessionRepo: Repository<AssessmentSession>,
@@ -37,6 +43,8 @@ export class AssessmentService {
     private readonly deptRepo: Repository<Department>,
     @InjectRepository(DepartmentDegree)
     private readonly deptDegreeRepo: Repository<DepartmentDegree>,
+    private readonly dataSource: DataSource,
+    private readonly assessmentGenService: AssessmentGenerationService,
   ) {}
 
   async findAllSessions(
@@ -51,8 +59,24 @@ export class AssessmentService {
     userId?: string,
     type?: string,
     emailStatus?: string,
+    groupBy?: string,
   ) {
     try {
+      // COMBINED "BY GROUP" VIEW: aggregate group_assessments by (group, program)
+      // so a cohort spread across several exam windows shows as ONE row.
+      if (type === 'group' && groupBy === 'group') {
+        return this.findGroupsCombined(
+          page,
+          limit,
+          search,
+          sortBy,
+          sortOrder,
+          startDate,
+          endDate,
+          status,
+        );
+      }
+
       // NEW LOGIC FOR GROUP ASSESSMENTS
       if (type === 'group') {
         const qb = this.groupAssessmentRepo
@@ -333,6 +357,722 @@ export class AssessmentService {
     }
   }
 
+  /**
+   * "By Group" list: aggregates group_assessments by (group_id, program_id) so
+   * each cohort+program shows as a single combined row regardless of how many
+   * exam windows it spans. Status is rolled up; candidate count is summed; the
+   * window is min(start)..max(end).
+   */
+  async findGroupsCombined(
+    page: number,
+    limit: number,
+    search?: string,
+    sortBy?: string,
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+    startDate?: string,
+    endDate?: string,
+    status?: string,
+  ) {
+    const qb = this.groupAssessmentRepo
+      .createQueryBuilder('ga')
+      .leftJoin(Program, 'p', 'p.id = ga.programId')
+      .leftJoin(Groups, 'g', 'g.id = ga.groupId')
+      .select('ga.group_id', 'groupId')
+      .addSelect('ga.program_id', 'programId')
+      .addSelect('g.name', 'groupName')
+      .addSelect('p.name', 'programName')
+      .addSelect('p.assessment_title', 'assessmentTitle')
+      .addSelect('COUNT(ga.id)', 'assessmentCount')
+      .addSelect('COALESCE(SUM(ga.total_candidates), 0)', 'totalCandidates')
+      .addSelect('MIN(ga.valid_from)', 'firstStart')
+      .addSelect('MAX(ga.valid_to)', 'lastEnd')
+      .addSelect("BOOL_AND(ga.status = 'COMPLETED')", 'allCompleted')
+      .addSelect("BOOL_AND(ga.status = 'NOT_STARTED')", 'allNotStarted')
+      .groupBy('ga.group_id')
+      .addGroupBy('ga.program_id')
+      .addGroupBy('g.name')
+      .addGroupBy('p.name')
+      .addGroupBy('p.assessment_title');
+
+    if (search) {
+      const s = `%${search.toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(g.name) LIKE :s)',
+        { s },
+      );
+    }
+    if (startDate)
+      qb.andWhere('ga.valid_from >= :startDate', {
+        startDate: `${startDate} 00:00:00`,
+      });
+    if (endDate)
+      qb.andWhere('ga.valid_from <= :endDate', {
+        endDate: `${endDate} 23:59:59`,
+      });
+    // status filter applies at the window level (a group is included if it has a
+    // window in that status); the rolled-up row status is computed separately.
+    if (status) qb.andWhere('ga.status = :status', { status });
+
+    // Sort on an aggregate alias.
+    const sortMap: Record<string, string> = {
+      group_name: 'g.name',
+      program_name: 'p.name',
+      exam_starts_on: 'MIN(ga.valid_from)',
+      exam_ends_on: 'MAX(ga.valid_to)',
+      no_of_candidates: 'COALESCE(SUM(ga.total_candidates), 0)',
+    };
+    qb.orderBy(sortMap[sortBy ?? ''] ?? 'MIN(ga.valid_from)', sortOrder);
+
+    // Aggregate rows are few (one per group+program) — fetch all, count, slice.
+    const allRows = await qb.getRawMany();
+    const total = allRows.length;
+    const pageRows = allRows.slice((page - 1) * limit, page * limit);
+
+    const data = pageRows.map((r) => ({
+      // synthetic id so the frontend can route to the combined detail view
+      id: `${r.groupId}:${r.programId}`,
+      groupId: Number(r.groupId),
+      programId: Number(r.programId),
+      groupName: r.groupName || 'N/A',
+      program: {
+        id: Number(r.programId),
+        name: r.programName,
+        assessmentTitle: r.assessmentTitle,
+      },
+      assessmentCount: Number(r.assessmentCount),
+      totalCandidates: Number(r.totalCandidates),
+      validFrom: r.firstStart,
+      validTo: r.lastEnd,
+      createdAt: r.firstStart,
+      status: r.allCompleted
+        ? 'COMPLETED'
+        : r.allNotStarted
+          ? 'NOT_STARTED'
+          : 'IN_PROGRESS',
+      // parity fields with the per-assessment rows
+      userId: 0,
+      registrationId: 0,
+      currentLevel: 0,
+      totalLevels: 0,
+    }));
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * Combined detail for a (group, program): every exam window plus the merged
+   * candidate list across all windows, deduped to ONE row per student (their
+   * latest completed session). The report button uses group.id, which the
+   * group-scoped report endpoint already supports.
+   */
+  async findGroupCombinedDetails(groupId: number, programId: number) {
+    try {
+      const group = await this.dataSource
+        .getRepository(Groups)
+        .findOne({ where: { id: groupId } });
+
+      const assessments = await this.groupAssessmentRepo.find({
+        where: { groupId, programId },
+        relations: ['program'],
+        order: { validFrom: 'ASC' },
+      });
+
+      const program =
+        assessments[0]?.program ||
+        (await this.dataSource
+          .getRepository(Program)
+          .findOne({ where: { id: programId } }));
+
+      // All sessions for this (group, program), ordered so the latest completed
+      // session per user comes first, then dedup in memory.
+      const sessions = await this.sessionRepo
+        .createQueryBuilder('s')
+        .leftJoinAndSelect('s.user', 'u')
+        .leftJoinAndSelect('s.registration', 'r')
+        .where('s.group_id = :groupId', { groupId })
+        .andWhere('s.program_id = :programId', { programId })
+        .orderBy('s.user_id', 'ASC')
+        .addOrderBy('s.completed_at', 'DESC', 'NULLS LAST')
+        .addOrderBy('s.created_at', 'DESC')
+        .getMany();
+
+      const seen = new Set<number>();
+      const dedupedSessions = sessions.filter((s) => {
+        const uid = Number(s.userId);
+        if (seen.has(uid)) return false;
+        seen.add(uid);
+        return true;
+      });
+
+      return {
+        groupId,
+        programId,
+        group: group ? { id: group.id, name: group.name } : null,
+        program,
+        totalAssessments: assessments.length,
+        totalCandidates: dedupedSessions.length,
+        assessments: assessments.map((ga) => ({
+          id: ga.id,
+          status: ga.status,
+          validFrom: ga.validFrom,
+          validTo: ga.validTo,
+          totalCandidates: ga.totalCandidates,
+        })),
+        sessions: dedupedSessions.map((s) => ({
+          ...s,
+          userFullName: s.registration?.fullName || 'N/A',
+          userEmail: s.user?.email || 'N/A',
+        })),
+      };
+    } catch (error) {
+      console.error('Error fetching group combined details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Survey (open question_type='SURVEY') answers for a session: the questions
+   * shown to this candidate plus the option they picked. Non-scoring — purely
+   * for the admin "Survey" preview tab. Empty array => no survey in this exam.
+   */
+  async findSurveyAnswers(sessionId: number) {
+    const rows = await this.dataSource.query(
+      `SELECT a.question_sequence  AS seq,
+              oq.id                AS question_id,
+              oq.set_number        AS set_number,
+              oq.context_text_en   AS context_en,
+              oq.context_text_ta   AS context_ta,
+              oq.question_text_en  AS question_en,
+              oq.question_text_ta  AS question_ta,
+              oq.metadata->>'theme' AS theme,
+              a.open_option_id     AS selected_option_id,
+              a.status             AS status
+       FROM assessment_answers a
+       JOIN open_questions oq ON a.open_question_id = oq.id
+       WHERE a.assessment_session_id = $1
+         AND a.question_source = 'OPEN'
+         AND oq.question_type = 'SURVEY'
+       ORDER BY a.question_sequence ASC`,
+      [sessionId],
+    );
+
+    if (!rows || rows.length === 0) {
+      return { setNumber: null, total: 0, answered: 0, answers: [] };
+    }
+
+    const questionIds = rows.map((r: any) => r.question_id);
+    const opts = await this.dataSource.query(
+      `SELECT id, open_question_id, option_text_en, option_text_ta, display_order
+       FROM open_question_options
+       WHERE open_question_id = ANY($1)
+       ORDER BY open_question_id, display_order ASC`,
+      [questionIds],
+    );
+
+    const optsByQ = new Map<string, any[]>();
+    for (const o of opts) {
+      const k = String(o.open_question_id);
+      if (!optsByQ.has(k)) optsByQ.set(k, []);
+      optsByQ.get(k)!.push(o);
+    }
+
+    const answers = rows.map((r: any) => {
+      const selId =
+        r.selected_option_id != null ? String(r.selected_option_id) : null;
+      return {
+        sequence: r.seq,
+        questionId: Number(r.question_id),
+        setNumber: r.set_number,
+        theme: r.theme || null,
+        contextEn: r.context_en,
+        contextTa: r.context_ta,
+        questionEn: r.question_en,
+        questionTa: r.question_ta,
+        status: r.status,
+        answered: selId != null,
+        selectedOptionId: selId != null ? Number(selId) : null,
+        options: (optsByQ.get(String(r.question_id)) || []).map((o: any) => ({
+          id: Number(o.id),
+          displayOrder: o.display_order,
+          textEn: o.option_text_en,
+          textTa: o.option_text_ta,
+          selected: selId != null && String(o.id) === selId,
+        })),
+      };
+    });
+
+    return {
+      setNumber: rows[0].set_number,
+      total: answers.length,
+      answered: answers.filter((a) => a.answered).length,
+      answers,
+    };
+  }
+
+  async findMetaphorReport(sessionId: number) {
+    const attemptRows = await this.dataSource.query(
+      `SELECT aa.id, aa.status, aa.started_at, aa.completed_at
+       FROM assessment_attempts aa
+       JOIN assessment_levels al ON al.id = aa.assessment_level_id
+       WHERE aa.assessment_session_id = $1
+         AND (LOWER(al.name) LIKE '%metaphor%' OR LOWER(COALESCE(al.pattern_type, '')) = 'metaphor' OR al.level_number = 3)
+       ORDER BY aa.id DESC
+       LIMIT 1`,
+      [sessionId],
+    );
+
+    if (!attemptRows || attemptRows.length === 0) {
+      return {
+        attempt: null,
+        total: 0,
+        answered: 0,
+        missing: 0,
+        readyForReport: false,
+        answers: [],
+        job: null,
+        report: null,
+      };
+    }
+
+    const attemptId = Number(attemptRows[0].id);
+    const answers = await this.dataSource.query(
+      `SELECT a.id,
+              a.question_sequence AS "sequence",
+              a.status,
+              a.spoken_language AS "spokenLanguage",
+              a.answer_text_web AS "webTranscript",
+              a.answer_text_original AS "finalTranscript",
+              a.answer_text_en AS "englishText",
+              a.translation_status AS "translationStatus",
+              a.transcription_status AS "transcriptionStatus",
+              a.transcription_source AS "transcriptionSource",
+              a.transcription_error AS "transcriptionError",
+              a.transcription_retry_count AS "transcriptionRetryCount",
+              a.transcription_next_retry_at AS "transcriptionNextRetryAt",
+              q.context_text_en AS "contextEn",
+              q.context_text_ta AS "contextTa",
+              q.question_text_en AS "questionEn",
+              q.question_text_ta AS "questionTa",
+              q.image_url AS "imageUrl",
+              q.image_description_en AS "imageDescriptionEn",
+              q.image_description_ta AS "imageDescriptionTa"
+       FROM metaphor_answers a
+       JOIN metaphor_questions q ON q.id = a.metaphor_question_id
+       WHERE a.assessment_attempt_id = $1
+       ORDER BY a.question_sequence ASC`,
+      [attemptId],
+    );
+
+    const jobRows = await this.dataSource.query(
+      `SELECT id,
+              status,
+              retry_count AS "retryCount",
+              max_retries AS "maxRetries",
+              next_retry_at AS "nextRetryAt",
+              last_error AS "lastError",
+              started_at AS "startedAt",
+              completed_at AS "completedAt",
+              updated_at AS "updatedAt"
+       FROM metaphor_report_jobs
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const reportRows = await this.dataSource.query(
+      `SELECT id,
+              model,
+              markdown,
+              generated_at AS "generatedAt",
+              updated_at AS "updatedAt"
+       FROM metaphor_reports
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const total = answers.length;
+    const answered = answers.filter((a: any) => a.status === 'ANSWERED').length;
+    const missing = total - answered;
+    const readyForReport =
+      total > 0 &&
+      answers.every((a: any) => {
+        if (a.status === 'NOT_ANSWERED') return true;
+        return (
+          a.translationStatus === 'DONE' && String(a.englishText || '').trim()
+        );
+      });
+
+    return {
+      attempt: {
+        id: attemptId,
+        status: attemptRows[0].status,
+        startedAt: attemptRows[0].started_at,
+        completedAt: attemptRows[0].completed_at,
+      },
+      total,
+      answered,
+      missing,
+      readyForReport,
+      answers,
+      job: jobRows[0] || null,
+      report: reportRows[0] || null,
+    };
+  }
+
+  async retryMetaphorReport(attemptId: number) {
+    const existingReport = await this.dataSource.query(
+      `SELECT id FROM metaphor_reports WHERE assessment_attempt_id = $1 LIMIT 1`,
+      [attemptId],
+    );
+    if (existingReport?.length) {
+      return { success: false, reason: 'report_exists' };
+    }
+
+    await this.dataSource.query(
+      `INSERT INTO metaphor_report_jobs
+         (assessment_attempt_id, status, retry_count, max_retries, next_retry_at, last_error, created_at, updated_at)
+       VALUES ($1, 'PENDING', 0, 5, NULL, NULL, NOW(), NOW())
+       ON CONFLICT (assessment_attempt_id)
+       DO UPDATE SET status = 'PENDING',
+                     retry_count = 0,
+                     next_retry_at = NULL,
+                     last_error = NULL,
+                     updated_at = NOW()`,
+      [attemptId],
+    );
+
+    return { success: true, queued: true };
+  }
+
+  async findIatReport(sessionId: number) {
+    const attemptRows = await this.dataSource.query(
+      `SELECT aa.id, aa.status, aa.started_at, aa.completed_at, aa.metadata
+       FROM assessment_attempts aa
+       JOIN assessment_levels al ON al.id = aa.assessment_level_id
+       WHERE aa.assessment_session_id = $1
+         AND al.level_number = 2
+         AND (
+           aa.metadata->>'assessment_kind' = 'IAT_GEN'
+           OR EXISTS (
+             SELECT 1 FROM iat_attempt_modules iam
+             WHERE iam.assessment_attempt_id = aa.id
+           )
+         )
+       ORDER BY aa.id DESC
+       LIMIT 1`,
+      [sessionId],
+    );
+
+    if (!attemptRows?.length) {
+      return {
+        attempt: null,
+        total: 0,
+        completed: 0,
+        modules: [],
+        job: null,
+        report: null,
+      };
+    }
+
+    const attemptId = Number(attemptRows[0].id);
+    const modules = await this.dataSource.query(
+      `SELECT iam.id,
+              iam.module_order AS "order",
+              iam.status,
+              iam.compatible_average_ms AS "compatibleAverageMs",
+              iam.incompatible_average_ms AS "incompatibleAverageMs",
+              iam.speed_gap_ms AS "speedGapMs",
+              iam.pattern_label AS "pattern",
+              iam.slowest_words AS "slowestWords",
+              iam.error_words AS "errorWords",
+              iam.error_rate AS "errorRate",
+              im.code,
+              im.name,
+              im.display_name AS "displayName"
+       FROM iat_attempt_modules iam
+       JOIN iat_modules im ON im.id = iam.module_id
+       WHERE iam.assessment_attempt_id = $1
+       ORDER BY iam.module_order ASC`,
+      [attemptId],
+    );
+
+    const jobRows = await this.dataSource.query(
+      `SELECT id,
+              status,
+              retry_count AS "retryCount",
+              max_retries AS "maxRetries",
+              next_retry_at AS "nextRetryAt",
+              last_error AS "lastError",
+              started_at AS "startedAt",
+              completed_at AS "completedAt",
+              updated_at AS "updatedAt"
+       FROM iat_report_jobs
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const reportRows = await this.dataSource.query(
+      `SELECT id,
+              status,
+              model,
+              report_text AS "reportText",
+              bias_map AS "biasMap",
+              error,
+              generated_at AS "generatedAt",
+              updated_at AS "updatedAt"
+       FROM iat_reports
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    const total = modules.length || 6;
+    const completed = modules.filter(
+      (m: any) => m.status === 'COMPLETED',
+    ).length;
+    return {
+      attempt: {
+        id: attemptId,
+        status: attemptRows[0].status,
+        startedAt: attemptRows[0].started_at,
+        completedAt: attemptRows[0].completed_at,
+      },
+      total,
+      completed,
+      modules,
+      job: jobRows[0] || null,
+      report: reportRows[0] || null,
+    };
+  }
+
+  async retryIatReport(attemptId: number) {
+    const existingReport = await this.dataSource.query(
+      `SELECT id FROM iat_reports WHERE assessment_attempt_id = $1 AND status = 'DONE' LIMIT 1`,
+      [attemptId],
+    );
+    if (existingReport?.length) {
+      return { success: false, reason: 'report_exists' };
+    }
+
+    await this.dataSource.query(
+      `INSERT INTO iat_report_jobs
+         (assessment_attempt_id, status, retry_count, max_retries, next_retry_at, last_error, created_at, updated_at)
+       VALUES ($1, 'PENDING', 0, 5, NULL, NULL, NOW(), NOW())
+       ON CONFLICT (assessment_attempt_id)
+       DO UPDATE SET status = 'PENDING',
+                     retry_count = 0,
+                     next_retry_at = NULL,
+                     last_error = NULL,
+                     started_at = NULL,
+                     completed_at = NULL,
+                     updated_at = NOW()`,
+      [attemptId],
+    );
+
+    return { success: true, queued: true };
+  }
+
+  async generateMetaphorReportPdf(attemptId: number): Promise<Buffer> {
+    const reportRows = await this.dataSource.query(
+      `SELECT markdown, model, generated_at AS "generatedAt"
+       FROM metaphor_reports
+       WHERE assessment_attempt_id = $1
+       LIMIT 1`,
+      [attemptId],
+    );
+
+    if (!reportRows?.length || !String(reportRows[0].markdown || '').trim()) {
+      throw new BadRequestException('Metaphor report is not generated yet.');
+    }
+
+    const answerRows = await this.dataSource.query(
+      `SELECT a.question_sequence AS sequence,
+              a.status,
+              a.answer_text_original AS "finalTranscript",
+              a.answer_text_en AS "englishText",
+              q.question_text_en AS "questionEn"
+       FROM metaphor_answers a
+       JOIN metaphor_questions q ON q.id = a.metaphor_question_id
+       WHERE a.assessment_attempt_id = $1
+       ORDER BY a.question_sequence ASC`,
+      [attemptId],
+    );
+
+    return new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({
+        size: 'A4',
+        margins: { top: 54, bottom: 54, left: 54, right: 54 },
+        info: {
+          Title: `Metaphor Claude Report ${attemptId}`,
+          Author: 'OriginBI',
+        },
+      });
+      const buffers: Buffer[] = [];
+
+      doc.on('data', (buffer) => buffers.push(buffer));
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+      doc.on('error', reject);
+
+      const pageWidth =
+        doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const ensureSpace = (height = 80) => {
+        if (doc.y + height > doc.page.height - doc.page.margins.bottom)
+          doc.addPage();
+      };
+      const cleanInline = (value: string) =>
+        value
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/__(.*?)__/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .replace(/\[(.*?)\]\((.*?)\)/g, '$1');
+
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(18)
+        .fillColor('#111827')
+        .text('Metaphor Claude Report');
+      doc.moveDown(0.4);
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#6b7280')
+        .text(`Attempt ID: ${attemptId}`)
+        .text(reportRows[0].model ? `Model: ${reportRows[0].model}` : '')
+        .text(
+          reportRows[0].generatedAt
+            ? `Generated: ${new Date(reportRows[0].generatedAt).toLocaleString('en-GB')}`
+            : '',
+        );
+      doc.moveDown(1);
+
+      String(reportRows[0].markdown)
+        .split(/\r?\n/)
+        .forEach((raw) => {
+          const line = raw.trim();
+          if (!line) {
+            doc.moveDown(0.55);
+            return;
+          }
+          ensureSpace();
+          if (line.startsWith('# ')) {
+            doc.moveDown(0.45);
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(16)
+              .fillColor('#111827')
+              .text(cleanInline(line.slice(2)), { width: pageWidth });
+          } else if (line.startsWith('## ')) {
+            doc.moveDown(0.4);
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(14)
+              .fillColor('#111827')
+              .text(cleanInline(line.slice(3)), { width: pageWidth });
+          } else if (line.startsWith('### ')) {
+            doc.moveDown(0.3);
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(12)
+              .fillColor('#111827')
+              .text(cleanInline(line.slice(4)), { width: pageWidth });
+          } else if (/^\d+\.\s+/.test(line)) {
+            doc
+              .font('Helvetica')
+              .fontSize(10.5)
+              .fillColor('#111827')
+              .text(cleanInline(line), {
+                width: pageWidth,
+                indent: 16,
+                lineGap: 3,
+              });
+          } else if (/^[-*]\s+/.test(line)) {
+            doc
+              .font('Helvetica')
+              .fontSize(10.5)
+              .fillColor('#111827')
+              .text(`- ${cleanInline(line.slice(2))}`, {
+                width: pageWidth,
+                indent: 16,
+                lineGap: 3,
+              });
+          } else {
+            doc
+              .font('Helvetica')
+              .fontSize(10.5)
+              .fillColor('#111827')
+              .text(cleanInline(line), {
+                width: pageWidth,
+                lineGap: 3,
+              });
+          }
+        });
+
+      if (answerRows?.length) {
+        doc.addPage();
+        doc
+          .font('Helvetica-Bold')
+          .fontSize(16)
+          .fillColor('#111827')
+          .text('Question Transcript Appendix');
+        doc.moveDown(0.8);
+        for (const answer of answerRows) {
+          ensureSpace(140);
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(11)
+            .fillColor('#111827')
+            .text(`Question ${answer.sequence}`);
+          doc
+            .font('Helvetica')
+            .fontSize(9.5)
+            .fillColor('#374151')
+            .text(
+              cleanInline(String(answer.questionEn || 'Metaphor question')),
+              {
+                width: pageWidth,
+                lineGap: 2,
+              },
+            );
+          doc.moveDown(0.25);
+          doc
+            .font('Helvetica-Bold')
+            .fontSize(9.5)
+            .fillColor('#111827')
+            .text('Transcript');
+          doc
+            .font('Helvetica')
+            .fontSize(9.5)
+            .fillColor('#374151')
+            .text(String(answer.finalTranscript || '[No answer submitted]'), {
+              width: pageWidth,
+              lineGap: 2,
+            });
+          if (answer.englishText) {
+            doc.moveDown(0.25);
+            doc
+              .font('Helvetica-Bold')
+              .fontSize(9.5)
+              .fillColor('#111827')
+              .text('English Translation');
+            doc
+              .font('Helvetica')
+              .fontSize(9.5)
+              .fillColor('#374151')
+              .text(String(answer.englishText), {
+                width: pageWidth,
+                lineGap: 2,
+              });
+          }
+          doc.moveDown(0.8);
+        }
+      }
+
+      doc.end();
+    });
+  }
+
   async getSessionDetails(id: number) {
     try {
       const session = await this.sessionRepo
@@ -531,18 +1271,419 @@ export class AssessmentService {
         .getRawMany();
 
       return {
-        departments: stats.map((s) => ({
-          id: Number(s.id),
-          name: s.degreeName
-            ? `${s.degreeName} ${s.departmentName}`
-            : s.departmentName,
-          total: Number(s.total),
-          completed: Number(s.completed),
-        })),
+        departments: stats.map((s) => {
+          // Avoid duplicating the degree prefix when the department name already
+          // begins with it — e.g. "MBA" + "MBA (Master of Business Administration)"
+          // collapses to "MBA (Master of Business Administration)".
+          const deptName: string = s.departmentName ?? '';
+          const degreeName: string = s.degreeName ?? '';
+          const startsWithDegree =
+            degreeName &&
+            deptName.toUpperCase().startsWith(degreeName.toUpperCase());
+          return {
+            id: Number(s.id),
+            name:
+              startsWithDegree || !degreeName
+                ? deptName
+                : `${degreeName} ${deptName}`,
+            total: Number(s.total),
+            completed: Number(s.completed),
+          };
+        }),
       };
     } catch (error) {
       console.error('Error fetching group department stats:', error);
       return { departments: [] };
     }
+  }
+
+  /**
+   * Assigns a new exam (Program + date window) to every active user already
+   * registered in a Group. Find-or-creates the parent GroupAssessment, then
+   * for each eligible user that doesn't already have a session for it,
+   * creates an AssessmentSession + mandatory-level AssessmentAttempts and
+   * generates Level-1 questions. Returns a per-user summary.
+   */
+  async assignGroupExam(input: {
+    groupId: number;
+    programId: number;
+    examStart?: string;
+    examEnd?: string;
+    sendEmail?: boolean;
+  }) {
+    const { groupId, programId, examStart, examEnd } = input;
+
+    if (!groupId) throw new BadRequestException('groupId is required');
+    if (!programId) throw new BadRequestException('programId is required');
+
+    const validFrom = examStart ? new Date(examStart) : new Date();
+    const validTo = examEnd
+      ? new Date(examEnd)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    return this.dataSource.transaction(async (manager) => {
+      const program = await manager
+        .getRepository(Program)
+        .findOne({ where: { id: programId as any } });
+      if (!program) {
+        throw new BadRequestException(`Program ${programId} not found`);
+      }
+
+      const group = await manager
+        .getRepository(Groups)
+        .findOne({ where: { id: groupId } });
+      if (!group) {
+        throw new BadRequestException(`Group ${groupId} not found`);
+      }
+
+      // 1. Find-or-create the GroupAssessment row (same dedupe key as
+      //    single-user admin create: groupId + programId + overlapping window).
+      const gaRepo = manager.getRepository(GroupAssessment);
+      let groupAssessment = await gaRepo
+        .createQueryBuilder('ga')
+        .where('ga.group_id = :groupId', { groupId })
+        .andWhere('ga.program_id = :programId', { programId })
+        .andWhere(
+          '(ga.valid_to IS NULL OR ga.valid_to >= :from) AND (ga.valid_from IS NULL OR ga.valid_from <= :to)',
+          { from: validFrom, to: validTo },
+        )
+        .orderBy('ga.created_at', 'DESC')
+        .getOne();
+
+      if (!groupAssessment) {
+        groupAssessment = gaRepo.create({
+          groupId: Number(groupId),
+          programId: Number(programId),
+          validFrom,
+          validTo,
+          totalCandidates: 0,
+          status: 'NOT_STARTED',
+          createdByUserId: this.ADMIN_USER_ID,
+          metadata: { source: 'ADMIN_ASSIGN_GROUP_EXAM' },
+        });
+        groupAssessment = await gaRepo.save(groupAssessment);
+      }
+
+      // 2. Pull every active registration in this group.
+      const registrations = await manager
+        .getRepository(Registration)
+        .createQueryBuilder('r')
+        .where('r.group_id = :groupId', { groupId })
+        .andWhere('r.is_deleted = false')
+        .getMany();
+
+      if (registrations.length === 0) {
+        return {
+          groupAssessmentId: Number(groupAssessment.id),
+          totalRegistrations: 0,
+          created: 0,
+          skipped: 0,
+          failed: 0,
+          failures: [] as { registrationId: number; reason: string }[],
+        };
+      }
+
+      // 3. Find users that already have a session for THIS GroupAssessment so
+      //    we can skip them (idempotency: repeated assign click is a no-op).
+      const existingSessions = await manager
+        .getRepository(AssessmentSession)
+        .find({
+          where: { groupAssessmentId: Number(groupAssessment.id) },
+          select: ['userId'],
+        });
+      const alreadyAssigned = new Set(
+        existingSessions.map((s) => String(s.userId)),
+      );
+
+      const levels = await manager.getRepository(AssessmentLevel).find({
+        where: { isMandatory: true },
+        order: { sortOrder: 'ASC' },
+      });
+
+      let created = 0;
+      let relinked = 0;
+      let skipped = 0;
+      let failed = 0;
+      const failures: { registrationId: number; reason: string }[] = [];
+
+      for (const registration of registrations) {
+        if (alreadyAssigned.has(String(registration.userId))) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          // Prevent double-scheduling: if the user already has an
+          // unlinked session for this program (e.g. their original
+          // individual assignment), re-link it into this group assessment
+          // instead of creating a second session. Mirrors the
+          // add-candidate flow.
+          const existingUnlinked = await manager
+            .getRepository(AssessmentSession)
+            .createQueryBuilder('s')
+            .where('s.user_id = :uid', { uid: registration.userId })
+            .andWhere('s.program_id = :pid', { pid: programId })
+            .andWhere('s.group_assessment_id IS NULL')
+            .orderBy(
+              `CASE WHEN s.status = 'NOT_STARTED' THEN 0 ELSE 1 END`,
+              'ASC',
+            )
+            .addOrderBy('s.created_at', 'DESC')
+            .getOne();
+
+          if (existingUnlinked) {
+            existingUnlinked.groupAssessmentId = Number(groupAssessment.id);
+            existingUnlinked.groupId = Number(groupId);
+            await manager.save(existingUnlinked);
+            relinked++;
+            continue;
+          }
+
+          const session = manager.create(AssessmentSession, {
+            userId: registration.userId,
+            registrationId: registration.id,
+            programId: Number(programId),
+            groupId: Number(groupId),
+            groupAssessmentId: Number(groupAssessment.id),
+            status: 'NOT_STARTED',
+            validFrom,
+            validTo,
+            metadata: { source: 'ADMIN_ASSIGN_GROUP_EXAM' },
+          });
+          await manager.save(session);
+
+          for (const level of levels) {
+            const attempt = manager.create(AssessmentAttempt, {
+              userId: registration.userId,
+              registrationId: registration.id,
+              programId: Number(programId),
+              assessmentSessionId: session.id,
+              assessmentLevelId: level.id,
+              status: 'NOT_STARTED',
+            });
+            await manager.save(attempt);
+
+            if (level.levelNumber === 1 || level.name === 'Level 1') {
+              await this.assessmentGenService.generateQuestions(
+                attempt,
+                manager,
+              );
+            }
+          }
+          created++;
+        } catch (err: any) {
+          this.logger.error(
+            `assignGroupExam: failed for registration ${registration.id}`,
+            err?.stack || err,
+          );
+          failed++;
+          failures.push({
+            registrationId: Number(registration.id),
+            reason: err?.message || 'Unknown error',
+          });
+        }
+      }
+
+      // 4. Update the GroupAssessment candidate total to reflect reality.
+      const total = await manager
+        .getRepository(AssessmentSession)
+        .count({ where: { groupAssessmentId: Number(groupAssessment.id) } });
+      groupAssessment.totalCandidates = total;
+      await gaRepo.save(groupAssessment);
+
+      return {
+        groupAssessmentId: Number(groupAssessment.id),
+        totalRegistrations: registrations.length,
+        created,
+        relinked,
+        skipped,
+        failed,
+        failures,
+      };
+    });
+  }
+
+  /**
+   * Returns the pool of users that the admin can add as a candidate to a
+   * specific group assessment. Eligibility (all must hold):
+   *   - registrationSource = 'ADMIN'
+   *   - Registration.groupId IS NULL (not yet in any group)
+   *   - Registration.programId = group_assessment.program_id
+   *   - Not already linked to this group_assessment via a session
+   */
+  async findEligibleCandidatesForGroupAssessment(
+    groupAssessmentId: number,
+    search?: string,
+  ) {
+    const ga = await this.groupAssessmentRepo.findOne({
+      where: { id: groupAssessmentId },
+    });
+    if (!ga) {
+      throw new BadRequestException(
+        `GroupAssessment ${groupAssessmentId} not found`,
+      );
+    }
+
+    const qb = this.sessionRepo.manager
+      .getRepository(Registration)
+      .createQueryBuilder('r')
+      .where('r.registration_source = :src', { src: 'ADMIN' })
+      .andWhere('r.group_id IS NULL')
+      .andWhere('r.program_id = :programId', { programId: ga.programId })
+      .andWhere('r.is_deleted = false')
+      .andWhere((qbInner) => {
+        const sub = qbInner
+          .subQuery()
+          .select('s.user_id')
+          .from(AssessmentSession, 's')
+          .where('s.group_assessment_id = :gaId', { gaId: groupAssessmentId })
+          .getQuery();
+        return `r.user_id NOT IN ${sub}`;
+      });
+
+    if (search && search.trim()) {
+      const s = `%${search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(r.full_name) LIKE :s OR LOWER(r.mobile_number) LIKE :s)',
+        { s },
+      );
+    }
+
+    qb.orderBy('r.created_at', 'DESC').limit(50);
+
+    const rows = await qb.getMany();
+
+    // Hydrate emails from the users table (Registration doesn't store email).
+    const userIds = rows.map((r) => r.userId).filter(Boolean);
+    let emailByUserId = new Map<string, string>();
+    if (userIds.length) {
+      const users = await this.sessionRepo.manager.query(
+        `SELECT id, email FROM users WHERE id = ANY($1::bigint[])`,
+        [userIds],
+      );
+      emailByUserId = new Map(
+        users.map((u: any) => [String(u.id), String(u.email || '')]),
+      );
+      if (search && search.trim()) {
+        const s = search.trim().toLowerCase();
+        // Allow email search too — re-filter in memory since email lives in
+        // a different table.
+        const filtered = rows.filter((r) => {
+          const email = emailByUserId.get(String(r.userId)) || '';
+          return (
+            r.fullName?.toLowerCase().includes(s) ||
+            (r.mobileNumber || '').toLowerCase().includes(s) ||
+            email.toLowerCase().includes(s)
+          );
+        });
+        return filtered.map((r) => ({
+          registrationId: Number(r.id),
+          userId: Number(r.userId),
+          fullName: r.fullName,
+          email: emailByUserId.get(String(r.userId)) || null,
+          mobileNumber: r.mobileNumber,
+          countryCode: r.countryCode,
+        }));
+      }
+    }
+
+    return rows.map((r) => ({
+      registrationId: Number(r.id),
+      userId: Number(r.userId),
+      fullName: r.fullName,
+      email: emailByUserId.get(String(r.userId)) || null,
+      mobileNumber: r.mobileNumber,
+      countryCode: r.countryCode,
+    }));
+  }
+
+  /**
+   * Re-link an eligible user's existing AssessmentSession into a group
+   * assessment. Does NOT create a new session; just sets the session's
+   * groupAssessmentId + groupId, and sets the Registration.groupId so the
+   * user is recorded as being in the group. Re-validates eligibility on the
+   * server to defend against stale UI.
+   */
+  async addCandidateToGroupAssessment(
+    groupAssessmentId: number,
+    registrationId: number,
+  ) {
+    return this.dataSource.transaction(async (manager) => {
+      const ga = await manager
+        .getRepository(GroupAssessment)
+        .findOne({ where: { id: groupAssessmentId } });
+      if (!ga) {
+        throw new BadRequestException(
+          `GroupAssessment ${groupAssessmentId} not found`,
+        );
+      }
+
+      const registration = await manager
+        .getRepository(Registration)
+        .findOne({ where: { id: registrationId as any } });
+      if (!registration) {
+        throw new BadRequestException(
+          `Registration ${registrationId} not found`,
+        );
+      }
+
+      // Server-side re-validation (UI must not be trusted).
+      if (registration.registrationSource !== 'ADMIN') {
+        throw new BadRequestException(
+          'Only ADMIN-created users can be added to a group from this screen.',
+        );
+      }
+      if (registration.groupId) {
+        throw new BadRequestException(
+          'User is already in a group. Remove them from that group first.',
+        );
+      }
+      if (Number(registration.programId) !== Number(ga.programId)) {
+        throw new BadRequestException(
+          "User's program does not match the group assessment's program.",
+        );
+      }
+
+      // Find their unlinked session for this program. Prefer NOT_STARTED,
+      // tie-break by most recent.
+      const session = await manager
+        .getRepository(AssessmentSession)
+        .createQueryBuilder('s')
+        .where('s.user_id = :userId', { userId: registration.userId })
+        .andWhere('s.program_id = :programId', { programId: ga.programId })
+        .andWhere('s.group_assessment_id IS NULL')
+        .orderBy(`CASE WHEN s.status = 'NOT_STARTED' THEN 0 ELSE 1 END`, 'ASC')
+        .addOrderBy('s.created_at', 'DESC')
+        .getOne();
+
+      if (!session) {
+        throw new BadRequestException(
+          'User has no unlinked assessment session for this program. Cannot add.',
+        );
+      }
+
+      // Re-link the session into the group assessment.
+      session.groupAssessmentId = Number(ga.id);
+      session.groupId = Number(ga.groupId);
+      await manager.save(session);
+
+      // Mark the registration as being in the group.
+      registration.group = { id: Number(ga.groupId) } as any;
+      await manager.save(registration);
+
+      // Bump candidate count.
+      const total = await manager
+        .getRepository(AssessmentSession)
+        .count({ where: { groupAssessmentId: Number(ga.id) } });
+      ga.totalCandidates = total;
+      await manager.save(ga);
+
+      return {
+        groupAssessmentId: Number(ga.id),
+        sessionId: Number(session.id),
+        registrationId: Number(registration.id),
+        totalCandidates: total,
+      };
+    });
   }
 }

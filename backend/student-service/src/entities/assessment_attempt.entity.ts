@@ -91,7 +91,7 @@ export class AssessmentAttempt {
   dominantTraitId: number | null;
 
   @Column({ name: 'metadata', type: 'jsonb', default: () => `'{}'` })
-  metadata: any;
+  metadata: Record<string, unknown>;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

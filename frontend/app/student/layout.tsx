@@ -82,7 +82,7 @@ export default function StudentLayout({
 
             // 1. Check Session Storage Flag (Fastest)
             if (sessionStorage.getItem('isAssessmentMode') === 'true') {
-                if (!pathname?.includes('/student/assessment')) {
+                if (!pathname?.includes('/student/assessment') && !pathname?.includes('/student/metaphor') && !pathname?.includes('/student/iat')) {
                     router.push('/student/assessment');
                     return;
                 }
@@ -105,7 +105,7 @@ export default function StudentLayout({
                     if (status?.isAssessmentMode) {
                         sessionStorage.setItem('isAssessmentMode', 'true');
                         syncModeFlags();
-                        if (!pathname?.includes('/student/assessment')) {
+                        if (!pathname?.includes('/student/assessment') && !pathname?.includes('/student/metaphor') && !pathname?.includes('/student/iat')) {
                             router.push('/student/assessment');
                         }
                     } else {
@@ -154,12 +154,15 @@ export default function StudentLayout({
         );
     }
 
-    // Detect special modes for Header
-    const isAssessmentPage = pathname?.includes('/student/assessment');
+    // Detect special modes for Header. The Level 3 metaphor exam lives at
+    // /student/metaphor — treat it as an assessment page (full-screen, no nav)
+    // so the assessment-mode redirect doesn't bounce the student off it.
+    const isAssessmentPage = pathname?.includes('/student/assessment') || pathname?.includes('/student/metaphor') || pathname?.includes('/student/iat');
     const isUpgradePage = pathname?.includes('/student/upgrade');
     const hideNav = (isAssessmentPage && !isReportReady) || isUpgradePage;
     const showAssessmentOnly = isAssessmentModeFlag && !isReportReady;
     const shouldApplyZoom = !isPublic && (!isAssessmentPage || isReportReady);
+    const shouldRenderHeader = !isAssessmentPage || isReportReady;
     const pageBaseBackgroundClass = (isAssessmentPage && !isReportReady)
         ? 'bg-transparent dark:bg-transparent'
         : 'bg-transparent dark:bg-[#19211C]';
@@ -173,16 +176,17 @@ export default function StudentLayout({
                     </div>
                 ) : (
                     <RequireStudent>
-                        {/* Persistent Header */}
-                        <div className="fixed top-0 left-0 right-0 z-50">
-                            <Header
-                                onLogout={handleLogout}
-                                currentView={currentView}
-                                onNavigate={handleNavigate}
-                                hideNav={hideNav}
-                                showAssessmentOnly={showAssessmentOnly}
-                            />
-                        </div>
+                        {shouldRenderHeader && (
+                            <div className="fixed top-0 left-0 right-0 z-50">
+                                <Header
+                                    onLogout={handleLogout}
+                                    currentView={currentView}
+                                    onNavigate={handleNavigate}
+                                    hideNav={hideNav}
+                                    showAssessmentOnly={showAssessmentOnly}
+                                />
+                            </div>
+                        )}
 
                         {/* Content Area with Top Padding - Matches AdminLayout structure */}
                         <main className={`relative z-10 w-full min-h-screen ${isAssessmentPage ? '' : 'pt-[clamp(70px,7.6vh,100px)]'} portal-bg`}>

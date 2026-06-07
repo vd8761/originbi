@@ -55,6 +55,7 @@ interface AssessmentData {
   completedQuestions: number;
   status: 'completed' | 'in-progress' | 'locked' | 'not-started';
   duration?: string;
+  assessmentKind?: string;
 }
 
 interface AssessmentModalProps {
@@ -91,6 +92,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
 
   const isContinue = assessment.status === 'in-progress';
   const progress = Math.round((assessment.completedQuestions / assessment.totalQuestions) * 100);
+  const isIatGen = assessment.assessmentKind === 'IAT_GEN';
 
   // Extract number from duration string (e.g. "60 minutes" -> "60")
   const durationVal = assessment.duration ? String(assessment.duration).replace(/minutes?/i, '').trim() : '30';
@@ -189,7 +191,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
             <ul className="space-y-1.5 mb-2">
               <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
-                {t.point1}
+                {isIatGen ? "This is a timed reaction block. Pause is unavailable once started." : t.point1}
               </li>
               <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
@@ -200,6 +202,35 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
                 {t.point3}
               </li>
             </ul>
+
+            {isIatGen && (
+              <div className="mb-4 rounded-2xl border border-brand-light-tertiary bg-brand-light-primary p-4 dark:border-white/10 dark:bg-white/5">
+                <h5 className="mb-3 text-[10.5px] font-bold uppercase tracking-wider text-brand-text-light-secondary dark:text-gray-400">
+                  Keyboard Controls
+                </h5>
+                <div className="flex items-center justify-around gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 select-none items-center justify-center rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50 text-lg font-black text-brand-green shadow-[0_3px_0_#1A8A47] dark:border-white/10 dark:from-white/10 dark:to-white/[0.02]">
+                      E
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-brand-text-light-primary dark:text-white">Left option</p>
+                      <p className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">Press E or tap the left card</p>
+                    </div>
+                  </div>
+                  <div className="h-8 w-px bg-brand-light-tertiary dark:bg-white/10" />
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 select-none items-center justify-center rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50 text-lg font-black text-brand-green shadow-[0_3px_0_#1A8A47] dark:border-white/10 dark:from-white/10 dark:to-white/[0.02]">
+                      I
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-brand-text-light-primary dark:text-white">Right option</p>
+                      <p className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">Press I or tap the right card</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Progress Bar for Continue State */}
             {isContinue && (

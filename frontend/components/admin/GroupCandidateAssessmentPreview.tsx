@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { AssessmentSession } from '../../lib/services/assessment.service';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { AssessmentSession, IatReportStatus, MetaphorReportStatus } from '../../lib/services/assessment.service';
 import { assessmentService } from '../../lib/services/assessment.service';
 import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import {
@@ -17,6 +17,9 @@ import {
     DownloadIcon,
     LoadingIcon,
 } from '../icons';
+import SurveyAnswersView, { SurveyAnswersData } from './SurveyAnswersView';
+import MetaphorReportPanel from './MetaphorReportPanel';
+import IatReportPanel from './IatReportPanel';
 
 interface AssessmentResultPreviewProps {
     session: AssessmentSession;
@@ -43,18 +46,56 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const [session, setSession] = useState<AssessmentSession | null>(initialSession);
     const [levels, setLevels] = useState<any[]>([]);
     const [activeTab, setActiveTab] = useState(0);
+    const [surveyData, setSurveyData] = useState<SurveyAnswersData | null>(null);
+    const [surveyLoading, setSurveyLoading] = useState(false);
+    const [metaphorData, setMetaphorData] = useState<MetaphorReportStatus | null>(null);
+    const [metaphorLoading, setMetaphorLoading] = useState(false);
+    const [metaphorRetrying, setMetaphorRetrying] = useState(false);
+    const [iatData, setIatData] = useState<IatReportStatus | null>(null);
+    const [iatLoading, setIatLoading] = useState(false);
+    const [iatRetrying, setIatRetrying] = useState(false);
 
     // Download State
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState('');
     const isDownloadingRef = useRef(false);
     const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+    const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+    const downloadDropdownRef = useRef<HTMLDivElement>(null);
 
     // Send Email State
     const [sendingEmail, setSendingEmail] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
     const [showEmailPopup, setShowEmailPopup] = useState(false);
     const [customEmail, setCustomEmail] = useState('');
+
+    const fetchMetaphorReport = useCallback(async (showLoading = false) => {
+        if (!initialSession?.id) return;
+        try {
+            if (showLoading) setMetaphorLoading(true);
+            const data = await assessmentService.getMetaphorReport(initialSession.id);
+            setMetaphorData(data);
+        } catch (error) {
+            console.error("Failed to fetch metaphor report", error);
+            setMetaphorData(null);
+        } finally {
+            if (showLoading) setMetaphorLoading(false);
+        }
+    }, [initialSession?.id]);
+
+    const fetchIatReport = useCallback(async (showLoading = false) => {
+        if (!initialSession?.id) return;
+        try {
+            if (showLoading) setIatLoading(true);
+            const data = await assessmentService.getIatReport(initialSession.id);
+            setIatData(data);
+        } catch (error) {
+            console.error("Failed to fetch IAT Gen report", error);
+            setIatData(null);
+        } finally {
+            if (showLoading) setIatLoading(false);
+        }
+    }, [initialSession?.id]);
 
     useEffect(() => {
         const fetchLevels = async () => {
@@ -79,7 +120,54 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             }
         };
         fetchSessionDetails();
-    }, [initialSession]);
+
+        // Fetch SURVEY answers (non-scoring open questions). Drives the Survey tab:
+        // present -> tab enabled; absent -> tab shown but disabled.
+        const fetchSurvey = async () => {
+            if (!initialSession?.id) return;
+            try {
+                setSurveyLoading(true);
+                const data = await assessmentService.getSurveyAnswers(initialSession.id);
+                setSurveyData(data);
+            } catch (error) {
+                console.error("Failed to fetch survey answers", error);
+                setSurveyData(null);
+            } finally {
+                setSurveyLoading(false);
+            }
+        };
+        fetchSurvey();
+        fetchMetaphorReport(true);
+        fetchIatReport(true);
+    }, [initialSession, fetchMetaphorReport, fetchIatReport]);
+
+    useEffect(() => {
+        const jobStatus = metaphorData?.job?.status;
+        const shouldPoll =
+            !!metaphorData?.attempt &&
+            !metaphorData?.report &&
+            (metaphorData.readyForReport || jobStatus === 'PENDING' || jobStatus === 'PROCESSING');
+        if (!shouldPoll) return;
+        const timer = window.setInterval(() => {
+            void fetchMetaphorReport(false);
+        }, 8000);
+        return () => window.clearInterval(timer);
+    }, [fetchMetaphorReport, metaphorData?.attempt, metaphorData?.job?.status, metaphorData?.readyForReport, metaphorData?.report]);
+
+    useEffect(() => {
+        const jobStatus = iatData?.job?.status;
+        const shouldPoll =
+            !!iatData?.attempt &&
+            !iatData?.report &&
+            (jobStatus === 'PENDING' || jobStatus === 'PROCESSING');
+        if (!shouldPoll) return;
+        const timer = window.setInterval(() => {
+            void fetchIatReport(false);
+        }, 8000);
+        return () => window.clearInterval(timer);
+    }, [fetchIatReport, iatData?.attempt, iatData?.job?.status, iatData?.report]);
+
+    const hasSurvey = (surveyData?.total ?? 0) > 0;
 
     // Helper to format dates
     const formatDate = (dateStr?: string) => {
@@ -95,6 +183,94 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const isStarted = status !== 'NOT_STARTED' && status !== 'ASSIGNED';
     const allLevelsCompleted = session?.status === 'COMPLETED';
     // Simplified completion logic: if status is COMPLETED, it's done.
+
+    // Check if program supports short report (School & College students only)
+    const programId = session?.programId ? Number(session.programId) : null;
+    const programCode = (session?.program as any)?.code || (session?.groupAssessment?.program as any)?.code || null;
+    const isShortReportAvailable = programCode === 'SCHOOL_STUDENT' || programCode === 'COLLEGE_STUDENT' || programId === 1 || programId === 2;
+
+    // Close download dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (downloadDropdownRef.current && !downloadDropdownRef.current.contains(event.target as Node)) {
+                setShowDownloadDropdown(false);
+            }
+        };
+        if (showDownloadDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showDownloadDropdown]);
+
+    // Shared download handler
+    const handleDownloadReport = async (short: boolean = false) => {
+        if (isDownloadingRef.current) return;
+        if (!session?.userId) {
+            alert("User ID not found for this session.");
+            return;
+        }
+        try {
+            isDownloadingRef.current = true;
+            setDownloading(true);
+            setShowDownloadDropdown(false);
+            setDownloadProgress('Initializing...');
+            
+            const studentId = session.userId; 
+            const startData = await assessmentService.generateStudentReport(studentId, short || undefined);
+            
+            if (!startData.success || !startData.jobId) {
+                throw new Error("Failed to start report generation");
+            }
+            
+            const jobId = startData.jobId;
+            
+            let isComplete = false;
+            while (!isComplete && isDownloadingRef.current) {
+                try {
+                    const statusData = await assessmentService.getDownloadStatus(jobId);
+                    
+                    if (statusData.status === 'PROCESSING') {
+                        setDownloadProgress(statusData.progress || 'Processing...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else if (statusData.status === 'COMPLETED') {
+                        isComplete = true;
+                        setDownloadProgress('Downloading...');
+
+                        if (!statusData.downloadUrl) {
+                            throw new Error('Download URL missing from report status.');
+                        }
+                        
+                        const extendedData = statusData as any;
+                        if (extendedData.password) {
+                            setGeneratedPassword(extendedData.password);
+                        }
+
+                        window.location.href = buildReportApiUrl(statusData.downloadUrl);
+                        
+                        setTimeout(() => {
+                            setDownloading(false);
+                            setDownloadProgress('');
+                        }, 2000);
+                    } else if (statusData.status === 'ERROR') {
+                        isComplete = true;
+                        throw new Error(statusData.error || 'Generation failed');
+                    }
+                } catch (err) {
+                    console.error("Polling error", err);
+                    isComplete = true;
+                    setDownloading(false);
+                    alert("Failed to download report. Please try again.");
+                }
+            }
+            
+        } catch (error) {
+            console.error("Download failed", error);
+            setDownloading(false);
+            alert("Failed to initiate download.");
+        } finally {
+            isDownloadingRef.current = false;
+        }
+    };
 
     // Calculation for progress bar
     const totalMandatoryLevels = levels.length || 4; // fallback
@@ -232,75 +408,39 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
                             <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress}</span>
                          </div>
+                    ) : isShortReportAvailable ? (
+                        <div className="relative" ref={downloadDropdownRef}>
+                            <button
+                                onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
+                            >
+                                <DownloadIcon className="w-3 h-3" />
+                                Download Report
+                                <svg className={`w-3 h-3 transition-transform ${showDownloadDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {showDownloadDropdown && (
+                                <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                                    <button
+                                        onClick={() => handleDownloadReport(false)}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                    >
+                                        <DownloadIcon className="w-3 h-3 text-brand-green" />
+                                        Full Report
+                                    </button>
+                                    <div className="border-t border-gray-100 dark:border-white/5" />
+                                    <button
+                                        onClick={() => handleDownloadReport(true)}
+                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                    >
+                                        <DownloadIcon className="w-3 h-3 text-blue-500" />
+                                        Short Report
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     ) : (
                         <button
-                            onClick={async () => {
-                                if (isDownloadingRef.current) return;
-                                if (!session?.userId) {
-                                    alert("User ID not found for this session.");
-                                    return;
-                                }
-                                try {
-                                    isDownloadingRef.current = true;
-                                    setDownloading(true);
-                                    setDownloadProgress('Initializing...');
-                                    
-                                    const studentId = session.userId; 
-                                    const startData = await assessmentService.generateStudentReport(studentId);
-                                    
-                                    if (!startData.success || !startData.jobId) {
-                                        throw new Error("Failed to start report generation");
-                                    }
-                                    
-                                    const jobId = startData.jobId;
-                                    
-                                    let isComplete = false;
-                                    while (!isComplete && isDownloadingRef.current) {
-                                        try {
-                                            const statusData = await assessmentService.getDownloadStatus(jobId);
-                                            
-                                            if (statusData.status === 'PROCESSING') {
-                                                setDownloadProgress(statusData.progress || 'Processing...');
-                                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                            } else if (statusData.status === 'COMPLETED') {
-                                                isComplete = true;
-                                                setDownloadProgress('Downloading...');
-
-                                                if (!statusData.downloadUrl) {
-                                                    throw new Error('Download URL missing from report status.');
-                                                }
-                                                
-                                                const extendedData = statusData as any;
-                                                if (extendedData.password) {
-                                                    setGeneratedPassword(extendedData.password);
-                                                }
-
-                                                window.location.href = buildReportApiUrl(statusData.downloadUrl);
-                                                
-                                                setTimeout(() => {
-                                                    setDownloading(false);
-                                                    setDownloadProgress('');
-                                                }, 2000);
-                                            } else if (statusData.status === 'ERROR') {
-                                                isComplete = true;
-                                                throw new Error(statusData.error || 'Generation failed');
-                                            }
-                                        } catch (err) {
-                                            isComplete = true;
-                                            console.error("Polling error", err);
-                                            setDownloading(false);
-                                            alert("Failed to download report. Please try again.");
-                                        }
-                                    }
-                                    
-                                } catch (error) {
-                                    console.error("Download failed", error);
-                                    setDownloading(false);
-                                    alert("Failed to initiate download.");
-                                } finally {
-                                    isDownloadingRef.current = false;
-                                }
-                            }}
+                            onClick={() => handleDownloadReport(false)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
                         >
                             <DownloadIcon className="w-3 h-3" />
@@ -581,33 +721,103 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         );
     };
 
+    const handleRetryMetaphorReport = async () => {
+        if (!metaphorData?.attempt?.id) return;
+        try {
+            setMetaphorRetrying(true);
+            await assessmentService.retryMetaphorReport(metaphorData.attempt.id);
+            await fetchMetaphorReport(false);
+        } catch (error) {
+            console.error("Failed to retry metaphor report", error);
+            alert("Failed to retry Metaphor report generation.");
+        } finally {
+            setMetaphorRetrying(false);
+        }
+    };
+
+    const handleRetryIatReport = async () => {
+        if (!iatData?.attempt?.id) return;
+        try {
+            setIatRetrying(true);
+            await assessmentService.retryIatReport(iatData.attempt.id);
+            await fetchIatReport(false);
+        } catch (error) {
+            console.error("Failed to retry IAT Gen report", error);
+            alert("Failed to retry IAT Gen report generation.");
+        } finally {
+            setIatRetrying(false);
+        }
+    };
+
+    const renderMetaphorReport = (levelAttempt?: any, levelData?: any) => {
+        return (
+            <MetaphorReportPanel
+                data={metaphorData}
+                loading={metaphorLoading}
+                retrying={metaphorRetrying}
+                onRetry={handleRetryMetaphorReport}
+                formatDate={formatDate}
+                stats={renderStatsBar(levelAttempt, levelData)}
+                displayData={displayData}
+            />
+        );
+    };
+
+    const renderIatReport = (levelAttempt?: any, levelData?: any) => {
+        return (
+            <IatReportPanel
+                data={iatData}
+                loading={iatLoading}
+                retrying={iatRetrying}
+                onRetry={handleRetryIatReport}
+                formatDate={formatDate}
+                stats={renderStatsBar(levelAttempt, levelData)}
+            />
+        );
+    };
+
     // Mock Data for Reports (Replace with Real Data later)
-    const aciBreakdownData = [
+    const _aciBreakdownData = [
         { value: 'Commitment', score: '24', note: 'Deeply dedicated and consistent.' },
         { value: 'Focus', score: '22', note: 'Exceptionally attentive to detail and priority.' },
         { value: 'Openness', score: '18', note: 'Learning to adapt and welcome diverse approaches.' },
         { value: 'Respect', score: '19', note: 'Professional tone with scope to show empathy.' },
         { value: 'Courage', score: '23', note: 'Honest and principled; leads through integrity.' },
     ];
-    const discBreakdownData = [
+    const _discBreakdownData = [
         { value: 'Dominance', score: '30', note: 'Direct and decisive.' },
         { value: 'Influence', score: '28', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '22', note: 'Patient and reliable.' },
         { value: 'Compliance', score: '20', note: 'Precise and analytical.' },
     ];
-    const aciCompatibilityData = {
+    const _aciCompatibilityData = {
         totalScore: '106 / 125',
         level: 'Agile Naturalist',
         tag: 'Embodies agility instinctively; thrives in collaboration and adapts with ease.',
         interpretation: 'You combine discipline with flexibility — upholding standards while remaining open to change.'
     };
-    const discCompatibilityData = {
+    const _discCompatibilityData = {
         totalScore: '100 / 125',
         level: 'Influential Leader',
         tag: 'Leads with enthusiasm and builds strong relationships.',
         interpretation: 'You are a natural influencer who thrives in social settings and values collaboration.'
     };
 
+
+    // Level 2 ("ACI") may instead be the IATGen variant for a given candidate.
+    const getLevelTabLabel = (lvl: any): string => {
+        const lvlNumber = Number(lvl?.levelNumber || lvl?.level_number || 0);
+        if (lvlNumber !== 2) return lvl?.name;
+        const lvlAttempt = session?.attempts?.find((a: any) =>
+            String(a.assessmentLevelId) === String(lvl?.id) ||
+            (a.assessmentLevel && String(a.assessmentLevel.id) === String(lvl?.id))
+        );
+        const kind = String(
+            lvlAttempt?.metadata?.assessment_kind || lvlAttempt?.metadata?.assessmentKind || ''
+        ).toUpperCase();
+        const isIatLevel2 = kind === 'IAT_GEN' || Boolean(iatData?.attempt);
+        return isIatLevel2 ? 'IATGen' : lvl?.name;
+    };
 
     const renderOverallReport = () => {
         // Identify levels and attempts for the overall report view
@@ -626,6 +836,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
         const discAttempt = getAttemptForLevel(discLevel);
         const aciAttempt = getAttemptForLevel(aciLevel);
+        const aciKind = String(aciAttempt?.metadata?.assessment_kind || aciAttempt?.metadata?.assessmentKind || '').toUpperCase();
+        const hasIatLevel2 = aciKind === 'IAT_GEN' || Boolean(iatData?.attempt);
 
         return (
             <div className="flex flex-col">
@@ -657,7 +869,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             return (
                                 <>
                                     {renderLevelReport('DISC', discData.breakdown, discData.compatibility, discAttempt, discLevel, true)}
-                                    {renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
+                                    {hasIatLevel2
+                                        ? renderIatReport(aciAttempt, aciLevel)
+                                        : renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
                                 </>
                             );
                         })()}
@@ -707,6 +921,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                         const tabIndex = idx + 1;
                         const accessible = isTabAccessible(tabIndex);
                         const isActive = activeTab === tabIndex;
+                        const tabLabel = getLevelTabLabel(lvl);
                         return (
                             <div
                                 key={lvl.id}
@@ -718,7 +933,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                         : 'text-gray-400 dark:text-white/50 cursor-not-allowed'
                                     }`}
                             >
-                                {lvl.name}
+                                {tabLabel}
                                 {isActive ? (
                                     <span className='bg-brand-green rounded-full p-[1px]'><CheckIcon className="w-2 h-2 text-black" /></span>
                                 ) : (
@@ -732,6 +947,28 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             </div>
                         );
                     })}
+                    {/* Survey Tab — always shown; enabled only if the candidate had survey questions */}
+                    {(() => {
+                        const surveyTabIndex = levels.length + 1;
+                        const isActive = activeTab === surveyTabIndex;
+                        return (
+                            <div
+                                onClick={() => hasSurvey && setActiveTab(surveyTabIndex)}
+                                className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap ${isActive
+                                    ? 'text-brand-green border-b-2 border-brand-green font-bold cursor-default'
+                                    : hasSurvey
+                                        ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer'
+                                        : 'text-gray-400 dark:text-white/50 cursor-not-allowed'
+                                    }`}
+                                title={hasSurvey ? 'Survey responses' : 'No survey questions in this assessment'}
+                            >
+                                Survey
+                                {!isActive && !hasSurvey && (
+                                    <LockIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Progress Indicator */}
@@ -756,6 +993,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
             {/* Main Content Area */}
             {activeTab === 0 ? renderOverallReport() :
+                activeTab === levels.length + 1 ? (
+                    <SurveyAnswersView data={surveyData} loading={surveyLoading} />
+                ) :
                 // Level Reports
                 (() => {
                     const levelIndex = activeTab - 1;
@@ -769,16 +1009,32 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                         return aId === levelId || alId === levelId;
                     });
 
-                    // Check for DISC pattern in robust ways: patternType (database), name includes 'disc', or exact name 'Behavioral Insight'
-                    const isDisc = level?.pattern_type === 'DISC' || level?.patternType === 'DISC' || level?.name.toLowerCase().includes('disc') || level?.name === 'Behavioral Insight';
+                    const levelName = String(level?.name || attempt?.assessmentLevel?.name || '').toLowerCase();
+                    const patternType = String(level?.pattern_type || level?.patternType || attempt?.assessmentLevel?.patternType || '').toLowerCase();
+                    const levelNumber = Number(level?.levelNumber || level?.level_number || attempt?.assessmentLevel?.levelNumber || 0);
+                    const assessmentKind = String(attempt?.metadata?.assessment_kind || attempt?.metadata?.assessmentKind || '').toUpperCase();
+                    const isIat = levelNumber === 2 && (assessmentKind === 'IAT_GEN' || Boolean(iatData?.attempt));
+                    const isMetaphor = patternType === 'metaphor' || levelName.includes('metaphor') || levelNumber === 3;
+                    const isDisc = patternType === 'disc' || levelName.includes('disc') || levelName === 'behavioral insight';
+                    const isAci = patternType === 'aci' || levelName.includes('aci') || levelName.includes('agile');
 
-                    if (isDisc) {
+                    if (isIat) {
+                        return renderIatReport(attempt, level);
+                    } else if (isMetaphor) {
+                        return renderMetaphorReport(attempt, level);
+                    } else if (isDisc) {
                         const { breakdown, compatibility } = getDiscData(attempt);
                         return renderLevelReport('DISC', breakdown, compatibility, attempt, level);
-                    } else {
+                    } else if (isAci) {
                         const { breakdown, compatibility } = getAciData(attempt);
                         return renderLevelReport('ACI', breakdown, compatibility, attempt, level);
                     }
+
+                    return (
+                        <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-8 text-sm text-gray-500 dark:text-gray-400">
+                            No report renderer is configured for this assessment level.
+                        </div>
+                    );
                 })()
             }
 

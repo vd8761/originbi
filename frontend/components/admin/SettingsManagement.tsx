@@ -29,11 +29,40 @@ interface SettingItem {
     updatedAt: string;
 }
 
+interface GeminiModelOption {
+    value: string;
+    label: string;
+    description?: string;
+}
+
+type ModelOption = GeminiModelOption;
+
+interface SelectOption {
+    value: string;
+    label: string;
+    description?: string;
+}
+
+interface IatRule {
+    programIds?: string[];
+    departmentDegreeIds?: string[];
+    departmentIds?: string[];
+    studentBoards?: string[];
+}
+
+interface IatRuleConfig {
+    rules?: IatRule[];
+}
+
 export default function SettingsManagement() {
     const [settingsGrouped, setSettingsGrouped] = useState<Record<string, SettingItem[]>>({});
     const [activeCategory, setActiveCategory] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [programOptions, setProgramOptions] = useState<SelectOption[]>([]);
+    const [departmentOptions, setDepartmentOptions] = useState<SelectOption[]>([]);
+    const [departmentDegreeOptions, setDepartmentDegreeOptions] = useState<SelectOption[]>([]);
+    const [iatOptionsLoading, setIatOptionsLoading] = useState(false);
     
     // Track modifications to only save what changed
     const [modifiedSettings, setModifiedSettings] = useState<Record<string, any>>({});
@@ -42,6 +71,7 @@ export default function SettingsManagement() {
 
     // Modal state for feature-specific overrides
     const [activeOverrideKey, setActiveOverrideKey] = useState<string | null>(null);
+    const [activeMarkdownSkill, setActiveMarkdownSkill] = useState<SettingItem | null>(null);
     const [visibleSensitiveFields, setVisibleSensitiveFields] = useState<Record<string, boolean>>({});
 
     const toggleToConfigMap: Record<string, string> = {
@@ -54,7 +84,47 @@ export default function SettingsManagement() {
     // Setup initial fetch
     useEffect(() => {
         fetchSettings();
+        fetchIatReferenceOptions();
     }, []);
+
+    const fetchIatReferenceOptions = async () => {
+        try {
+            setIatOptionsLoading(true);
+            const [programsRes, departmentsRes, departmentDegreesRes] = await Promise.all([
+                api.get('/admin/programs?is_active=true'),
+                api.get('/admin/departments?is_active=true'),
+                api.get('/admin/departments/degrees'),
+            ]);
+            const normalizeList = (body: any) => Array.isArray(body) ? body : (body?.data || []);
+            const programs = normalizeList(programsRes.data);
+            const departments = normalizeList(departmentsRes.data);
+            const departmentDegrees = normalizeList(departmentDegreesRes.data);
+
+            setProgramOptions(programs.map((program: any) => ({
+                value: String(program.id),
+                label: program.name || program.code || `Program ${program.id}`,
+                description: program.code,
+            })));
+            setDepartmentOptions(departments.map((department: any) => ({
+                value: String(department.id),
+                label: department.name || department.short_name || `Department ${department.id}`,
+                description: department.short_name,
+            })));
+            setDepartmentDegreeOptions(departmentDegrees.map((degree: any) => {
+                const departmentName = degree.department?.name || degree.department_name || degree.departmentName || degree.department?.shortName;
+                const degreeName = degree.degree?.name || degree.degree_name || degree.degreeName || degree.name;
+                return {
+                    value: String(degree.id),
+                    label: [departmentName, degreeName].filter(Boolean).join(' - ') || `Department Degree ${degree.id}`,
+                    description: degree.degree?.short_name || degree.degree_short_name || degree.short_name,
+                };
+            }));
+        } catch (error) {
+            console.error("Failed to load IAT reference options", error);
+        } finally {
+            setIatOptionsLoading(false);
+        }
+    };
 
     const fetchSettings = async (showLoading = true) => {
         try {
@@ -259,6 +329,41 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'string' || item.valueType === 'number') {
+            if (item.category === 'metaphor' && item.key === 'gemini_model') {
+                return (
+                    <GeminiModelSelect
+                        value={String(item.value || '')}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            if ((item.category === 'metaphor' || item.category === 'iat') && item.key === 'claude_report_model') {
+                return (
+                    <ClaudeModelSelect
+                        value={String(item.value || '')}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            if ((item.category === 'metaphor' || item.category === 'iat') && item.key === 'report_skill_markdown') {
+                return (
+                    <div className="flex items-center justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setActiveMarkdownSkill(item)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-green/40"
+                        >
+                            <ProfileIcon className="h-4 w-4" />
+                            Edit / Preview
+                        </button>
+                    </div>
+                );
+            }
+
             const fieldId = `${item.category}:${item.key}`;
             const isSensitiveTextField = item.isSensitive && item.valueType === 'string';
             const isVisible = visibleSensitiveFields[fieldId];
@@ -304,6 +409,53 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'json') {
+            // Dedicated editor for the open-question distribution setting
+            // (array of {questionType, count, selection} rows).
+            if (item.category === 'assessment' && item.key === 'open_question_distribution') {
+                return (
+                    <DistributionEditor
+                        value={Array.isArray(item.value) ? item.value : []}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            // Level 3 metaphor: STT provider (object) + supported languages (array of objects)
+            if (item.category === 'metaphor' && item.key === 'stt_provider') {
+                return (
+                    <SttProviderEditor
+                        value={item.value && typeof item.value === 'object' ? item.value : { provider: 'web_speech', params: {} }}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+            if (item.category === 'metaphor' && item.key === 'supported_languages') {
+                return (
+                    <LanguagesEditor
+                        value={Array.isArray(item.value) ? item.value : []}
+                        isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            if (item.category === 'iat' && item.key === 'level2_replacement_rules') {
+                const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
+                return (
+                    <IatRulesEditor
+                        value={value}
+                        isReadonly={item.isReadonly}
+                        programOptions={programOptions}
+                        departmentOptions={departmentOptions}
+                        departmentDegreeOptions={departmentDegreeOptions}
+                        loading={iatOptionsLoading}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
             if (item.key.endsWith('_config')) {
                 const isLocal = item.value && typeof item.value === 'object' && item.value.mode === 'local';
                 return (
@@ -451,8 +603,21 @@ export default function SettingsManagement() {
                                             : true;
                                         const isDimmed = isReportPasswordField && !reportPasswordEnabled;
 
+                                        // Wide editors (e.g. the distribution table) render full-width,
+                                        // stacked below the label — not squeezed into the side input column.
+                                        // The Claude/Gemini model pickers pair a dropdown with a Refresh
+                                        // button, which gets clipped in the narrow side column — give them
+                                        // the full-width treatment too.
+                                        const isModelSelect = (item.category === 'metaphor' || item.category === 'iat')
+                                            && (item.key === 'claude_report_model' || item.key === 'gemini_model');
+                                        const isFullWidth = isModelSelect || (item.valueType === 'json'
+                                            && (
+                                                (item.category === 'assessment' && item.key === 'open_question_distribution')
+                                                || (item.category === 'metaphor' && (item.key === 'stt_provider' || item.key === 'supported_languages'))
+                                            ));
+
                                         return (
-                                        <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
+                                        <div key={item.id} className={`${isFullWidth ? 'flex flex-col gap-4' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-6'} pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
                                             <div className="sm:max-w-md">
                                                 <label htmlFor={item.key} className="flex items-center text-[15px] font-semibold leading-6 text-gray-900 dark:text-white">
                                                     {item.label}
@@ -487,7 +652,7 @@ export default function SettingsManagement() {
                                                 )}
                                             </p>
                                         </div>
-                                        <div className="mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]">
+                                        <div className={isFullWidth ? 'w-full' : 'mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]'}>
                                             {renderInput(item)}
                                         </div>
                                     </div>
@@ -500,11 +665,19 @@ export default function SettingsManagement() {
 
             {/* Modal for email overrides */}
             {activeOverrideKey && (
-                <EmailOverrideModal 
+                <EmailOverrideModal
                     isOpen={!!activeOverrideKey}
                     onClose={() => setActiveOverrideKey(null)}
                     configItem={settingsGrouped['email']?.find(s => s.key === activeOverrideKey)}
                     onChange={(newVal: any) => handleValueChange('email', activeOverrideKey as string, newVal)}
+                />
+            )}
+
+            {activeMarkdownSkill && (
+                <MarkdownSkillModal
+                    item={settingsGrouped[activeMarkdownSkill.category]?.find((s) => s.key === activeMarkdownSkill.key) || activeMarkdownSkill}
+                    onClose={() => setActiveMarkdownSkill(null)}
+                    onChange={(next) => handleValueChange(activeMarkdownSkill.category, activeMarkdownSkill.key, next)}
                 />
             )}
         </div>
@@ -686,6 +859,900 @@ function ArrayChipInput({ values, isReadonly, onChange }: { values: string[], is
                     className="flex-1 min-w-[120px] border-0 bg-transparent py-1 px-1 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-0"
                 />
             )}
+        </div>
+    );
+}
+
+function SettingsSelect({
+    value,
+    options,
+    onChange,
+    placeholder = 'Select',
+    disabled = false,
+    size = 'md',
+}: {
+    value: string;
+    options: SelectOption[];
+    onChange: (value: string) => void;
+    placeholder?: string;
+    disabled?: boolean;
+    size?: 'sm' | 'md';
+}) {
+    const [open, setOpen] = useState(false);
+    const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const selected = options.find((option) => option.value === value);
+
+    const close = () => setOpen(false);
+
+    const updatePosition = () => {
+        const trigger = triggerRef.current;
+        if (!trigger) return;
+        const rect = trigger.getBoundingClientRect();
+        const gap = 6;
+        const maxHeight = Math.min(280, Math.max(160, window.innerHeight - rect.bottom - gap - 12));
+        const opensUp = maxHeight < 180 && rect.top > window.innerHeight - rect.bottom;
+        const usableHeight = opensUp
+            ? Math.min(280, Math.max(160, rect.top - gap - 12))
+            : maxHeight;
+
+        setMenuStyle({
+            position: 'fixed',
+            left: rect.left,
+            top: opensUp ? undefined : rect.bottom + gap,
+            bottom: opensUp ? window.innerHeight - rect.top + gap : undefined,
+            width: rect.width,
+            maxHeight: usableHeight,
+            zIndex: 9999,
+        });
+    };
+
+    useEffect(() => {
+        if (!open) return;
+        updatePosition();
+
+        const handlePointerDown = (event: MouseEvent) => {
+            const target = event.target as Node;
+            if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+            close();
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') close();
+        };
+        const handleViewportChange = () => updatePosition();
+
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('resize', handleViewportChange);
+        window.addEventListener('scroll', handleViewportChange, true);
+
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('resize', handleViewportChange);
+            window.removeEventListener('scroll', handleViewportChange, true);
+        };
+    }, [open]);
+
+    const choose = (next: string) => {
+        onChange(next);
+        close();
+    };
+
+    const padding = size === 'sm' ? 'px-3 py-1.5' : 'px-4 py-2.5';
+
+    return (
+        <>
+            <button
+                ref={triggerRef}
+                type="button"
+                disabled={disabled}
+                onClick={() => {
+                    if (disabled) return;
+                    setOpen((next) => !next);
+                }}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl border-0 bg-gray-50 text-left text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 transition-all hover:ring-gray-300 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-green dark:bg-white/5 dark:text-white dark:ring-white/10 dark:hover:ring-white/20 sm:text-sm ${padding} ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+            >
+                <span className="min-w-0 truncate">
+                    {selected?.label || value || placeholder}
+                </span>
+                <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className={`h-4 w-4 flex-shrink-0 text-gray-500 transition-transform dark:text-gray-400 ${open ? 'rotate-180' : ''}`}
+                    aria-hidden="true"
+                >
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+            </button>
+
+            {open && ReactDOM.createPortal(
+                <div
+                    ref={menuRef}
+                    style={menuStyle}
+                    className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl ring-1 ring-black/5 dark:border-white/10 dark:bg-[#202820] dark:ring-white/10"
+                >
+                    <div className="max-h-[inherit] overflow-y-auto py-1 custom-scrollbar">
+                        {options.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                {placeholder}
+                            </div>
+                        ) : (
+                            options.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => choose(option.value)}
+                                    className={`flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                                        value === option.value
+                                            ? 'bg-brand-green text-white'
+                                            : 'text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-white/10'
+                                    }`}
+                                >
+                                    <span className="min-w-0">
+                                        <span className="block truncate font-medium">{option.label}</span>
+                                        {option.description && (
+                                            <span className={`mt-0.5 block line-clamp-2 text-xs ${
+                                                value === option.value ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+                                            }`}>
+                                                {option.description}
+                                            </span>
+                                        )}
+                                    </span>
+                                    {value === option.value && (
+                                        <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-current" />
+                                    )}
+                                </button>
+                            ))
+                        )}
+                    </div>
+                </div>,
+                document.body,
+            )}
+        </>
+    );
+}
+
+// ------------------------------------------------------------------
+// Editor for the open-question distribution setting.
+// Value shape: [{ questionType: string|null, count: number, selection: 'random'|'set_sequential' }, ...]
+// Lives next to ArrayChipInput so we don't proliferate components.
+// ------------------------------------------------------------------
+interface DistributionRow {
+    questionType: string | null;
+    count: number;
+    selection: 'random' | 'set_random' | 'set_sequential';
+}
+
+function DistributionEditor({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: DistributionRow[];
+    isReadonly: boolean;
+    onChange: (next: DistributionRow[]) => void;
+}) {
+    const rows: DistributionRow[] = value.map((r) => ({
+        questionType: r.questionType ?? null,
+        count: Number(r.count) || 0,
+        selection:
+            r.selection === 'set_sequential'
+                ? 'set_sequential'
+                : r.selection === 'set_random'
+                    ? 'set_random'
+                    : 'random',
+    }));
+
+    const update = (i: number, patch: Partial<DistributionRow>) => {
+        const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+        onChange(next);
+    };
+    const remove = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
+    const add = () =>
+        onChange([...rows, { questionType: '', count: 10, selection: 'random' }]);
+
+    const total = rows.reduce((s, r) => s + (Number(r.count) || 0), 0);
+
+    return (
+        <div className="w-full max-w-5xl space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[640px]">
+                    <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-3 py-2 font-medium w-[40%]">Question Type</th>
+                            <th className="px-3 py-2 font-medium w-24">Count</th>
+                            <th className="px-3 py-2 font-medium w-64">Selection</th>
+                            <th className="px-3 py-2 font-medium w-20"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        {rows.length === 0 && (
+                            <tr>
+                                <td colSpan={4} className="px-3 py-4 text-center text-gray-400 dark:text-gray-500">
+                                    No groups configured. Click "Add group" to pick open questions.
+                                </td>
+                            </tr>
+                        )}
+                        {rows.map((row, i) => (
+                            <tr key={i} className="bg-white dark:bg-transparent">
+                                <td className="px-3 py-2">
+                                    <input
+                                        type="text"
+                                        disabled={isReadonly}
+                                        value={row.questionType ?? ''}
+                                        onChange={(e) =>
+                                            update(i, {
+                                                questionType: e.target.value === '' ? null : e.target.value,
+                                            })
+                                        }
+                                        placeholder="e.g. OPEN, SURVEY (blank = any type)"
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        disabled={isReadonly}
+                                        value={row.count}
+                                        onChange={(e) => update(i, { count: Number(e.target.value) || 0 })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                    />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <SettingsSelect
+                                        value={row.selection}
+                                        disabled={isReadonly}
+                                        options={[
+                                            { value: 'random', label: 'random (N random of type)' },
+                                            { value: 'set_random', label: 'set_random (one set, then N random)' },
+                                            { value: 'set_sequential', label: 'set_sequential (one set, fixed order)' },
+                                        ]}
+                                        onChange={(next) =>
+                                            update(i, {
+                                                selection: next as DistributionRow['selection'],
+                                            })
+                                        }
+                                        size="sm"
+                                    />
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    <button
+                                        type="button"
+                                        disabled={isReadonly}
+                                        onClick={() => remove(i)}
+                                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 disabled:opacity-40"
+                                        title="Remove this group"
+                                    >
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+                <button
+                    type="button"
+                    disabled={isReadonly}
+                    onClick={add}
+                    className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40"
+                >
+                    + Add group
+                </button>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Total open questions per assessment: <strong className="text-gray-700 dark:text-gray-200">{total}</strong>
+                </span>
+            </div>
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Level 3 metaphor — STT provider editor (object: {provider, params})
+// ------------------------------------------------------------------
+const STT_PROVIDERS = [
+    { value: 'web_speech', label: 'Browser Web Speech (free, Chrome/Edge)' },
+    { value: 'elevenlabs', label: 'ElevenLabs (realtime, cloud)' },
+    { value: 'azure', label: 'Azure Speech (cloud)' },
+    { value: 'google', label: 'Google STT (cloud)' },
+    { value: 'deepgram', label: 'Deepgram (cloud)' },
+];
+
+function SttProviderEditor({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: { provider?: string; params?: any };
+    isReadonly: boolean;
+    onChange: (next: { provider: string; params: any }) => void;
+}) {
+    const provider = value?.provider || 'web_speech';
+    return (
+        <div className="w-full max-w-lg space-y-2">
+            <SettingsSelect
+                value={provider}
+                disabled={isReadonly}
+                options={STT_PROVIDERS}
+                onChange={(next) => onChange({ provider: next, params: value?.params || {} })}
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                Cloud providers also require the API key in “STT provider API key” above. The exam page reads this and uses the matching adapter.
+            </p>
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Level 3 metaphor — supported languages editor (array of {code,label,native})
+// ------------------------------------------------------------------
+function GeminiModelSelect({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: string;
+    isReadonly: boolean;
+    onChange: (next: string) => void;
+}) {
+    const [models, setModels] = useState<GeminiModelOption[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchModels = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const { data } = await api.get('/settings/metaphor/gemini-models');
+            setModels(Array.isArray(data.models) ? data.models : []);
+            setError(data.error || null);
+        } catch (err: any) {
+            setModels([]);
+            setError(err.response?.data?.message || 'Failed to fetch Gemini models.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void fetchModels();
+    }, []);
+
+    const options = [...models];
+    if (value && !options.some((model) => model.value === value)) {
+        options.unshift({ value, label: `${value} (current)` });
+    }
+
+    return (
+        <div className="w-full max-w-lg space-y-2">
+            <div className="flex gap-2">
+                <SettingsSelect
+                    value={value}
+                    disabled={isReadonly || loading || options.length === 0}
+                    options={options}
+                    placeholder="No Gemini models available"
+                    onChange={onChange}
+                />
+                <button
+                    type="button"
+                    disabled={isReadonly || loading}
+                    onClick={() => void fetchModels()}
+                    className="rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40"
+                >
+                    {loading ? 'Loading' : 'Refresh'}
+                </button>
+            </div>
+            {error && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                    {error}
+                </p>
+            )}
+        </div>
+    );
+}
+
+function ClaudeModelSelect({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: string;
+    isReadonly: boolean;
+    onChange: (next: string) => void;
+}) {
+    const [models, setModels] = useState<ModelOption[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchModels = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const { data } = await api.get('/settings/metaphor/claude-models');
+            setModels(Array.isArray(data.models) ? data.models : []);
+            setError(data.error || null);
+        } catch (err: any) {
+            setModels([]);
+            setError(err.response?.data?.message || 'Failed to fetch Claude models.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void fetchModels();
+    }, []);
+
+    const options = [...models];
+    if (value && !options.some((model) => model.value === value)) {
+        options.unshift({ value, label: `${value} (current)` });
+    }
+
+    return (
+        <div className="w-full max-w-lg space-y-2">
+            <div className="flex gap-2">
+                <SettingsSelect
+                    value={value}
+                    disabled={isReadonly || loading || options.length === 0}
+                    options={options}
+                    placeholder="No Claude models available"
+                    onChange={onChange}
+                />
+                <button
+                    type="button"
+                    disabled={isReadonly || loading}
+                    onClick={() => void fetchModels()}
+                    className="rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40"
+                >
+                    {loading ? 'Loading' : 'Refresh'}
+                </button>
+            </div>
+            {error && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                    {error}
+                </p>
+            )}
+        </div>
+    );
+}
+
+function MarkdownSkillModal({
+    item,
+    onClose,
+    onChange,
+}: {
+    item: SettingItem;
+    onClose: () => void;
+    onChange: (next: string) => void;
+}) {
+    const [tab, setTab] = useState<'edit' | 'preview'>('edit');
+    const value = String(item.value || '');
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
+
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+            <div
+                className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#19211C]"
+                onMouseDown={(event) => event.stopPropagation()}
+            >
+                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 dark:border-white/10 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{item.label}</h2>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{item.description}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="flex rounded-xl bg-gray-100 p-1 dark:bg-white/5">
+                            {(['edit', 'preview'] as const).map((mode) => (
+                                <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => setTab(mode)}
+                                    className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
+                                        tab === mode
+                                            ? 'bg-white text-gray-900 shadow-sm dark:bg-[#273127] dark:text-white'
+                                            : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+                                    }`}
+                                >
+                                    {mode}
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded-xl px-3 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                    {tab === 'edit' ? (
+                        <textarea
+                            disabled={item.isReadonly}
+                            value={value}
+                            onChange={(event) => onChange(event.target.value)}
+                            className={`min-h-[58vh] w-full resize-y rounded-xl border-0 bg-gray-50 px-4 py-3 font-mono text-sm leading-6 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 transition-all placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green dark:bg-white/5 dark:text-white dark:ring-white/10 ${item.isReadonly ? 'cursor-not-allowed opacity-60' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
+                        />
+                    ) : (
+                        <MarkdownPreview markdown={value} />
+                    )}
+                </div>
+            </div>
+        </div>,
+        document.body,
+    );
+}
+
+const MarkdownPreview = ({ markdown }: { markdown: string }) => {
+    const lines = markdown.split(/\r?\n/);
+    return (
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-700 dark:border-white/10 dark:bg-black/10 dark:text-gray-200">
+            <div className="space-y-3">
+                {lines.map((raw, index) => {
+                    const line = raw.trim();
+                    if (!line) return <div key={index} className="h-1" />;
+                    if (/^-{3,}$/.test(line)) return <div key={index} className="my-4 border-t border-gray-200 dark:border-white/10" />;
+                    if (line.startsWith('### ')) return <h4 key={index} className="pt-2 text-sm font-semibold text-gray-900 dark:text-white">{line.slice(4)}</h4>;
+                    if (line.startsWith('## ')) return <h3 key={index} className="pt-3 text-base font-semibold text-[#150089] dark:text-white">{line.slice(3)}</h3>;
+                    if (line.startsWith('# ')) return <h2 key={index} className="text-lg font-semibold text-[#150089] dark:text-white">{line.slice(2)}</h2>;
+                    const ordered = line.match(/^(\d+)\.\s+(.*)$/);
+                    if (ordered) {
+                        return (
+                            <div key={index} className="flex gap-3">
+                                <span className="w-5 font-semibold text-brand-green">{ordered[1]}.</span>
+                                <p className="leading-6">{ordered[2]}</p>
+                            </div>
+                        );
+                    }
+                    if (line.startsWith('- ')) {
+                        return (
+                            <div key={index} className="flex gap-3">
+                                <span className="text-brand-green">-</span>
+                                <p className="leading-6">{line.slice(2)}</p>
+                            </div>
+                        );
+                    }
+                    return <p key={index} className="whitespace-pre-wrap leading-6">{line}</p>;
+                })}
+            </div>
+        </div>
+    );
+};
+
+const SCHOOL_BOARD_OPTIONS: SelectOption[] = [
+    { value: 'CBSE', label: 'CBSE' },
+    { value: 'ICSE', label: 'ICSE' },
+    { value: 'State Board', label: 'State Board' },
+    { value: 'IB', label: 'IB' },
+    { value: 'IGCSE', label: 'IGCSE' },
+    { value: 'Other', label: 'Other' },
+];
+
+function IatRulesEditor({
+    value,
+    isReadonly,
+    programOptions,
+    departmentOptions,
+    departmentDegreeOptions,
+    loading,
+    onChange,
+}: {
+    value: IatRuleConfig;
+    isReadonly: boolean;
+    programOptions: SelectOption[];
+    departmentOptions: SelectOption[];
+    departmentDegreeOptions: SelectOption[];
+    loading: boolean;
+    onChange: (next: IatRuleConfig) => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const rules = Array.isArray(value?.rules) ? value.rules : [];
+
+    const normalizeRule = (rule: IatRule): IatRule => ({
+        programIds: (rule.programIds || []).map(String),
+        departmentDegreeIds: (rule.departmentDegreeIds || []).map(String),
+        departmentIds: (rule.departmentIds || []).map(String),
+        studentBoards: (rule.studentBoards || []).map(String),
+    });
+
+    const updateRule = (index: number, patch: Partial<IatRule>) => {
+        const nextRules = rules.map((rule, idx) =>
+            idx === index ? { ...normalizeRule(rule), ...patch } : normalizeRule(rule),
+        );
+        onChange({ rules: nextRules });
+    };
+
+    const addRule = () => {
+        onChange({
+            rules: [
+                ...rules.map(normalizeRule),
+                { programIds: [], departmentDegreeIds: [], departmentIds: [], studentBoards: [] },
+            ],
+        });
+    };
+
+    const removeRule = (index: number) => {
+        onChange({ rules: rules.filter((_, idx) => idx !== index).map(normalizeRule) });
+    };
+
+    const editor = (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm" onMouseDown={() => setIsOpen(false)}>
+            <div
+                className="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#19211C]"
+                onMouseDown={(event) => event.stopPropagation()}
+            >
+                <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 dark:border-white/10 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">IAT Gen</p>
+                        <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">Level 2 replacement routing</h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+                            Empty selections match all values in that field. A student matches when the program matches and at least one selected department, department-degree, or board condition matches.
+                        </p>
+                        {loading && (
+                            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading program and department options...</p>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={isReadonly}
+                            onClick={addRule}
+                            className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 disabled:opacity-40"
+                        >
+                            Add rule
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsOpen(false)}
+                            className="rounded-xl px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">
+                    {rules.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                            No IAT Gen replacement rules configured.
+                        </div>
+                    ) : (
+                        <div className="space-y-5">
+                            {rules.map((rawRule, index) => {
+                                const rule = normalizeRule(rawRule);
+                                return (
+                                    <div key={index} className="rounded-xl border border-gray-200 p-5 dark:border-white/10">
+                                        <div className="mb-5 flex items-center justify-between gap-3">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white">Rule {index + 1}</p>
+                                            <button
+                                                type="button"
+                                                disabled={isReadonly}
+                                                onClick={() => removeRule(index)}
+                                                className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-500/10"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                            <MultiCheckboxGroup
+                                                label="Programs"
+                                                emptyLabel="All programs"
+                                                values={rule.programIds || []}
+                                                options={programOptions}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { programIds: next })}
+                                            />
+                                            <MultiCheckboxGroup
+                                                label="Department / Degree"
+                                                emptyLabel="All department-degree rows"
+                                                values={rule.departmentDegreeIds || []}
+                                                options={departmentDegreeOptions}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { departmentDegreeIds: next })}
+                                            />
+                                            <MultiCheckboxGroup
+                                                label="Departments"
+                                                emptyLabel="All departments"
+                                                values={rule.departmentIds || []}
+                                                options={departmentOptions}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { departmentIds: next })}
+                                            />
+                                            <MultiCheckboxGroup
+                                                label="Boards"
+                                                emptyLabel="All boards"
+                                                values={rule.studentBoards || []}
+                                                options={SCHOOL_BOARD_OPTIONS}
+                                                disabled={isReadonly}
+                                                onChange={(next) => updateRule(index, { studentBoards: next })}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between gap-4 border-t border-gray-200 px-6 py-4 dark:border-white/10">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Close this popup, then use Save Changes to persist the setting.</p>
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(false)}
+                        className="rounded-xl bg-brand-green px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col items-start gap-2">
+            <button
+                type="button"
+                disabled={isReadonly}
+                onClick={() => setIsOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-green/40 disabled:opacity-40"
+            >
+                Configure rules
+            </button>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                {rules.length === 0 ? 'No rules configured' : `${rules.length} rule${rules.length === 1 ? '' : 's'} configured`}
+            </p>
+            {isOpen ? ReactDOM.createPortal(editor, document.body) : null}
+        </div>
+    );
+}
+
+function MultiCheckboxGroup({
+    label,
+    emptyLabel,
+    values,
+    options,
+    disabled,
+    onChange,
+}: {
+    label: string;
+    emptyLabel: string;
+    values: string[];
+    options: SelectOption[];
+    disabled?: boolean;
+    onChange: (next: string[]) => void;
+}) {
+    const selected = new Set(values.map(String));
+    const toggle = (value: string) => {
+        if (selected.has(value)) {
+            onChange(values.filter((item) => String(item) !== value));
+        } else {
+            onChange([...values, value]);
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{label}</p>
+                <button
+                    type="button"
+                    disabled={disabled || values.length === 0}
+                    onClick={() => onChange([])}
+                    className="text-xs font-medium text-brand-green disabled:text-gray-400"
+                >
+                    {values.length === 0 ? emptyLabel : 'Clear'}
+                </button>
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-black/10">
+                {options.length === 0 ? (
+                    <p className="px-2 py-3 text-xs text-gray-400">No options available.</p>
+                ) : (
+                    <div className="space-y-1">
+                        {options.map((option) => (
+                            <label
+                                key={option.value}
+                                className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
+                            >
+                                <input
+                                    type="checkbox"
+                                    disabled={disabled}
+                                    checked={selected.has(option.value)}
+                                    onChange={() => toggle(option.value)}
+                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-green focus:ring-brand-green disabled:opacity-40"
+                                />
+                                <span className="min-w-0">
+                                    <span className="block truncate text-gray-800 dark:text-gray-100">{option.label}</span>
+                                    {option.description && (
+                                        <span className="block truncate text-xs text-gray-400">{option.description}</span>
+                                    )}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+interface LangRow { code: string; label: string; native: string }
+
+function LanguagesEditor({
+    value,
+    isReadonly,
+    onChange,
+}: {
+    value: LangRow[];
+    isReadonly: boolean;
+    onChange: (next: LangRow[]) => void;
+}) {
+    const rows: LangRow[] = value.map((r) => ({
+        code: r.code || '',
+        label: r.label || '',
+        native: r.native || '',
+    }));
+    const update = (i: number, patch: Partial<LangRow>) =>
+        onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+    const remove = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
+    const add = () => onChange([...rows, { code: '', label: '', native: '' }]);
+
+    return (
+        <div className="w-full max-w-3xl space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[480px]">
+                    <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-3 py-2 font-medium w-40">Code (BCP-47)</th>
+                            <th className="px-3 py-2 font-medium">Label</th>
+                            <th className="px-3 py-2 font-medium">Native</th>
+                            <th className="px-3 py-2 font-medium w-16"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        {rows.length === 0 && (
+                            <tr><td colSpan={4} className="px-3 py-4 text-center text-gray-400">No languages configured.</td></tr>
+                        )}
+                        {rows.map((row, i) => (
+                            <tr key={i}>
+                                <td className="px-3 py-2">
+                                    <input type="text" disabled={isReadonly} value={row.code} placeholder="en-IN"
+                                        onChange={(e) => update(i, { code: e.target.value })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green" />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <input type="text" disabled={isReadonly} value={row.label} placeholder="English"
+                                        onChange={(e) => update(i, { label: e.target.value })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green" />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <input type="text" disabled={isReadonly} value={row.native} placeholder="English"
+                                        onChange={(e) => update(i, { native: e.target.value })}
+                                        className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green" />
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    <button type="button" disabled={isReadonly} onClick={() => remove(i)}
+                                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 disabled:opacity-40">Remove</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" disabled={isReadonly} onClick={add}
+                className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green hover:bg-brand-green/20 transition-colors disabled:opacity-40">+ Add language</button>
         </div>
     );
 }
