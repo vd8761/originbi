@@ -1,55 +1,34 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgileScore, CollegeData } from '../../types/types';
-import { BaseReport } from '../BaseReport';
+import { BaseReport, StyledRow } from '../BaseReport';
 import { logger } from '../../helpers/logger';
 import {
-  CareerRoleData,
-  getCareerGuidanceByTrait,
-} from '../../helpers/sqlHelper';
-import {
-  ALIGNMENT_MULTIPLIER,
   BEHAVIORAL_ORIENTATION,
-  BehavioralAlignment,
-  DISC_ALIGNMENT,
-  FitLevel,
-  fitLevelFromScore,
+  detectDeclaredTrackCode,
+  DiscTrait,
   fitLevelStyle,
+  normalizeReadiness,
+  rankSpecializations,
   READINESS_LABEL,
   READINESS_ORDER,
   ReadinessKey,
   readinessBand,
   SPECIALIZATIONS,
-  SPECIALIZATION_ORDER,
-  SPEC_WEIGHTS,
-  SpecializationCode,
   SpecializationMeta,
+  SpecRanking,
 } from './mbaConstants';
 
-type DiscTrait = 'D' | 'I' | 'S' | 'C';
-
-interface SpecRanking {
-  code: SpecializationCode;
-  meta: SpecializationMeta;
-  readinessScore: number;
-  alignment: BehavioralAlignment;
-  finalScore: number;
-  fit: FitLevel;
-  rank: number;
-}
-
 /**
- * Origin BI MBA SpecFit — 2-page short report.
+ * Origin BI MBA SpecFit - 2-page short report.
  *
  * Page 1: Profile snapshot + recommended specialization
  * Page 2: All-5 ranking, strengths/development, career chips, preparation plan
  *
- * Uses the same page frame + header + footer system as
- * {@link ../college/collegeShortReport.ts CollegeShortReport}.
+ * Mirrors the page frame + header + footer system used by CollegeShortReport.
  */
 export class CollegeMBAShortReport extends BaseReport {
   private data: CollegeData;
-  private careerGuidance: CareerRoleData[] = [];
 
   private readonly CONTENT_X = this.MARGIN_STD;
   private readonly CONTENT_W = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
@@ -80,7 +59,6 @@ export class CollegeMBAShortReport extends BaseReport {
   public async generate(outputPath: string): Promise<void> {
     logger.info('[MBA Short REPORT] Starting PDF Generation...');
     this.computeProfile();
-    await this.preloadCareerGuidance();
 
     const stream = fs.createWriteStream(outputPath);
     this.doc.pipe(stream);
@@ -98,9 +76,7 @@ export class CollegeMBAShortReport extends BaseReport {
     logger.info('[MBA Short REPORT] PDF Generation completed.');
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  //  Computation
-  // ────────────────────────────────────────────────────────────────────────
+  // Computation ────────────────────────────────────────────────────────────
 
   private computeProfile(): void {
     const [primary, secondary] = this.getTopTwoTraits(
@@ -131,93 +107,29 @@ export class CollegeMBAShortReport extends BaseReport {
       courage: this.normalizeScore(agile.courage),
     };
 
-    const ranked: SpecRanking[] = SPECIALIZATION_ORDER.map((code) => {
-      const meta = SPECIALIZATIONS[code];
-      const weights = SPEC_WEIGHTS[code];
-      let weighted = 0;
-      let sumW = 0;
-      READINESS_ORDER.forEach((k) => {
-        weighted += this.readinessPct[k] * weights[k];
-        sumW += weights[k];
-      });
-      const readinessScore = sumW > 0 ? weighted / sumW : 0;
-      const alignment = DISC_ALIGNMENT[primary][code];
-      const finalScore = readinessScore * ALIGNMENT_MULTIPLIER[alignment];
-      return {
-        code,
-        meta,
-        readinessScore,
-        alignment,
-        finalScore,
-        fit: fitLevelFromScore(finalScore),
-        rank: 0,
-      };
-    });
-    ranked.sort((a, b) => b.finalScore - a.finalScore);
-    ranked.forEach((r, i) => (r.rank = i + 1));
-    this.rankings = ranked;
-    this.recommendedSpec = ranked[0].meta;
+    // Shared ranking math (see mbaConstants.rankSpecializations) so the short
+    // report and the MBA placement report stay perfectly consistent.
+    this.rankings = rankSpecializations(this.readinessPct, primary);
+    this.recommendedSpec = this.rankings[0].meta;
 
     this.declaredTrack = this.detectDeclaredTrack();
   }
 
-  /**
-   * Agile scores are documented as /25; some pipelines may already convert
-   * to 0-100. Auto-detect: anything >25 is treated as already a percentage.
-   */
+  // Agile scores are documented as /25; some pipelines emit 0-100. Auto-detect.
   private normalizeScore(raw: unknown): number {
-    const v = Number(raw) || 0;
-    if (v <= 0) return 0;
-    const pct = v > 25 ? v : (v / 25) * 100;
-    return Math.max(0, Math.min(100, pct));
+    return normalizeReadiness(raw);
   }
 
-  /**
-   * Detects a declared MBA specialization-of-study from dept_code/group_name.
-   * Returns the specialization name if it does NOT match the recommendation,
-   * else null. Used for the soft mismatch note on page 1.
-   */
   private detectDeclaredTrack(): string | null {
-    const haystack =
-      `${this.data.dept_code || ''} ${this.data.group_name || ''}`.toUpperCase();
-    const map: { keys: string[]; name: string; code: SpecializationCode }[] = [
-      { keys: ['FINANCE', 'FIN'], name: 'Finance', code: 'FIN' },
-      { keys: ['HUMAN RESOURCE', 'HR'], name: 'Human Resources', code: 'HR' },
-      {
-        keys: ['BUSINESS ANALYTIC', 'ANALYTICS', 'BA '],
-        name: 'Business Analytics',
-        code: 'BA',
-      },
-      { keys: ['OPERATION', 'OPS '], name: 'Operations', code: 'OPS' },
-      { keys: ['MARKETING', 'MKT '], name: 'Marketing', code: 'MKT' },
-    ];
-    for (const entry of map) {
-      if (entry.keys.some((k) => haystack.includes(k))) {
-        return entry.code === this.recommendedSpec.code ? null : entry.name;
-      }
-    }
-    return null;
+    const code = detectDeclaredTrackCode(
+      this.data.dept_code,
+      this.data.group_name,
+    );
+    if (!code || code === this.recommendedSpec.code) return null;
+    return SPECIALIZATIONS[code].name;
   }
 
-  private async preloadCareerGuidance(): Promise<void> {
-    const traitCode = `${this.primaryTrait}${this.secondaryTrait}`;
-    try {
-      this.careerGuidance = await getCareerGuidanceByTrait(
-        traitCode,
-        this.data.department_deg_id,
-      );
-    } catch (err) {
-      logger.warn(
-        '[MBA Short REPORT] Failed to fetch career guidance data.',
-        err,
-      );
-      this.careerGuidance = [];
-    }
-  }
-
-  // ────────────────────────────────────────────────────────────────────────
-  //  Page rendering
-  // ────────────────────────────────────────────────────────────────────────
+  // Page rendering ─────────────────────────────────────────────────────────
 
   private renderPageOne(): void {
     this._useStdMargins = false;
@@ -228,7 +140,8 @@ export class CollegeMBAShortReport extends BaseReport {
     y = this.drawHeader(y);
     y = this.drawHeroRecommendationCard(y + 14);
     y = this.drawReadinessProfile(y + 16);
-    this.drawWhyRecommendation(y + 14);
+    y = this.drawWhyRecommendation(y + 14);
+    this.drawSpecializationRanking(y + 16);
 
     this.drawFooterStrip(1);
   }
@@ -240,18 +153,15 @@ export class CollegeMBAShortReport extends BaseReport {
 
     let y = 20;
     y = this.drawHeader(y);
-    y = this.drawSpecializationRanking(y + 14);
-    y = this.drawStrengthsAndDevelopment(y + 12);
-    y = this.drawCareerChips(y + 12);
-    y = this.drawPreparationPlan(y + 10);
-    this.drawDisclaimer(y + 8);
+    y = this.drawStrengthsAndDevelopment(y + 14);
+    y = this.drawCareerChips(y + 14);
+    y = this.drawPreparationPlan(y + 12);
+    this.drawDisclaimer(y + 10);
 
     this.drawFooterStrip(2);
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  //  Page frame, header, footer (mirrors collegeShortReport.ts)
-  // ────────────────────────────────────────────────────────────────────────
+  // Page frame + header + footer (mirrors CollegeShortReport) ──────────────
 
   private resolveBackgroundPath(): string | null {
     const candidates = [
@@ -288,34 +198,66 @@ export class CollegeMBAShortReport extends BaseReport {
       .fill(this.COLOR_DEEP_BLUE);
   }
 
+  /** Label shown as the eyebrow in the header and on the left of the footer. */
+  private readonly SNAPSHOT_LABEL = 'MBA Specialization Snapshot';
+
   private drawHeader(y: number): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
 
-    this.doc
-      .font(this.FONT_SORA_SEMIBOLD)
-      .fontSize(9)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text('MBA Specialization Snapshot', x, y, { lineBreak: false });
+    // ── Sizes ──
+    const logoH = 22; // small logo
+    const logoW = 78; // approximate rendered width at this height (covers "Origin BI" wordmark)
+    const titleFontSize = 16;
+    const nameSize = 15;
+    const dateSize = 8.5;
+    const metaGap = 4;
 
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(20)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Origin BI MBA SpecFit', x, y + 14, {
-        width: w * 0.62,
-        lineBreak: false,
-        ellipsis: true,
-      });
-
+    // ── Right meta column (name + date stack) ──
     const metaX = x + w * 0.62;
     const metaW = w * 0.38;
+    const metaH = nameSize + metaGap + dateSize;
+
+    // ── Title geometry (left of meta, right of logo) ──
+    const titleLeft = x + logoW + 12;
+    const titleAvailW = metaX - titleLeft - 16; // 16pt safety gap to meta
+    const titleText = 'MBA Pathway Fit Report';
+
+    // Measure the rendered title height - adapts if it wraps to 2 lines.
+    this.doc.font(this.FONT_SORA_BOLD).fontSize(titleFontSize);
+    const titleH = this.doc.heightOfString(titleText, {
+      width: titleAvailW,
+    });
+
+    // Band height = whichever element is tallest, plus a tiny padding.
+    const contentH = Math.max(logoH, titleH, metaH);
+    const bandH = contentH + 4;
+    const midY = y + bandH / 2;
+
+    // ── Logo (left, vertically centered to midY) ──
+    const logoPath = this.resolveLogoPath();
+    if (logoPath) {
+      this.doc.image(logoPath, x, midY - logoH / 2, { height: logoH });
+    }
+
+    // ── Title (block vertically centered on midY - adapts to wrap) ──
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(titleFontSize)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(titleText, titleLeft, midY - titleH / 2, {
+        width: titleAvailW,
+        lineGap: 0,
+      });
+
+    // ── Meta (block vertically centered on midY) ──
+    const metaTop = midY - metaH / 2;
 
     this.doc
       .font(this.FONT_SORA_BOLD)
-      .fontSize(13)
-      .fillColor(this.COLOR_BLACK)
-      .text(this.data.full_name || '-', metaX, y + 14, {
+      .fontSize(nameSize)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(this.data.full_name || '-', metaX, metaTop, {
         width: metaW,
         align: 'right',
         lineBreak: false,
@@ -332,22 +274,29 @@ export class CollegeMBAShortReport extends BaseReport {
 
     this.doc
       .font(this.FONT_REGULAR)
-      .fontSize(8.5)
+      .fontSize(dateSize)
       .fillColor(this.C_MUTED)
-      .text(`${this.data.email_id || ''}   •   ${dateStr}`, metaX, y + 34, {
-        width: metaW,
-        align: 'right',
-        lineBreak: false,
-      });
+      .text(
+        `${this.data.email_id || ''}   •   ${dateStr}`,
+        metaX,
+        metaTop + nameSize + metaGap,
+        {
+          width: metaW,
+          align: 'right',
+          lineBreak: false,
+        },
+      );
 
+    // ── Underline rule ──
+    const ruleY = y + bandH + 4;
     this.doc
       .lineWidth(0.6)
       .strokeColor(this.C_RULE)
-      .moveTo(x, y + 52)
-      .lineTo(x + w, y + 52)
+      .moveTo(x, ruleY)
+      .lineTo(x + w, ruleY)
       .stroke();
 
-    return y + 52;
+    return ruleY;
   }
 
   private drawFooterStrip(pageNum: number): void {
@@ -362,11 +311,12 @@ export class CollegeMBAShortReport extends BaseReport {
       .lineTo(x + w, y)
       .stroke();
 
+    // ── Snapshot label (replaces the old "Origin BI" text) ──
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(9)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Origin BI', x, y + 8, { lineBreak: false });
+      .text(this.SNAPSHOT_LABEL, x, y + 8, { lineBreak: false });
 
     this.doc
       .font(this.FONT_REGULAR)
@@ -389,9 +339,7 @@ export class CollegeMBAShortReport extends BaseReport {
       });
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  //  Page 1 sections
-  // ────────────────────────────────────────────────────────────────────────
+  // Page 1 sections ────────────────────────────────────────────────────────
 
   private drawHeroRecommendationCard(y: number): number {
     const x = this.CONTENT_X;
@@ -401,35 +349,40 @@ export class CollegeMBAShortReport extends BaseReport {
     const topRank = this.rankings[0];
     const fitStyle = fitLevelStyle(topRank.fit);
 
-    // Card frame
+    // Fixed light-toned deep blue palette for the hero card (spec-agnostic).
+    const heroFill = '#EDEDF7';
+    const heroBorder = this.COLOR_DEEP_BLUE;
+    const heroAccentBar = this.COLOR_DEEP_BLUE;
+    const heroEyebrow = this.COLOR_DEEP_BLUE;
+
     this.doc.save();
-    this.doc.roundedRect(x, y, w, h, 10).fill(spec.accentSoft);
+    this.doc.roundedRect(x, y, w, h, 10).fill(heroFill);
     this.doc.restore();
     this.doc
       .lineWidth(1.2)
-      .strokeColor(spec.accent)
+      .strokeColor(heroBorder)
       .roundedRect(x, y, w, h, 10)
       .stroke();
 
-    // Left accent bar
+    // Left accent bar - inset from top & bottom by the corner radius so it
+    // sits inside the rounded corners instead of overflowing the card.
+    const accentR = 10;
     this.doc.save();
-    this.doc.rect(x, y, 6, h).fill(spec.accent);
+    this.doc.rect(x, y + accentR, 6, h - accentR * 2).fill(heroAccentBar);
     this.doc.restore();
 
     const innerX = x + 22;
     const innerY = y + 18;
 
-    // Eyebrow
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(9.5)
-      .fillColor(spec.accent)
+      .fillColor(heroEyebrow)
       .text('BEST-FIT MBA SPECIALIZATION', innerX, innerY, {
         characterSpacing: 0.6,
         lineBreak: false,
       });
 
-    // Specialization name (large)
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(28)
@@ -440,7 +393,6 @@ export class CollegeMBAShortReport extends BaseReport {
         ellipsis: true,
       });
 
-    // Fit Level pill
     this.drawPill(
       innerX,
       innerY + 54,
@@ -450,7 +402,6 @@ export class CollegeMBAShortReport extends BaseReport {
       fitStyle.dot,
     );
 
-    // Right column: behavioral orientation
     const rightX = x + w * 0.62;
     const rightW = w - (rightX - x) - 22;
 
@@ -472,7 +423,6 @@ export class CollegeMBAShortReport extends BaseReport {
         lineGap: 1.2,
       });
 
-    // One-liner reason at card bottom
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(10)
@@ -543,12 +493,17 @@ export class CollegeMBAShortReport extends BaseReport {
     const barX = x + labelW + 8;
     const barW = w - labelW - valueW - 16;
 
-    READINESS_ORDER.forEach((key, i) => {
+    // Sort readiness indicators by percentage descending so the strongest
+    // areas appear at the top - easier to scan than a fixed order.
+    const sortedKeys = [...READINESS_ORDER].sort(
+      (a, b) => this.readinessPct[b] - this.readinessPct[a],
+    );
+
+    sortedKeys.forEach((key, i) => {
       const rowY = barsY + i * rowH;
       const pct = this.readinessPct[key];
       const band = readinessBand(pct);
 
-      // Label
       this.doc
         .font(this.FONT_SORA_SEMIBOLD)
         .fontSize(10)
@@ -559,18 +514,15 @@ export class CollegeMBAShortReport extends BaseReport {
           ellipsis: true,
         });
 
-      // Track
       this.doc.save();
       this.doc.roundedRect(barX, rowY + 8, barW, 10, 5).fill('#ECECF1');
       this.doc.restore();
 
-      // Fill
       const fillW = Math.max(4, (pct / 100) * barW);
       this.doc.save();
       this.doc.roundedRect(barX, rowY + 8, fillW, 10, 5).fill(band.color);
       this.doc.restore();
 
-      // Value + band label
       this.doc
         .font(this.FONT_SORA_BOLD)
         .fontSize(10)
@@ -626,146 +578,79 @@ export class CollegeMBAShortReport extends BaseReport {
       .font(this.FONT_REGULAR)
       .fontSize(10.5)
       .fillColor(this.C_INK)
-      .text(paragraph, x, y + 22, { width: w, lineGap: 2 });
+      .text(paragraph, x, y + 22, {
+        width: w,
+        lineGap: 2,
+        align: 'justify',
+      });
 
-    const textH = this.doc.heightOfString(paragraph, { width: w, lineGap: 2 });
+    const textH = this.doc.heightOfString(paragraph, {
+      width: w,
+      lineGap: 2,
+      align: 'justify',
+    });
     return y + 22 + textH;
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  //  Page 2 sections
-  // ────────────────────────────────────────────────────────────────────────
+  // Page 2 sections ────────────────────────────────────────────────────────
 
   private drawSpecializationRanking(y: number): number {
     const x = this.CONTENT_X;
-    const w = this.CONTENT_W;
 
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('All 5 Specializations — Suitability Ranking', x, y, {
+      .text('All 5 Specializations - Suitability Ranking', x, y, {
         lineBreak: false,
       });
 
-    const headerY = y + 24;
-    const rowH = 42;
-    const cols = [
-      { label: 'Rank', w: 44, align: 'center' as const },
-      { label: 'Specialization', w: 140, align: 'left' as const },
-      { label: 'Fit', w: 110, align: 'left' as const },
-      { label: 'Reason', w: w - 44 - 140 - 110, align: 'left' as const },
-    ];
+    const tableY = y + 22;
 
-    // Header row
-    this.doc.save();
-    this.doc.rect(x, headerY, w, 22).fill('#F0F0F6');
-    this.doc.restore();
-    let cx = x;
-    cols.forEach((c) => {
-      this.doc
-        .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(9.5)
-        .fillColor(this.COLOR_DEEP_BLUE)
-        .text(c.label, cx + 8, headerY + 6, {
-          width: c.w - 16,
-          align: c.align,
-          lineBreak: false,
-        });
-      cx += c.w;
-    });
+    const headers = ['Rank', 'Specialization', 'Fit Level', 'Score', 'Reason'];
 
-    // Rows
-    this.rankings.forEach((r, i) => {
-      const rowY = headerY + 22 + i * rowH;
-      const isRecommended = r.rank === 1;
-
-      if (isRecommended) {
-        this.doc.save();
-        this.doc.rect(x, rowY, w, rowH).fill(r.meta.accentSoft);
-        this.doc.restore();
-      } else if (i % 2 === 1) {
-        this.doc.save();
-        this.doc.rect(x, rowY, w, rowH).fill('#FAFAFD');
-        this.doc.restore();
-      }
-
-      // Bottom rule
-      this.doc
-        .lineWidth(0.4)
-        .strokeColor(this.C_RULE)
-        .moveTo(x, rowY + rowH)
-        .lineTo(x + w, rowY + rowH)
-        .stroke();
-
-      cx = x;
-      // Rank
-      this.doc
-        .font(this.FONT_SORA_BOLD)
-        .fontSize(12)
-        .fillColor(isRecommended ? r.meta.accent : this.C_INK)
-        .text(`${r.rank}`, cx, rowY + 14, {
-          width: cols[0].w,
-          align: 'center',
-          lineBreak: false,
-        });
-      cx += cols[0].w;
-
-      // Specialization name
-      this.doc
-        .font(isRecommended ? this.FONT_SORA_BOLD : this.FONT_SORA_SEMIBOLD)
-        .fontSize(10.5)
-        .fillColor(this.C_INK)
-        .text(r.meta.name, cx + 8, rowY + 15, {
-          width: cols[1].w - 16,
-          lineBreak: false,
-          ellipsis: true,
-        });
-      cx += cols[1].w;
-
-      // Fit pill (inline mini)
-      const fStyle = fitLevelStyle(r.fit);
-      this.drawInlineFitChip(cx + 8, rowY + 13, r.fit, fStyle);
-      cx += cols[2].w;
-
-      // Reason
-      this.doc
-        .font(this.FONT_REGULAR)
-        .fontSize(8.5)
-        .fillColor(this.C_INK)
-        .text(r.meta.reasonOnePager, cx + 8, rowY + 12, {
-          width: cols[3].w - 16,
-        });
-    });
-
-    return headerY + 22 + this.rankings.length * rowH;
-  }
-
-  private drawInlineFitChip(
-    x: number,
-    y: number,
-    label: string,
-    style: { bg: string; fg: string; dot: string },
-  ): void {
-    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8.8);
-    const textW = this.doc.widthOfString(label);
-    const padX = 8;
-    const dotR = 2.6;
-    const dotGap = 5;
-    const chipW = textW + padX * 2 + dotR * 2 + dotGap;
-    const chipH = 16;
-    this.doc.save();
-    this.doc.roundedRect(x, y, chipW, chipH, chipH / 2).fill(style.bg);
-    this.doc.restore();
-    this.doc.circle(x + padX + dotR, y + chipH / 2, dotR).fill(style.dot);
-    this.doc
-      .font(this.FONT_SORA_SEMIBOLD)
-      .fontSize(8.8)
-      .fillColor(style.fg)
-      .text(label, x + padX + dotR * 2 + dotGap, y + 4, {
-        width: textW + 4,
-        lineBreak: false,
+    const rows: (StyledRow | (string | number | null | undefined)[])[] =
+      this.rankings.map((r) => {
+        const cells = [
+          `${r.rank}`,
+          r.meta.name,
+          r.fit,
+          `${Math.round(r.finalScore)}%`,
+          r.meta.reasonOnePager,
+        ];
+        if (r.rank === 1) {
+          const styled: StyledRow = {
+            type: 'row',
+            data: cells,
+            fill: r.meta.accentSoft,
+            color: this.C_INK,
+            font: this.FONT_SORA_SEMIBOLD,
+            fontSize: 8,
+          };
+          return styled;
+        }
+        return cells;
       });
+
+    this.table(headers, rows, {
+      y: tableY,
+      x,
+      width: this.CONTENT_W,
+      fontSize: 8,
+      headerFontSize: 8,
+      headerColor: '#150089',
+      headerTextColor: '#FFFFFF',
+      borderColor: '#CCCCCC',
+      borderWidth: 0.5,
+      cellPadding: 5,
+      colWidths: ['fit', 'fit', 'fit', 'fit', 'fill'],
+      headerAlign: ['center', 'left', 'left', 'center', 'left'],
+      rowAlign: ['center', 'left', 'left', 'center', 'left'],
+      verticalAlign: 'middle',
+      headerVerticalAlign: 'middle',
+    } as any);
+
+    return this.doc.y;
   }
 
   private drawStrengthsAndDevelopment(y: number): number {
@@ -810,51 +695,78 @@ export class CollegeMBAShortReport extends BaseReport {
         'Needed for interviews, presentations, and leadership communication.',
     };
 
+    const titleSize = 10.2;
+    const bodySize = 9;
+    const itemGap = 10; // vertical gap between items in a column
+
     const drawItem = (
       colX: number,
-      idx: number,
+      itemY: number,
       titleText: string,
       bodyText: string,
       accent: string,
-    ) => {
-      const itemY = itemsY + idx * 42;
+    ): number => {
+      // Measure body height to position correctly and size the accent bar
+      const bodyH = this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(bodySize)
+        .heightOfString(bodyText, { width: colW - 12, lineGap: 1 });
+      const titleH = this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(titleSize)
+        .heightOfString(titleText);
+
+      const totalH = titleH + 2 + bodyH;
+
+      // Left accent bar - spans the full item height
       this.doc.save();
-      this.doc.rect(colX, itemY + 4, 3, 22).fill(accent);
+      this.doc.rect(colX, itemY + 2, 3, totalH).fill(accent);
       this.doc.restore();
+
       this.doc
         .font(this.FONT_SORA_BOLD)
-        .fontSize(10.2)
+        .fontSize(titleSize)
         .fillColor(this.C_INK)
-        .text(titleText, colX + 10, itemY + 2, {
+        .text(titleText, colX + 10, itemY, {
           width: colW - 12,
           lineBreak: false,
           ellipsis: true,
         });
       this.doc
         .font(this.FONT_REGULAR)
-        .fontSize(9)
+        .fontSize(bodySize)
         .fillColor(this.C_MUTED)
-        .text(bodyText, colX + 10, itemY + 16, {
+        .text(bodyText, colX + 10, itemY + titleH + 2, {
           width: colW - 12,
           lineGap: 1,
         });
+
+      return itemY + totalH + itemGap;
     };
 
-    strengths.forEach((k, i) => {
-      drawItem(x, i, READINESS_LABEL[k], strengthExplain[k], '#2E7D32');
+    let leftY = itemsY;
+    strengths.forEach((k) => {
+      leftY = drawItem(
+        x,
+        leftY,
+        READINESS_LABEL[k],
+        strengthExplain[k],
+        '#2E7D32',
+      );
     });
-    dev.forEach((k, i) => {
-      drawItem(
+
+    let rightY = itemsY;
+    dev.forEach((k) => {
+      rightY = drawItem(
         x + colW + colGap,
-        i,
+        rightY,
         READINESS_LABEL[k],
         devExplain[k],
         '#ED6C02',
       );
     });
 
-    const usedRows = Math.max(strengths.length, dev.length);
-    return itemsY + usedRows * 42;
+    return Math.max(leftY, rightY) - itemGap;
   }
 
   private drawCareerChips(y: number): number {
@@ -862,111 +774,273 @@ export class CollegeMBAShortReport extends BaseReport {
     const w = this.CONTENT_W;
     const spec = this.recommendedSpec;
 
+    // Normalise roles to { name, description } objects
+    const allRoles = spec.defaultRoles.map((r) =>
+      typeof r === 'string' ? { name: r, description: '' } : r,
+    );
+    const top = allRoles[0];
+    const others = allRoles.slice(1, 5); // up to 4 supporting cards
+
+    // ── Title + subtitle ──
     this.doc
       .font(this.FONT_SORA_BOLD)
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Suitable Career Paths', x, y, { lineBreak: false });
+      .text('Recommended Career Paths', x, y, { lineBreak: false });
 
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(9.5)
       .fillColor(this.C_MUTED)
-      .text(`Roles aligned with the ${spec.name} specialization.`, x, y + 18, {
-        width: w,
+      .text(
+        `Roles where your ${spec.name} strengths translate into immediate workplace value.`,
+        x,
+        y + 18,
+        { width: w, lineBreak: false },
+      );
+
+    // ── Top Career Match hero card ──
+    const heroY = y + 40;
+    const heroH = 70;
+    const iconGutter = 80; // reserved right area for the trophy emblem
+    const textW = w - 32 - iconGutter;
+
+    this.doc.save();
+    this.doc.roundedRect(x, heroY, w, heroH, 8).fill(spec.accent);
+    this.doc.restore();
+
+    // Universal "top pick" mark - prefer the PNG asset; fall back to the
+    // drawn target if the file isn't present.
+    const iconSize = heroH - 20;
+    const iconCx = x + w - iconGutter / 2 - 6;
+    const iconCy = heroY + heroH / 2;
+    // Prefer the pre-inverted white version; fall back to the black source,
+    // then to the drawn target. Rendered translucent so it reads as a
+    // watermark, not as a competing focal point with the role name.
+    const iconPath =
+      this.resolveIconPath('top-career-match-white.png') ||
+      this.resolveIconPath('top-career-match.png');
+    if (iconPath) {
+      this.doc.save();
+      this.doc.opacity(0.35);
+      this.doc.image(iconPath, iconCx - iconSize / 2, iconCy - iconSize / 2, {
+        width: iconSize,
+        height: iconSize,
+      });
+      this.doc.restore();
+      this.doc.opacity(1);
+    } else {
+      this.drawTargetIcon(iconCx, iconCy, iconSize / 2, '#FFFFFF', 0.35);
+    }
+
+    const eyebrowH = this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(8)
+      .heightOfString('TOP CAREER MATCH');
+    const nameH = this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(18)
+      .heightOfString(top?.name || '-');
+    const descH = top?.description
+      ? this.doc
+          .font(this.FONT_REGULAR)
+          .fontSize(9.5)
+          .heightOfString(top.description, { width: textW })
+      : 0;
+    const stackH = eyebrowH + 4 + nameH + (descH ? 4 + descH : 0);
+    const stackTop = heroY + (heroH - stackH) / 2;
+
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(8)
+      .fillColor('#FFFFFF')
+      .text('TOP CAREER MATCH', x + 16, stackTop, {
+        characterSpacing: 1.2,
         lineBreak: false,
       });
 
-    // Pick up to 7 roles: prefer DB roles, fall back to default list
-    const dbRoles = this.careerGuidance
-      .map((r) => this.cleanLabel(r.roleName))
-      .filter(Boolean);
-    const pool = dbRoles.length > 0 ? dbRoles : spec.defaultRoles;
-    const roles = pool.slice(0, 7);
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(18)
+      .fillColor('#FFFFFF')
+      .text(top?.name || '-', x + 16, stackTop + eyebrowH + 4, {
+        width: textW,
+        lineBreak: false,
+        ellipsis: true,
+      });
 
-    const chipY = y + 40;
-    let cursorX = x;
-    let cursorY = chipY;
-    const chipH = 22;
-    const chipPadX = 12;
-    const chipGap = 8;
+    if (top?.description) {
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(9.5)
+        .fillColor('#FFFFFF')
+        .text(top.description, x + 16, stackTop + eyebrowH + 4 + nameH + 4, {
+          width: textW,
+        });
+    }
 
-    roles.forEach((role) => {
-      this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(9.5);
-      const textW = this.doc.widthOfString(role);
-      const chipW = textW + chipPadX * 2;
-      if (cursorX + chipW > x + w) {
-        cursorX = x;
-        cursorY += chipH + chipGap;
-      }
-      this.doc.save();
-      this.doc
-        .roundedRect(cursorX, cursorY, chipW, chipH, chipH / 2)
-        .fill(spec.accentSoft);
-      this.doc.restore();
-      this.doc
-        .lineWidth(0.6)
-        .strokeColor(spec.accent)
-        .roundedRect(cursorX, cursorY, chipW, chipH, chipH / 2)
-        .stroke();
+    let cursorY = heroY + heroH + 14;
+
+    // ── OTHER STRONG MATCHES eyebrow ──
+    if (others.length > 0) {
       this.doc
         .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(9.5)
-        .fillColor(spec.accent)
-        .text(role, cursorX + chipPadX, cursorY + 6, {
-          width: textW + 4,
+        .fontSize(8)
+        .fillColor(this.C_MUTED)
+        .text('OTHER STRONG MATCHES', x, cursorY, {
+          characterSpacing: 1.2,
           lineBreak: false,
         });
-      cursorX += chipW + chipGap;
-    });
+      cursorY += 16;
 
-    return cursorY + chipH;
+      // ── 2×2 grid of role cards ──
+      const colGap = 12;
+      const rowGap = 10;
+      const cardW = (w - colGap) / 2;
+      const cardH = 52;
+
+      others.forEach((role, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const cardX = x + col * (cardW + colGap);
+        const cardY = cursorY + row * (cardH + rowGap);
+
+        // Fill + thin border
+        this.doc.save();
+        this.doc
+          .roundedRect(cardX, cardY, cardW, cardH, 6)
+          .fill(spec.accentSoft);
+        this.doc.restore();
+        this.doc
+          .lineWidth(0.6)
+          .strokeColor(spec.accent)
+          .roundedRect(cardX, cardY, cardW, cardH, 6)
+          .stroke();
+
+        const padX = 12;
+        const padY = 10;
+        this.doc
+          .font(this.FONT_SORA_BOLD)
+          .fontSize(10.5)
+          .fillColor(this.C_INK)
+          .text(role.name, cardX + padX, cardY + padY, {
+            width: cardW - padX * 2,
+            lineBreak: false,
+            ellipsis: true,
+          });
+
+        if (role.description) {
+          this.doc
+            .font(this.FONT_REGULAR)
+            .fontSize(8.5)
+            .fillColor(this.C_MUTED)
+            .text(role.description, cardX + padX, cardY + padY + 16, {
+              width: cardW - padX * 2,
+              lineGap: 1,
+            });
+        }
+      });
+
+      const rows = Math.ceil(others.length / 2);
+      cursorY += rows * cardH + (rows - 1) * rowGap;
+    }
+
+    return cursorY;
   }
 
+  /**
+   * "Your Preparation Plan" - numbered timeline (01 → 02 → 03 → 04).
+   *
+   * Each step is a rounded numbered tile in the specialization's accent
+   * colour, connected by a thin vertical line so the reader perceives
+   * the steps as a sequence rather than a flat checklist.
+   */
   private drawPreparationPlan(y: number): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
     const spec = this.recommendedSpec;
-    const padX = 14;
-    const padY = 12;
-
-    const titleH = 18;
     const items = spec.preparation.slice(0, 4);
 
-    this.doc.font(this.FONT_REGULAR).fontSize(9.5);
-    let bodyH = 0;
-    items.forEach((it) => {
-      bodyH += this.doc.heightOfString(it, { width: w - padX * 2 - 18 }) + 6;
-    });
-    const blockH = padY * 2 + titleH + bodyH + 2;
-
-    this.doc.save();
-    this.doc.roundedRect(x, y, w, blockH, 8).fill(this.C_SUBTLE_BG);
-    this.doc.restore();
-    this.doc
-      .lineWidth(0.6)
-      .strokeColor('#E2E2EC')
-      .roundedRect(x, y, w, blockH, 8)
-      .stroke();
-
+    // ── Title + subtitle ──
     this.doc
       .font(this.FONT_SORA_BOLD)
-      .fontSize(12)
+      .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE)
-      .text('Your Preparation Plan', x + padX, y + padY, { lineBreak: false });
+      .text('Your Preparation Plan', x, y, { lineBreak: false });
 
-    let curY = y + padY + titleH + 2;
-    items.forEach((it) => {
-      this.doc.circle(x + padX + 4, curY + 6, 2.2).fill(spec.accent);
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9.5)
+      .fillColor(this.C_MUTED)
+      .text(
+        `Sequenced next steps tailored to a ${spec.name} direction.`,
+        x,
+        y + 18,
+        { width: w, lineBreak: false },
+      );
+
+    // ── Numbered timeline ──
+    const tileSize = 24;
+    const tileGap = 14; // gap from tile to text
+    const itemGap = 12; // vertical gap between items
+    const textFontSize = 10;
+    const tileCenterX = x + tileSize / 2;
+    const textX = x + tileSize + tileGap;
+    const textW = w - (textX - x) - 4;
+
+    let curY = y + 42;
+
+    items.forEach((item, i) => {
+      // Measure item text to determine row height
+      this.doc.font(this.FONT_REGULAR).fontSize(textFontSize);
+      const textH = this.doc.heightOfString(item, {
+        width: textW,
+        lineGap: 1,
+      });
+      const rowH = Math.max(tileSize, textH);
+
+      // Connector line above (skip for first item)
+      if (i > 0) {
+        this.doc
+          .save()
+          .lineWidth(2)
+          .strokeColor(spec.accent)
+          .moveTo(tileCenterX, curY - itemGap)
+          .lineTo(tileCenterX, curY)
+          .stroke()
+          .restore();
+      }
+
+      // Tile (vertically centered to row)
+      const tileY = curY + (rowH - tileSize) / 2;
+      this.doc.save();
+      this.doc.roundedRect(x, tileY, tileSize, tileSize, 6).fill(spec.accent);
+      this.doc.restore();
+
+      // Number "01", "02", …
+      const numStr = String(i + 1).padStart(2, '0');
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(10)
+        .fillColor(spec.accentOn)
+        .text(numStr, x, tileY + 7, {
+          width: tileSize,
+          align: 'center',
+          lineBreak: false,
+        });
+
+      // Item text (vertically centered to row)
+      const itemTextY = curY + (rowH - textH) / 2;
       this.doc
         .font(this.FONT_REGULAR)
-        .fontSize(9.5)
+        .fontSize(textFontSize)
         .fillColor(this.C_INK)
-        .text(it, x + padX + 16, curY, { width: w - padX * 2 - 18 });
-      curY = this.doc.y + 4;
+        .text(item, textX, itemTextY, { width: textW, lineGap: 1 });
+
+      curY += rowH + itemGap;
     });
 
-    return y + blockH;
+    return curY - itemGap + 4;
   }
 
   private drawDisclaimer(y: number): number {
@@ -991,9 +1065,7 @@ export class CollegeMBAShortReport extends BaseReport {
     return y + 48;
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  //  Helpers
-  // ────────────────────────────────────────────────────────────────────────
+  // Helpers ────────────────────────────────────────────────────────────────
 
   private topReadinessKeys(count: number): ReadinessKey[] {
     return [...READINESS_ORDER]
@@ -1039,5 +1111,73 @@ export class CollegeMBAShortReport extends BaseReport {
       .replace(/\([^)]*\)/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  /**
+   * Draws a translucent target/bullseye emblem centered at (cx, cy).
+   * Universal "top pick" mark - same shape regardless of specialization.
+   *
+   * Geometry: 3 concentric rings (outer/middle stroked, inner filled) plus
+   * 4 short crosshair tick marks extending just past the outer ring.
+   *
+   * @param cx       center x
+   * @param cy       center y
+   * @param r        outer radius
+   * @param color    stroke/fill color (hex)
+   * @param opacity  0..1 (use ~0.3-0.4 for a watermark - thin strokes need
+   *                 slightly higher opacity than filled blobs to read)
+   */
+  private drawTargetIcon(
+    cx: number,
+    cy: number,
+    r: number,
+    color: string,
+    opacity: number,
+  ): void {
+    this.doc.save();
+    this.doc.strokeOpacity(opacity).fillOpacity(opacity);
+    this.doc.strokeColor(color).fillColor(color);
+
+    const ringW = Math.max(1.5, r * 0.12);
+    this.doc.lineWidth(ringW);
+
+    // Outer ring
+    this.doc.circle(cx, cy, r).stroke();
+    // Middle ring (≈ 65% radius)
+    this.doc.circle(cx, cy, r * 0.62).stroke();
+    // Inner filled dot (≈ 22% radius)
+    this.doc.circle(cx, cy, r * 0.22).fill();
+
+    // Crosshair ticks - short marks just outside the outer ring on the 4
+    // cardinal axes, giving the bullseye a "scope" feel.
+    const tickGap = r * 0.12;
+    const tickLen = r * 0.28;
+    const tickStart = r + tickGap;
+    const tickEnd = tickStart + tickLen;
+    this.doc.lineWidth(ringW * 0.9);
+    // Top
+    this.doc
+      .moveTo(cx, cy - tickStart)
+      .lineTo(cx, cy - tickEnd)
+      .stroke();
+    // Bottom
+    this.doc
+      .moveTo(cx, cy + tickStart)
+      .lineTo(cx, cy + tickEnd)
+      .stroke();
+    // Left
+    this.doc
+      .moveTo(cx - tickStart, cy)
+      .lineTo(cx - tickEnd, cy)
+      .stroke();
+    // Right
+    this.doc
+      .moveTo(cx + tickStart, cy)
+      .lineTo(cx + tickEnd, cy)
+      .stroke();
+
+    this.doc.restore();
+    // Reset opacity for subsequent draws.
+    this.doc.fillOpacity(1).strokeOpacity(1);
   }
 }

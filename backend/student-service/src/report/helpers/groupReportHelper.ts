@@ -14,19 +14,41 @@ import { SCHOOL_LEVEL_ID, SCHOOL_STREAM_ID } from '../reports/BaseConstants';
 
 export async function fetchGroupAssessmentData(
   groupId: string,
+  programId?: string | number,
 ): Promise<MergedReportData[]> {
   const client = await getPool().connect();
 
   try {
-    logger.info(`Fetching data for group: ${groupId}`);
+    logger.info(
+      `Fetching data for group: ${groupId}${
+        programId ? `, program: ${programId}` : ''
+      }`,
+    );
 
+    // Optional program filter — used by the combined "By Group" report so the
+    // report stays scoped to one (group, program) cohort.
+    const params: (string | number)[] = [groupId];
+    let programFilter = '';
+    if (
+      programId !== undefined &&
+      programId !== null &&
+      `${programId}` !== ''
+    ) {
+      params.push(programId);
+      programFilter = ` AND s.program_id = $${params.length}`;
+    }
+
+    // DISTINCT ON (user) keeps exactly one row per student — their latest
+    // completed session — so a student who sat in multiple exam windows of the
+    // same group is counted once in the combined report. (No-op for single
+    // windows, where a user has only one session.)
     const sessionsQuery = `
-            SELECT 
-                s.id as session_id, 
-                s.user_id, 
-                s.registration_id, 
+            SELECT DISTINCT ON (s.user_id)
+                s.id as session_id,
+                s.user_id,
+                s.registration_id,
                 s.program_id,
-                s.started_at, 
+                s.started_at,
                 s.completed_at,
                 r.full_name,
                 r.department_degree_id,
@@ -44,9 +66,12 @@ export async function fetchGroupAssessmentData(
             JOIN department_degrees dd ON r.department_degree_id = dd.id
             JOIN departments d ON dd.department_id = d.id
             JOIN groups q ON s.group_id = q.id
-            WHERE s.group_id = $1
+            WHERE s.group_id = $1${programFilter}
+            ORDER BY s.user_id,
+                     s.completed_at DESC NULLS LAST,
+                     s.started_at DESC NULLS LAST
         `;
-    const sessionsResult = await client.query(sessionsQuery, [groupId]);
+    const sessionsResult = await client.query(sessionsQuery, params);
     logger.info(
       `Sessions fetched for group ${groupId}: ${sessionsResult.rows.length} rows`,
     );

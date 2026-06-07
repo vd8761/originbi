@@ -16,10 +16,14 @@ import {
   AciValue,
   Program,
   Registration,
+  OriginbiSetting,
+  MetaphorQuestion,
+  MetaphorAnswer,
 } from '@originbi/shared-entities';
 import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
 import { AssessmentGenerationService } from './assessment-generation.service';
+import { MetaphorGenerationService } from './metaphor-generation.service';
 import { AssessmentService } from './assessment.service';
 import { AssessmentController } from './assessment.controller';
 
@@ -43,10 +47,22 @@ import { AssessmentController } from './assessment.controller';
       DepartmentDegree,
       Program,
       Registration,
+      OriginbiSetting,
+      MetaphorQuestion,
+      MetaphorAnswer,
     ]),
   ],
   controllers: [AssessmentController],
-  providers: [AssessmentGenerationService, AssessmentService],
-  exports: [TypeOrmModule, AssessmentGenerationService, AssessmentService],
+  providers: [
+    AssessmentGenerationService,
+    MetaphorGenerationService,
+    AssessmentService,
+  ],
+  exports: [
+    TypeOrmModule,
+    AssessmentGenerationService,
+    MetaphorGenerationService,
+    AssessmentService,
+  ],
 })
 export class AssessmentModule {}

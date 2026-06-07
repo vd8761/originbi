@@ -15,16 +15,22 @@ export class ReportQueueService {
     groupId: number,
     deptDegreeId: number,
     jobId: string,
+    reportTypeOverride?: 'standard' | 'mba',
   ): Promise<void> {
     return reportQueueService.processPlacementReport(
       groupId,
       deptDegreeId,
       jobId,
+      reportTypeOverride,
     );
   }
 
-  processGroupReports(groupId: string, jobId: string): Promise<void> {
-    return reportQueueService.processGroupReports(groupId, jobId);
+  processGroupReports(
+    groupId: string,
+    jobId: string,
+    programId?: string,
+  ): Promise<void> {
+    return reportQueueService.processGroupReports(groupId, jobId, programId);
   }
 
   processUserReports(userIds: string[], jobId: string): Promise<void> {

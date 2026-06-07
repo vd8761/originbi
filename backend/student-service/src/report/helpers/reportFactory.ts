@@ -22,7 +22,7 @@ import { buildSchoolReportJSON } from '../reports/school/schoolReportJSON';
 import { buildCollegeReportJSON } from '../reports/college/collegeReportJSON';
 import { buildEmployeeReportJSON } from '../reports/employee/employeeReportJSON';
 import { buildCxoReportJSON } from '../reports/cxo/cxoReportJSON';
-/** Program type IDs — keep in sync with the `programs` table. */
+/** Program type IDs - keep in sync with the `programs` table. */
 export const ProgramType = {
   SCHOOL: 1,
   COLLEGE: 2,
@@ -107,7 +107,7 @@ export async function generateReportForUser(
     // 2. Generate PDF user password (cryptographically random)
     userPassword = generateRandomPassword();
 
-    // 3. Admin password — from DB, fall back to ENV, then throw if neither is set
+    // 3. Admin password - from DB, fall back to ENV, then throw if neither is set
     const adminPassword =
       passwordSettings.adminPassword || process.env.PDF_ADMIN_PASSWORD;
     if (!adminPassword) {
