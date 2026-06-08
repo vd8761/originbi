@@ -138,7 +138,7 @@ export function CategoryLabel({
       <div className="mt-4 flex flex-wrap items-center gap-2 text-xl font-black leading-tight sm:text-2xl">
         {shown.map((part, index) => (
           <React.Fragment key={`${part}-${index}`}>
-            {index > 0 && <span className="text-[14px] font-bold text-black/50 dark:text-white/40 px-1 lowercase">or</span>}
+            {index > 0 && <span className="text-[14px] font-bold text-black dark:text-white px-1 lowercase">or</span>}
             <span
               className={
                 index > 0

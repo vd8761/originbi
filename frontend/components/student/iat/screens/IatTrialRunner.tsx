@@ -20,6 +20,44 @@ const splitLabel = (label?: string | null) =>
     .split(/\s*\+\s*/)
     .filter(Boolean);
 
+function isAttributeWord(word: string, moduleLabel: string): boolean {
+  const cleanWord = word.trim();
+  const match = moduleLabel.match(/(\d+)\s+of/);
+  const moduleNum = match ? parseInt(match[1], 10) : 1;
+
+  if (moduleNum === 1) {
+    const strategic = ['Visionary', 'Decision-maker', 'Innovative', 'Autonomy', 'Architect'];
+    const dependent = ['Assistant', 'Implementer', 'Follower', 'Execution', 'Trainee'];
+    return strategic.includes(cleanWord) || dependent.includes(cleanWord);
+  }
+  if (moduleNum === 2) {
+    const high = ['Exceptional', 'Top-performer', 'Strategic Asset', 'Visionary', 'High-potential'];
+    const average = ['Ordinary', 'Mediocre', 'Standard', 'Replaceable', 'Baseline'];
+    return high.includes(cleanWord) || average.includes(cleanWord);
+  }
+  if (moduleNum === 3) {
+    const executive = ['Boardroom', 'P&L Owner', 'Global Project', 'Scale', 'Strategy'];
+    const domestic = ['Childcare', 'Household', 'Marriage', 'Leave', 'Maternity'];
+    return executive.includes(cleanWord) || domestic.includes(cleanWord);
+  }
+  if (moduleNum === 4) {
+    const leader = ['Authority', 'Strategist', 'Key Thinker', 'Decision-maker', 'Director'];
+    const back_office = ['Executor', 'Coder', 'Data Entry', 'Support', 'Support-staff'];
+    return leader.includes(cleanWord) || back_office.includes(cleanWord);
+  }
+  if (moduleNum === 5) {
+    const always_correct = ['Infallible', 'Absolute', 'Command', 'Final Word', 'Definite'];
+    const open_to_critique = ['Feedback', 'Disagreement', 'Debate', 'Challenged', 'Questioned'];
+    return always_correct.includes(cleanWord) || open_to_critique.includes(cleanWord);
+  }
+  if (moduleNum === 6) {
+    const leadership = ['Director', 'Founder', 'Manager', 'Strategist', 'Leader'];
+    const support = ['Helper', 'Cleaner', 'Assistant', 'Attendant', 'Labourer'];
+    return leadership.includes(cleanWord) || support.includes(cleanWord);
+  }
+  return false;
+}
+
 export default function IatTrialRunner({
   isPractice,
   trial,
@@ -50,6 +88,8 @@ export default function IatTrialRunner({
   const leftParts = splitLabel(trial?.leftLabel);
   const rightParts = splitLabel(trial?.rightLabel);
   const step = trial?.stepNumber ?? 1;
+  const currentModule = modules.find((m) => String(m.id) === String(currentModuleId));
+  const activeModuleName = currentModule ? (currentModule.displayName || currentModule.name) : "";
   const flash = wrong ? "wrong" : flashKey ? "correct" : null;
 
   const [pressedKey, setPressedKey] = useState<"E" | "I" | null>(null);
@@ -103,7 +143,7 @@ export default function IatTrialRunner({
       <div className={`flex flex-wrap items-center gap-1 text-sm sm:text-base font-bold leading-tight ${side === "right" ? "justify-end" : ""}`}>
         {parts.map((part, i) => (
           <React.Fragment key={`${part}-${i}`}>
-            {i > 0 && <span className="text-[11px] font-bold text-black/40 dark:text-white/35 px-0.5 lowercase">or</span>}
+            {i > 0 && <span className="text-[11px] font-bold text-black dark:text-white px-0.5 lowercase">or</span>}
             <span className={i > 0 ? "text-brand-green" : "text-black dark:text-white"}>
               {part}
             </span>
@@ -116,23 +156,47 @@ export default function IatTrialRunner({
   return (
     <div className={`grid grid-cols-1 gap-0 ${isPractice ? "" : "lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-8"}`}>
       {/* Main trial area */}
-      <div className="flex flex-col gap-0 pt-4">
+      <div className="flex flex-col gap-0 pt-[5vh] sm:pt-4">
 
         {/* ═══ Single unified container ═══ */}
         <div className="w-full rounded-3xl border border-brand-light-tertiary dark:border-white/10 bg-white/50 dark:bg-white/[0.02] shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-none overflow-hidden">
 
-          {/* Top section: Module + Questions + Module strip */}
-          <div className="flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3 sm:py-4">
-            <StatPill label="Module" value={moduleLabel} />
-            {!isPractice && <StatPill label="Step" value={`${step} of 7`} />}
-            {isPractice && <StatPill label="Questions" value={`${current} / ${total}`} />}
-            {!isPractice && (
-              <div className="lg:hidden ml-auto">
-                <IatModuleStepper
-                  modules={modules}
-                  currentModuleId={currentModuleId}
-                  variant="strip"
-                />
+          {/* Top section: Module label + Name (no container) */}
+          <div className="flex flex-col gap-2 px-4 sm:px-6 py-3 sm:py-4">
+            <div className="text-sm font-bold text-black dark:text-white flex flex-wrap items-center gap-1.5 leading-none">
+              <span>{isPractice ? "Practice Block" : `Module: ${moduleLabel}`}</span>
+              {isPractice ? (
+                <span className="text-gray-400 dark:text-white/30 font-medium">({current} / {total})</span>
+              ) : (
+                <>
+                  {/* On mobile: show active module name */}
+                  <span className="sm:hidden text-gray-400 dark:text-white/30 font-medium">|</span>
+                  <span className="sm:hidden text-brand-green font-bold truncate max-w-[200px]">
+                    {activeModuleName}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Mobile/Tablet Segmented Progress Bar */}
+            {!isPractice && modules.length > 0 && (
+              <div className="w-full flex gap-1.5 mt-1 lg:hidden">
+                {modules.map((m, idx) => {
+                  const isCompleted = m.status === "COMPLETED";
+                  const isCurrent = String(m.id) === String(currentModuleId);
+                  return (
+                    <div
+                      key={m.id}
+                      className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                        isCompleted
+                          ? "bg-brand-green"
+                          : isCurrent
+                            ? "bg-yellow-500 animate-pulse"
+                            : "bg-brand-light-tertiary dark:bg-white/10"
+                      }`}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -156,7 +220,7 @@ export default function IatTrialRunner({
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <span className="text-sm font-semibold text-brand-red">
-                  Wrong key — press the correct one to continue
+                  You made a mistake , click the other one to continue
                 </span>
               </div>
             )}
@@ -183,7 +247,11 @@ export default function IatTrialRunner({
               `}} />
               <span
                 key={`${isPractice ? "p" : "e"}-${current}-${trial?.wordShown}`}
-                className={`animate-fade-in-fast font-bold leading-none text-center text-black dark:text-white ${
+                className={`animate-fade-in-fast font-bold leading-none text-center ${
+                  isAttributeWord(trial?.wordShown || "", moduleLabel)
+                    ? "text-brand-green"
+                    : "text-black dark:text-white"
+                } ${
                   String(trial?.wordShown || "").length > 18
                     ? "text-[clamp(28px,5vw,56px)]"
                     : "text-[clamp(36px,7vw,80px)]"
@@ -202,7 +270,7 @@ export default function IatTrialRunner({
         </div>
 
         {/* ═══ Mobile: Large category buttons OUTSIDE the container ═══ */}
-        <div className="flex sm:hidden items-stretch gap-3 mt-4 px-1">
+        <div className="flex sm:hidden items-stretch gap-3 mt-[6vh] px-1">
           <button
             type="button"
             onClick={() => onKey("E")}
@@ -215,7 +283,7 @@ export default function IatTrialRunner({
             <span className="text-sm font-bold">{leftShown[0]}</span>
             {leftShown.length > 1 && (
               <>
-                <span className="text-[10px] font-bold uppercase my-0.5 text-black/50 dark:text-white/40">or</span>
+                <span className={`text-[10px] font-bold uppercase my-0.5 ${isLeftActive ? "text-white" : "text-black dark:text-white"}`}>or</span>
                 <span className={`text-sm font-bold ${isLeftActive ? "text-white" : "text-brand-green"}`}>
                   {leftShown[1]}
                 </span>
@@ -235,7 +303,7 @@ export default function IatTrialRunner({
             <span className="text-sm font-bold">{rightShown[0]}</span>
             {rightShown.length > 1 && (
               <>
-                <span className="text-[10px] font-bold uppercase my-0.5 text-black/50 dark:text-white/40">or</span>
+                <span className={`text-[10px] font-bold uppercase my-0.5 ${isRightActive ? "text-white" : "text-black dark:text-white"}`}>or</span>
                 <span className={`text-sm font-bold ${isRightActive ? "text-white" : "text-brand-green"}`}>
                   {rightShown[1]}
                 </span>

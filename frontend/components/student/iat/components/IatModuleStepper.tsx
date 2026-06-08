@@ -29,7 +29,7 @@ export default function IatModuleStepper({
               key={m.id}
               className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${chip(state)}`}
             >
-              <StatusIcon state={state} />
+              <StatusIcon state={state} variant="strip" />
               <span>Module {i + 1}</span>
             </div>
           );
@@ -65,15 +65,15 @@ export default function IatModuleStepper({
                 {/* Icon wrapper with solid background to mask the timeline line */}
                 <div className={`relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all duration-150 ${
                   state === "done"
-                    ? "border-brand-green bg-white dark:bg-[#19211C] text-brand-green"
+                    ? "border-brand-green bg-brand-green text-white"
                     : isActive
-                      ? "border-brand-green bg-brand-green text-white animate-pulse"
+                      ? "border-yellow-500 bg-yellow-500 text-white animate-pulse"
                       : "border-brand-light-tertiary dark:border-white/15 bg-white dark:bg-[#19211C] text-black dark:text-white"
                 }`}>
-                  <StatusIcon state={state} />
+                  <StatusIcon state={state} variant="sidebar" />
                 </div>
                 <span className={`text-sm font-semibold transition-colors duration-150 leading-relaxed ${
-                  isActive ? "text-brand-green font-bold" : "text-black dark:text-white"
+                  isActive ? "text-black dark:text-white font-bold" : "text-black dark:text-white"
                 }`}>
                   {m.displayName || m.name || `Module ${i + 1}`}
                 </span>
@@ -94,16 +94,16 @@ function stateOf(m: IatModuleProgress, currentId: number | null): State {
   return "todo";
 }
 
-function StatusIcon({ state }: { state: State }) {
+function StatusIcon({ state, variant = "sidebar" }: { state: State; variant?: "sidebar" | "strip" }) {
   if (state === "done") return <Check className="h-3.5 w-3.5" />;
   if (state === "current")
-    return <Play className="h-2.5 w-2.5 fill-current text-white ml-[0.5px]" />;
+    return <Play className={`h-2.5 w-2.5 fill-current ml-[0.5px] ${variant === "sidebar" ? "text-white" : "text-yellow-500"}`} />;
   return <div className="h-1.5 w-1.5 rounded-full bg-black/40 dark:bg-white/40" />;
 }
 
 function chip(state: State) {
   if (state === "current")
-    return "border-brand-green bg-brand-green/10 text-brand-green";
+    return "border-yellow-500 bg-yellow-500/10 text-black dark:text-white";
   if (state === "done")
     return "border-brand-green/30 bg-brand-green/5 text-black dark:text-white";
   return "border-brand-light-tertiary text-black dark:border-white/10 dark:text-white";
