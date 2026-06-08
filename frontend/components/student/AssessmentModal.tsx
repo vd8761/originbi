@@ -47,6 +47,12 @@ const modalTranslations = {
   }
 };
 
+const isIatGenAssessment = (assessment: AssessmentData | null) => {
+  const kind = String(assessment?.assessmentKind || '').toUpperCase();
+  const title = String(assessment?.title || '');
+  return kind === 'IAT_GEN' || /iat\s*gen/i.test(title);
+};
+
 interface AssessmentData {
   id: string;
   title: string;
@@ -92,7 +98,15 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
 
   const isContinue = assessment.status === 'in-progress';
   const progress = Math.round((assessment.completedQuestions / assessment.totalQuestions) * 100);
-  const isIatGen = assessment.assessmentKind === 'IAT_GEN';
+  const isIatGen = isIatGenAssessment(assessment);
+  const unitLabel = isIatGen ? 'modules' : t.questions;
+  const pendingLabel = isIatGen ? 'Modules Pending' : t.pending;
+  const modalHeader = isIatGen
+    ? 'Each module helps map your instinctive response patterns'
+    : t.header;
+  const description = isIatGen
+    ? 'Timed E/I sorting blocks that reveal instinctive workplace bias patterns across leadership, capability, communication, authority, and background cues.'
+    : assessment.description;
 
   // Extract number from duration string (e.g. "60 minutes" -> "60")
   const durationVal = assessment.duration ? String(assessment.duration).replace(/minutes?/i, '').trim() : '30';
@@ -119,7 +133,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
             {/* Header Section */}
             <div className="flex justify-between items-start mb-6">
               <p className="text-[10px] sm:text-xs text-black dark:text-white font-medium max-w-[220px] leading-relaxed">
-                {t.header}
+                {modalHeader}
               </p>
 
               {/* Language Selector */}
@@ -157,7 +171,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
             <h2 className="text-[clamp(18px,2vw,28px)] font-semibold text-black dark:text-white mb-3 leading-tight tracking-tight">{assessment.title}</h2>
 
             <p className="text-black dark:text-white text-[clamp(11px,0.9vw,14px)] leading-relaxed mb-6">
-              {assessment.description}
+              {description}
             </p>
 
             {/* Meta Info Box */}
@@ -169,7 +183,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
                   <CustomQuestionIcon className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-black dark:text-white">
-                  {t.contains} <strong className="text-black dark:text-white font-bold">{assessment.totalQuestions} {t.questions}</strong>
+                  {t.contains} <strong className="text-black dark:text-white font-bold">{assessment.totalQuestions} {unitLabel}</strong>
                 </span>
               </div>
 
@@ -199,7 +213,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
               </li>
               <li className="text-[clamp(10px,0.8vw,13px)] text-black dark:text-white flex items-start gap-3">
                 <span className="block w-1.5 h-1.5 rounded-full bg-black dark:bg-white mt-1.5 shrink-0"></span>
-                {t.point3}
+                {isIatGen ? "You must complete all modules for the assessment to be scored." : t.point3}
               </li>
             </ul>
 
@@ -235,7 +249,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
             {isContinue && (
               <div className="mb-6">
                 <div className="flex justify-between text-[10px] sm:text-xs font-bold mb-2">
-                  <span className="text-brand-green">{assessment.completedQuestions}/{assessment.totalQuestions} {t.pending}</span>
+                  <span className="text-brand-green">{assessment.completedQuestions}/{assessment.totalQuestions} {pendingLabel}</span>
                   <span className="text-brand-green">{progress}%</span>
                 </div>
                 <div className="h-1.5 w-full bg-brand-light-primary dark:bg-white/10 rounded-full overflow-hidden">

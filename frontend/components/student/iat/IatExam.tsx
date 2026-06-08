@@ -76,6 +76,15 @@ export default function IatExam({
   const [finishError, setFinishError] = useState("");
   // Track wrong answers in the current module to re-show at module break
   const [wrongTrials, setWrongTrials] = useState<{ word: string; correctKey: "E" | "I"; leftLabel: string; rightLabel: string }[]>([]);
+  // Re-ask gate: a part only completes once every word missed in it has been
+  // answered correctly on the first press. Misses are queued here and re-asked
+  // at the end of the part. Re-ask presses are NOT sent to the server, so they
+  // never affect the scored first-presentation timings.
+  const [retryTrial, setRetryTrial] = useState<RunnerTrial | null>(null);
+  const retryQueueRef = useRef<RunnerTrial[]>([]);
+  const pendingTransitionRef = useRef<{ type: "next-part" | "finish"; nextIndex: number } | null>(null);
+  // True while a missed re-ask word is waiting for its corrective key press.
+  const awaitingCorrectionRef = useRef(false);
 
   const finishingRef = useRef(false);
   const shownAtRef = useRef<number>(Date.now());
@@ -198,6 +207,11 @@ export default function IatExam({
       moduleStartRef.current = Date.now();
       moduleTimingStartedRef.current = true;
     }
+    // Each part starts with a clean re-ask gate.
+    retryQueueRef.current = [];
+    pendingTransitionRef.current = null;
+    awaitingCorrectionRef.current = false;
+    setRetryTrial(null);
     setScreen("exam");
     resetClock();
   }, []);
@@ -281,6 +295,43 @@ export default function IatExam({
     }
   }, [attemptId, completedModules, currentModule, flushEvents, state]);
 
+  // Move to the next queued re-ask word, or — when the queue is empty — run the
+  // transition that was deferred while the student cleared their misses.
+  const advanceRetry = useCallback(() => {
+    awaitingCorrectionRef.current = false;
+    setWrongFlash(false);
+    const next = retryQueueRef.current.shift();
+    if (next) {
+      setRetryTrial(next);
+      resetClock();
+      return;
+    }
+    setRetryTrial(null);
+    const pending = pendingTransitionRef.current;
+    pendingTransitionRef.current = null;
+    if (pending?.type === "finish") {
+      setTrialIndex(trials.length);
+      void finishModuleOrAttempt();
+    } else if (pending?.type === "next-part") {
+      setScreen("briefing");
+      resetClock();
+    }
+  }, [finishModuleOrAttempt, trials.length]);
+
+  // Begin re-asking the words missed in the part that just ended. The part can
+  // only complete once this queue is fully cleared.
+  const startRetryPhase = useCallback(() => {
+    awaitingCorrectionRef.current = false;
+    setWrongFlash(false);
+    const first = retryQueueRef.current.shift();
+    if (!first) {
+      advanceRetry();
+      return;
+    }
+    setRetryTrial(first);
+    resetClock();
+  }, [advanceRetry]);
+
   const handleCorrect = useCallback(async () => {
     if (screen === "practice") {
       if (practiceIndex >= practiceTrials.length - 1) {
@@ -296,24 +347,87 @@ export default function IatExam({
     }
 
     if (screen !== "exam" || !currentTrial) return;
+
+    // End of this module's trials: re-ask any words missed in this final part
+    // before scoring, otherwise complete the module.
     if (trialIndex >= trials.length - 1) {
-      setTrialIndex(trials.length);
-      await finishModuleOrAttempt();
-    } else {
-      const nextIndex = trialIndex + 1;
-      const nextTrial = trials[nextIndex];
-      setTrialIndex(nextIndex);
-      setWrongFlash(false);
-      resetClock();
-      if (nextTrial && nextTrial.stepNumber !== currentTrial.stepNumber) {
+      if (retryQueueRef.current.length > 0) {
+        pendingTransitionRef.current = { type: "finish", nextIndex: trials.length };
+        startRetryPhase();
+      } else {
+        setTrialIndex(trials.length);
+        await finishModuleOrAttempt();
+      }
+      return;
+    }
+
+    const nextIndex = trialIndex + 1;
+    const nextTrial = trials[nextIndex];
+    const crossesPart = !!nextTrial && nextTrial.stepNumber !== currentTrial.stepNumber;
+
+    // Crossing into a new part: gate on re-asking this part's misses first.
+    if (crossesPart) {
+      setTrialIndex(nextIndex); // point the next briefing at the upcoming part
+      if (retryQueueRef.current.length > 0) {
+        pendingTransitionRef.current = { type: "next-part", nextIndex };
+        startRetryPhase();
+      } else {
+        setWrongFlash(false);
+        resetClock();
         setScreen("briefing");
       }
+      return;
     }
-  }, [attemptId, beginExam, currentTrial, finishModuleOrAttempt, practiceIndex, screen, trialIndex, trials]);
+
+    // Normal advance within the same part.
+    setTrialIndex(nextIndex);
+    setWrongFlash(false);
+    resetClock();
+  }, [attemptId, beginExam, currentTrial, finishModuleOrAttempt, practiceIndex, screen, startRetryPhase, trialIndex, trials]);
+
+  // Drives the re-ask rounds at the end of a part. Nothing here is persisted —
+  // it only enforces that every missed word is eventually answered correctly.
+  const handleRetryKey = useCallback(
+    (key: "E" | "I") => {
+      const trial = retryTrial;
+      if (!trial) return;
+      const isCorrect = key === trial.expectedKey;
+
+      // After a wrong re-ask the word has already been requeued; the student
+      // must press the correct key to move on, but it still counts as a miss.
+      if (awaitingCorrectionRef.current) {
+        if (!isCorrect) {
+          setWrongFlash(true);
+          return;
+        }
+        setCorrectFlash(key);
+        window.setTimeout(() => setCorrectFlash(null), 180);
+        advanceRetry();
+        return;
+      }
+
+      if (isCorrect) {
+        // Cleared on the first press of the re-ask: this word is done.
+        setCorrectFlash(key);
+        window.setTimeout(() => setCorrectFlash(null), 180);
+        advanceRetry();
+      } else {
+        // Missed again: send it to the back of the queue to be asked once more.
+        setWrongFlash(true);
+        awaitingCorrectionRef.current = true;
+        retryQueueRef.current.push(trial);
+      }
+    },
+    [retryTrial, advanceRetry],
+  );
 
   const handleKey = useCallback(
     (key: "E" | "I") => {
       if (saving) return;
+      if (retryTrial) {
+        handleRetryKey(key);
+        return;
+      }
       const trial = screen === "practice" ? activePractice : currentTrial;
       if (!trial) return;
 
@@ -354,6 +468,17 @@ export default function IatExam({
               rightLabel: String(trial.rightLabel || ""),
             }];
           });
+          // Queue this word to be re-asked at the end of the part. The part
+          // won't complete until it's answered correctly on the first press.
+          if (!retryQueueRef.current.some((w) => w.wordShown === currentTrial.wordShown)) {
+            retryQueueRef.current.push({
+              wordShown: currentTrial.wordShown,
+              leftLabel: currentTrial.leftLabel,
+              rightLabel: currentTrial.rightLabel,
+              expectedKey: trial.expectedKey,
+              stepNumber: currentTrial.stepNumber,
+            });
+          }
         }
         return;
       }
@@ -362,7 +487,7 @@ export default function IatExam({
       window.setTimeout(() => setCorrectFlash(null), 180);
       void handleCorrect();
     },
-    [activePractice, currentTrial, handleCorrect, saving, scheduleFlush, screen],
+    [activePractice, currentTrial, handleCorrect, handleRetryKey, retryTrial, saving, scheduleFlush, screen],
   );
 
   useEffect(() => {
@@ -501,7 +626,7 @@ export default function IatExam({
   }
 
   // Exam module is finishing (all trials answered, completion in flight or failed).
-  if (screen === "exam" && trials.length > 0 && trialIndex >= trials.length) {
+  if (screen === "exam" && !retryTrial && trials.length > 0 && trialIndex >= trials.length) {
     return (
       <IatShell onExit={onExit}>
         <div className="flex min-h-[calc(100vh-3.5rem)] flex-col items-center justify-center py-8">
@@ -546,15 +671,17 @@ export default function IatExam({
   const progress = total ? Math.round((current / total) * 100) : 0;
   const displayTrial: RunnerTrial | null = isPractice
     ? activePractice
-    : currentTrial
-      ? {
-          wordShown: currentTrial.wordShown,
-          leftLabel: currentTrial.leftLabel,
-          rightLabel: currentTrial.rightLabel,
-          expectedKey: currentTrial.expectedKey,
-          stepNumber: currentTrial.stepNumber,
-        }
-      : null;
+    : retryTrial
+      ? retryTrial
+      : currentTrial
+        ? {
+            wordShown: currentTrial.wordShown,
+            leftLabel: currentTrial.leftLabel,
+            rightLabel: currentTrial.rightLabel,
+            expectedKey: currentTrial.expectedKey,
+            stepNumber: currentTrial.stepNumber,
+          }
+        : null;
   const moduleLabel = isPractice
     ? "Practice"
     : `${completedModules + 1} of ${modules.length || 6}`;
@@ -566,6 +693,7 @@ export default function IatExam({
     >
       <IatTrialRunner
         isPractice={isPractice}
+        isRetry={!!retryTrial}
         trial={displayTrial}
         current={current}
         total={total}

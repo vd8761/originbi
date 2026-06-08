@@ -16,12 +16,7 @@ import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
 import { AssessmentLevel } from '../entities/assessment_level.entity';
 import { AssessmentSession } from '../entities/assessment_session.entity';
 import { Registration } from '../entities/registration.entity';
-import {
-  IAT_ASSESSMENT_KIND,
-  IAT_OTHER_WORDS,
-  IAT_REPORT_QUEUE,
-  IAT_SELF_WORDS,
-} from './iat.constants';
+import { IAT_ASSESSMENT_KIND, IAT_REPORT_QUEUE } from './iat.constants';
 import { IatEligibilityService } from './iat-eligibility.service';
 
 interface TrialEvent {
@@ -576,38 +571,16 @@ export class IatService {
         });
       }
     };
-    const addWords = (
-      stepNumber: number,
-      blockType: string,
-      leftWords: string[],
-      rightWords: string[],
-      leftLabel: string,
-      rightLabel: string,
-    ) => {
-      const words = [
-        ...leftWords.map((word) => ({ word, key: 'E' })),
-        ...rightWords.map((word) => ({ word, key: 'I' })),
-      ];
-      for (const item of this.shuffle(words)) {
-        rows.push({
-          assessmentAttemptId: attempt.id,
-          iatAttemptModuleId: Number(attemptModule.id),
-          moduleId: Number(module.id),
-          trialSequence: sequence++,
-          stepNumber,
-          blockType,
-          wordShown: item.word,
-          leftLabel,
-          rightLabel,
-          expectedKey: item.key,
-          status: 'PENDING',
-          metadata: { synthetic: true },
-        });
-      }
-    };
-
     const leftConcept = this.title(module.leftConceptKey);
     const rightConcept = this.title(module.rightConceptKey);
+    // Attribute categories are the non-target keys in the compatible pairing
+    // (e.g. for the gender module: Domestic on the left, Executive on the right).
+    const attributeLeftKeys = (module.compatibleLeftKeys || []).filter(
+      (key) => key !== module.leftConceptKey,
+    );
+    const attributeRightKeys = (module.compatibleRightKeys || []).filter(
+      (key) => key !== module.rightConceptKey,
+    );
     addStimuli(
       1,
       'PRACTICE_LEFT_RIGHT',
@@ -624,7 +597,14 @@ export class IatService {
       leftConcept,
       rightConcept,
     );
-    addWords(3, 'SELF_OTHER', IAT_SELF_WORDS, IAT_OTHER_WORDS, 'Self', 'Other');
+    addStimuli(
+      3,
+      'PRACTICE_ATTRIBUTE',
+      attributeLeftKeys,
+      attributeRightKeys,
+      this.labelForKeys(attributeLeftKeys),
+      this.labelForKeys(attributeRightKeys),
+    );
     addStimuli(
       4,
       'COMPATIBLE',
