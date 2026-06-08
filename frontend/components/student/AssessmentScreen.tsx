@@ -593,6 +593,20 @@ export interface AssessmentData {
   assessmentKind?: string;
 }
 
+const IAT_GEN_DESCRIPTION =
+  "Timed E/I sorting blocks that reveal instinctive workplace bias patterns across leadership, capability, communication, authority, and background cues.";
+
+const isIatGenStep = (step: any) => {
+  const kind = String(step?.assessmentKind || step?.assessment_kind || '').toUpperCase();
+  const name = String(step?.stepName || step?.name || step?.title || '');
+  return kind === 'IAT_GEN' || /iat\s*gen/i.test(name);
+};
+
+const isIatGenAssessment = (assessment: Pick<AssessmentData, 'assessmentKind' | 'title'>) => {
+  const kind = String(assessment.assessmentKind || '').toUpperCase();
+  return kind === 'IAT_GEN' || /iat\s*gen/i.test(assessment.title || '');
+};
+
 interface AssessmentCardProps extends AssessmentData {
   progress: number;
   onAction: (id: string) => void;
@@ -802,10 +816,14 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
   status,
   dateCompleted,
   unlockTime,
+  assessmentKind,
   onAction,
 }) => {
   const { language } = useLanguage();
   const t = translations[language];
+  const isIatGen = isIatGenAssessment({ assessmentKind, title });
+  const cardDescription = isIatGen ? IAT_GEN_DESCRIPTION : description;
+  const completionLabel = isIatGen ? 'Modules Completed' : 'Questions Completed';
 
   // Local state to handle auto-unlock when timer expires
   const [isTimerExpired, setIsTimerExpired] = useState(false);
@@ -840,7 +858,7 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
               {title}
             </h3>
             <p className="text-[clamp(10px,0.8vw,12px)] w-[90%] text-brand-text-light-secondary dark:text-brand-text-secondary leading-normal">
-              {description}
+              {cardDescription}
             </p>
           </div>
           {/* Only show timer if actually locked on server (status) and not yet expired locally */}
@@ -878,7 +896,7 @@ const AssessmentCard: React.FC<AssessmentCardProps> = ({
               {completedQuestions}/{totalQuestions}
             </span>
             <span className="text-[clamp(8px,0.7vw,11px)] text-brand-text-light-white dark:text-brand-text-white">
-              {effectiveStatus === 'completed' ? `Completed on ${dateCompleted}` : 'Questions Completed'}
+              {effectiveStatus === 'completed' ? `Completed on ${dateCompleted}` : completionLabel}
             </span>
           </div>
           {!isLocked && (
@@ -990,6 +1008,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
     return fetchedSteps.map((step, index) => {
       const normalizedStatus = String(step?.status || '').toUpperCase();
+      const isIatGen = isIatGenStep(step);
 
       let status: "completed" | "in-progress" | "locked" | "not-started" = "not-started";
       if (normalizedStatus === 'COMPLETED') status = 'completed';
@@ -1012,7 +1031,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         id: String(step.levelNumber || index + 1),
         attemptId: foundAttemptId,
         title: step.stepName,
-        description: step.description || step.stepName,
+        description: isIatGen ? IAT_GEN_DESCRIPTION : (step.description || step.stepName),
         totalQuestions: step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : (step.levelNumber === 2 || step.stepName.includes('ACI') ? 25 : 40)),
         completedQuestions: status === 'completed'
           ? (step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : (step.levelNumber === 2 || step.stepName.includes('ACI') ? 25 : 40)))
@@ -1020,10 +1039,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         status: status,
         unlockTime: step.unlockTime,
         dateCompleted: step.dateCompleted,
-        duration: step.assessmentKind === 'IAT_GEN'
+        duration: isIatGen
           ? "20 minutes"
           : (step.levelNumber === 1 || step.stepName.includes('Level 1')) ? "60 minutes" : "45 minutes",
-        assessmentKind: step.assessmentKind,
+        assessmentKind: isIatGen ? 'IAT_GEN' : step.assessmentKind,
       };
     });
   }, [fetchedSteps]);
@@ -1071,8 +1090,6 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const isReportPageMode =
     (assessments.length > 0 && completedAssessmentCount >= assessments.length) ||
     forceReportPageMode;
-  const canPreviewReport = isReportPageMode;
-
   const loadPdfIntoViewer = async (
     absoluteDownloadUrl: string,
     authContext: SessionAuthContext,

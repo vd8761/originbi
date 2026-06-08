@@ -57,6 +57,7 @@ function isAttributeWord(word: string, moduleLabel: string): boolean {
 
 export default function IatTrialRunner({
   isPractice,
+  isRetry = false,
   trial,
   current,
   total,
@@ -69,6 +70,7 @@ export default function IatTrialRunner({
   onKey,
 }: {
   isPractice: boolean;
+  isRetry?: boolean;
   trial: RunnerTrial | null;
   current: number;
   total: number;
@@ -119,6 +121,11 @@ export default function IatTrialRunner({
           <div className="flex flex-col gap-2 px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold leading-none text-black dark:text-white">
               <span>{isPractice ? "Practice Block" : `Module: ${moduleLabel}`}</span>
+              {isRetry && (
+                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                  Re-check
+                </span>
+              )}
               {isPractice ? (
                 <span className="font-medium text-gray-400 dark:text-white/30">({current} / {total})</span>
               ) : (
