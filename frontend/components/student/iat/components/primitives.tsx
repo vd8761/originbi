@@ -163,11 +163,16 @@ export function StimulusCard({
         : "border-brand-light-tertiary dark:border-white/10";
   return (
     <div
-      className={`flex min-h-[200px] w-full items-center justify-center rounded-3xl border bg-white px-6 shadow-2xl transition-all duration-150 dark:bg-brand-dark-secondary md:min-h-[300px] ${ring}`}
+      className={`flex min-h-[200px] w-full items-center justify-center rounded-3xl border bg-white px-6 shadow-2xl transition-colors duration-100 dark:bg-brand-dark-secondary md:min-h-[300px] ${ring}`}
     >
+      {/*
+        No entrance animation: in a reaction-time test the word must appear the
+        instant the trial changes. A fade-in delays the visual onset and makes
+        each question feel laggy (and skews the measured response time).
+      */}
       <span
         key={stimulusKey}
-        className={`animate-fade-in-fast font-bold leading-none text-brand-text-light-primary dark:text-white ${
+        className={`font-bold leading-none text-brand-text-light-primary dark:text-white ${
           isLong ? "text-[clamp(32px,5vw,64px)]" : "text-[clamp(40px,7vw,96px)]"
         }`}
       >

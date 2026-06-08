@@ -58,6 +58,20 @@ export default function IatExam({
   const assessmentStartRef = useRef<number>(Date.now());
   const moduleStartRef = useRef<number>(Date.now());
   const loadingRef = useRef(false);
+  // Keypress events are buffered and flushed to the server in the background so
+  // the runner never blocks on a network round-trip between trials (that lag
+  // was causing presses to bleed into the next trial on slow connections).
+  type BufferedEvent = {
+    trialId: number;
+    keyPressed: "E" | "I";
+    responseTimeMs: number;
+    eventSequence: number;
+    shownAt?: string;
+    answeredAt?: string;
+  };
+  const eventBufferRef = useRef<BufferedEvent[]>([]);
+  const flushTimerRef = useRef<number | null>(null);
+  const flushingRef = useRef(false);
 
   const load = useCallback(async () => {
     // Guard against concurrent loads (React StrictMode invokes the effect
@@ -134,6 +148,41 @@ export default function IatExam({
     resetClock();
   }, []);
 
+  // Send any buffered keypress events to the server. Safe to call repeatedly;
+  // on failure the batch is requeued so nothing is lost.
+  const flushEvents = useCallback(async () => {
+    if (flushTimerRef.current !== null) {
+      window.clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
+    if (flushingRef.current) return;
+    const batch = eventBufferRef.current;
+    if (batch.length === 0) return;
+    eventBufferRef.current = [];
+    flushingRef.current = true;
+    try {
+      await iatService.saveTrialEvents(attemptId, batch);
+    } catch {
+      // Re-queue so a transient failure doesn't drop the responses.
+      eventBufferRef.current = [...batch, ...eventBufferRef.current];
+    } finally {
+      flushingRef.current = false;
+    }
+  }, [attemptId]);
+
+  // Debounced background flush: send when the buffer grows or after a short idle.
+  const scheduleFlush = useCallback(() => {
+    if (eventBufferRef.current.length >= 12) {
+      void flushEvents();
+      return;
+    }
+    if (flushTimerRef.current !== null) return;
+    flushTimerRef.current = window.setTimeout(() => {
+      flushTimerRef.current = null;
+      void flushEvents();
+    }, 700);
+  }, [flushEvents]);
+
   const finishModuleOrAttempt = useCallback(async () => {
     if (!state || !currentModule) return;
     if (finishingRef.current) return;
@@ -144,6 +193,8 @@ export default function IatExam({
       const moduleNumber = completedModules + 1;
       const stats = moduleStatsRef.current;
       const moduleElapsedSec = Math.round((Date.now() - moduleStartRef.current) / 1000);
+      // Make sure every buffered keypress is persisted before the module is scored.
+      await flushEvents();
       await iatService.completeModule(attemptId, currentModule.id);
       const nextState = await iatService.getState(attemptId);
       setState(nextState);
@@ -174,7 +225,7 @@ export default function IatExam({
       setSaving(false);
       finishingRef.current = false;
     }
-  }, [attemptId, completedModules, currentModule, state]);
+  }, [attemptId, completedModules, currentModule, flushEvents, state]);
 
   const handleCorrect = useCallback(async () => {
     if (screen === "practice") {
@@ -201,7 +252,7 @@ export default function IatExam({
   }, [beginExam, currentTrial, finishModuleOrAttempt, practiceIndex, screen, trialIndex, trials.length]);
 
   const handleKey = useCallback(
-    async (key: "E" | "I") => {
+    (key: "E" | "I") => {
       if (saving) return;
       const trial = screen === "practice" ? activePractice : currentTrial;
       if (!trial) return;
@@ -216,16 +267,18 @@ export default function IatExam({
           moduleStatsRef.current.answered += 1;
           if (isCorrect) moduleStatsRef.current.correct += 1;
         }
-        await iatService.saveTrialEvents(attemptId, [
-          {
-            trialId: currentTrial.id,
-            keyPressed: key,
-            responseTimeMs: elapsed,
-            eventSequence: count,
-            shownAt: new Date(shownAtRef.current).toISOString(),
-            answeredAt: new Date().toISOString(),
-          },
-        ]);
+        // Buffer the event and save in the background — never block the advance
+        // on the network. This is what keeps fast/repeated key presses snappy
+        // and stops them from spilling into the next trial.
+        eventBufferRef.current.push({
+          trialId: currentTrial.id,
+          keyPressed: key,
+          responseTimeMs: elapsed,
+          eventSequence: count,
+          shownAt: new Date(shownAtRef.current).toISOString(),
+          answeredAt: new Date().toISOString(),
+        });
+        scheduleFlush();
       }
 
       if (!isCorrect) {
@@ -236,9 +289,9 @@ export default function IatExam({
 
       setCorrectFlash(key);
       window.setTimeout(() => setCorrectFlash(null), 180);
-      await handleCorrect();
+      void handleCorrect();
     },
-    [activePractice, attemptId, currentTrial, handleCorrect, saving, screen],
+    [activePractice, currentTrial, handleCorrect, saving, scheduleFlush, screen],
   );
 
   useEffect(() => {
@@ -252,6 +305,13 @@ export default function IatExam({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleKey, screen]);
+
+  // Flush any buffered events when leaving the exam (navigation / unmount).
+  useEffect(() => {
+    return () => {
+      void flushEvents();
+    };
+  }, [flushEvents]);
 
   // Safety net: if we're in the exam with every trial answered but the module
   // hasn't been completed yet (e.g. the completion call failed earlier), kick
