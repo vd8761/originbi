@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { ArrowRight, Keyboard } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { KeyHint } from "../components/primitives";
 
 export interface BriefingCategory {
   category: string;
@@ -64,8 +65,6 @@ export default function IatModuleBriefingScreen({
   totalParts,
   leftLabel,
   rightLabel,
-  moduleTableData,
-  showModuleTable,
   onContinue,
 }: {
   moduleNumber: number;
@@ -74,8 +73,6 @@ export default function IatModuleBriefingScreen({
   totalParts: number;
   leftLabel: string | null;
   rightLabel: string | null;
-  moduleTableData: BriefingCategory[];
-  showModuleTable: boolean;
   onContinue: () => void;
 }) {
   useEffect(() => {
@@ -93,57 +90,68 @@ export default function IatModuleBriefingScreen({
   const rightParts = splitLabel(rightLabel, "Right");
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] w-full flex-col justify-center py-6 sm:py-10">
-      <div className="mx-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-brand-light-tertiary bg-white shadow-[0_18px_60px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-[#19211C] dark:shadow-none">
-        <div className="flex flex-col gap-4 border-b border-brand-light-tertiary px-5 py-5 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div className="flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-brand-green/12 text-brand-green">
-              <Keyboard className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/50 dark:text-white/50">
-                Module {moduleNumber} of {totalModules}
-              </p>
-              <h1 className="text-xl font-bold text-black dark:text-white sm:text-2xl">
-                Part {partNumber} of {totalParts}
-              </h1>
-            </div>
-          </div>
-          <div className="rounded-full border border-brand-green/25 bg-brand-green/10 px-4 py-2 text-sm font-bold text-brand-green">
-            New key mapping
-          </div>
+    <div className="flex min-h-[calc(100vh-3.5rem)] w-full flex-col justify-center pb-28 pt-6 sm:py-10">
+      <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-3xl border border-brand-light-tertiary bg-white shadow-[0_18px_60px_rgba(0,0,0,0.08)] dark:border-white/10 dark:bg-[#19211C] dark:shadow-none">
+        <div className="flex flex-col gap-1 border-b border-brand-light-tertiary px-5 py-5 dark:border-white/[0.08] sm:px-8">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/50 dark:text-white/50">
+            Module {moduleNumber} of {totalModules}
+          </p>
+          <h1 className="text-xl font-bold text-black dark:text-white sm:text-2xl">
+            Part {partNumber} of {totalParts}
+          </h1>
         </div>
 
         <div className="px-5 py-6 sm:px-8 sm:py-8">
-          <p className="max-w-2xl text-sm leading-6 text-black/70 dark:text-white/65">
-            Review the two response keys for this part before the words begin.
-            Sort each item into the one category it belongs to, moving quickly
-            while staying accurate.
-          </p>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <KeySide keyLabel="E" parts={leftParts} />
-            <KeySide keyLabel="I" parts={rightParts} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <KeySide keyLabel="E" side="Left finger" parts={leftParts} />
+            <KeySide keyLabel="I" side="Right finger" parts={rightParts} />
           </div>
 
-          {showModuleTable && moduleTableData.length > 0 && (
-            <ModuleCategoryTable rows={moduleTableData} />
-          )}
+          {/* Per-part instructions, larger than supporting text. */}
+          <div className="mt-6 space-y-3 text-[clamp(15px,2.1vw,18px)] font-semibold leading-7 text-black dark:text-white">
+            <p>
+              Put a <span className="text-brand-green">left finger on E</span> for items in{" "}
+              <CategoryPhrase parts={leftParts} />.
+            </p>
+            <p>
+              Put a <span className="text-brand-green">right finger on I</span> for items in{" "}
+              <CategoryPhrase parts={rightParts} />.
+            </p>
+          </div>
+
+          <ul className="mt-4 space-y-1.5 text-sm leading-6 text-black/70 dark:text-white/65">
+            <li>Items appear one at a time.</li>
+            <li>If you make a mistake, a red indicator appears — press the other key to continue.</li>
+            <li>Go as fast as you can while staying accurate.</li>
+          </ul>
 
           <div className="mt-7 flex flex-col gap-3 border-t border-brand-light-tertiary pt-5 dark:border-white/[0.08] sm:flex-row sm:items-center sm:justify-between">
             <p className="hidden text-sm font-medium text-black/60 dark:text-white/55 sm:block">
-              Press <strong className="text-brand-green">Spacebar</strong> when you are ready.
+              Press <strong className="text-brand-green">Spacebar</strong> when you are ready to
+              start.
             </p>
             <button
               type="button"
               onClick={onContinue}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-green px-7 py-3 text-sm font-semibold text-white transition hover:brightness-105"
+              className="hidden items-center justify-center gap-2 rounded-full bg-brand-green px-7 py-3 text-sm font-semibold text-white transition hover:brightness-105 sm:inline-flex"
             >
               Start this part
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Mobile: bottom-anchored Start button (no keyboard available). */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-light-tertiary bg-brand-light-primary/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur dark:border-white/10 dark:bg-[#19211C]/95 sm:hidden">
+        <button
+          type="button"
+          onClick={onContinue}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-green px-6 py-3.5 text-base font-bold text-white"
+        >
+          Start
+          <ArrowRight className="h-5 w-5" />
+        </button>
       </div>
     </div>
   );
@@ -162,71 +170,51 @@ function splitLabelParts(label: string | null | undefined) {
     .filter(Boolean);
 }
 
+/** Renders ["Male", "Family"] as "Male or Family" with category emphasis. */
+function CategoryPhrase({ parts }: { parts: string[] }) {
+  return (
+    <>
+      {parts.map((part, index) => (
+        <React.Fragment key={`${part}-${index}`}>
+          {index > 0 && <span className="font-medium lowercase text-black/55 dark:text-white/55"> or </span>}
+          <span className="font-black text-black dark:text-white">{part}</span>
+        </React.Fragment>
+      ))}
+    </>
+  );
+}
+
 function KeySide({
   keyLabel,
+  side,
   parts,
 }: {
   keyLabel: "E" | "I";
+  side: string;
   parts: string[];
 }) {
   return (
-    <div className="grid min-h-[150px] gap-5 rounded-2xl border border-brand-light-tertiary bg-brand-light-primary/40 p-4 dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center sm:p-6">
-      <div className="flex items-center gap-3 sm:flex-col sm:items-start">
-        <span className="grid h-12 w-12 place-items-center rounded-xl border border-brand-green/30 bg-white font-black text-brand-green shadow-[0_3px_0_#1A8A47] dark:border-brand-green/40 dark:bg-white/10 sm:h-16 sm:w-16 sm:text-xl">
-          {keyLabel}
-        </span>
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
-            Press key
-          </p>
-          <p className="text-sm font-semibold text-black dark:text-white">
-            Use {keyLabel} for
-          </p>
-        </div>
+    <div className="grid gap-4 rounded-2xl border border-brand-light-tertiary bg-brand-light-primary/40 p-4 dark:border-white/10 dark:bg-white/[0.04] sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:p-6">
+      <div className="flex items-center gap-3 sm:flex-col sm:items-start sm:gap-2">
+        <KeyHint keyLabel={keyLabel} />
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-black/45 dark:text-white/45">
+          {side}
+        </p>
       </div>
-
-      <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-center">
+      <div className="flex min-w-0 flex-col items-center justify-center gap-1 text-center sm:items-start sm:text-left">
         {parts.map((part, index) => (
           <React.Fragment key={`${keyLabel}-${part}-${index}`}>
             {index > 0 && (
-              <span className="text-sm font-bold lowercase text-black/45 dark:text-white/45 sm:text-base">
-                or
-              </span>
+              <span className="text-sm font-bold lowercase text-black/45 dark:text-white/45">or</span>
             )}
             <span
-              className={`min-w-0 break-words text-[clamp(24px,3.2vw,42px)] font-black leading-tight ${
+              className={`min-w-0 break-words text-[clamp(22px,3vw,36px)] font-black leading-tight ${
                 index > 0 ? "text-brand-green" : "text-black dark:text-white"
               }`}
             >
               {part}
             </span>
           </React.Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ModuleCategoryTable({ rows }: { rows: BriefingCategory[] }) {
-  return (
-    <div className="mt-6 overflow-hidden rounded-2xl border border-brand-light-tertiary dark:border-white/10">
-      <div className="border-b border-brand-light-tertiary bg-brand-light-primary/50 px-4 py-3 dark:border-white/[0.08] dark:bg-white/[0.03]">
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-black/50 dark:text-white/50">
-          Module word table
-        </p>
-      </div>
-
-      <div className="divide-y divide-brand-light-tertiary dark:divide-white/[0.08]">
-        {rows.map((row) => (
-          <div
-            key={row.category}
-            className="grid gap-2 px-4 py-3 sm:grid-cols-[170px_minmax(0,1fr)] sm:items-start"
-          >
-            <p className="text-sm font-bold text-black dark:text-white">{row.category}</p>
-            <p className="text-sm font-medium leading-6 text-black/70 dark:text-white/70">
-              {row.words.join(", ")}
-            </p>
-          </div>
         ))}
       </div>
     </div>
