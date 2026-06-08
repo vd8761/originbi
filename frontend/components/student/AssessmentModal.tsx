@@ -113,12 +113,12 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
       {/* Modal Content - Compact Layout */}
       <div className="relative w-full max-w-xl bg-white dark:bg-[#1A1D21] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[90vh] animate-fade-in overflow-hidden transition-colors duration-300">
 
-        {/* Scrollable Body - Reduced Padding/Margins to prevent scroll */}
+        {/* Scrollable Body - Increased Padding/Margins to give breathing space */}
         <div className="overflow-y-auto custom-scrollbar flex-1">
-          <div className="p-5 sm:p-5">
+          <div className="p-6 sm:p-8">
             {/* Header Section */}
-            <div className="flex justify-between items-start mb-4">
-              <p className="text-[10px] sm:text-xs text-brand-text-light-secondary dark:text-gray-400 font-medium max-w-[200px] leading-relaxed">
+            <div className="flex justify-between items-start mb-6">
+              <p className="text-[10px] sm:text-xs text-black dark:text-white font-medium max-w-[220px] leading-relaxed">
                 {t.header}
               </p>
 
@@ -126,7 +126,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
-                  className="flex items-center space-x-2 bg-brand-light-primary dark:bg-white/5 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold text-brand-text-light-primary dark:text-white border border-brand-light-tertiary dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0 focus:outline-none"
+                  className="flex items-center space-x-2 bg-brand-light-primary dark:bg-white/5 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold text-black dark:text-white border border-brand-light-tertiary dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0 focus:outline-none"
                 >
                   <span>{language}</span>
                   <svg className={`w-3 h-3 transition-transform duration-200 ${isLangDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,13 +139,13 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
                   <div className="absolute right-0 top-full mt-2 w-24 bg-white dark:bg-[#24272B] border border-brand-light-tertiary dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50">
                     <button
                       onClick={() => handleLanguageChange('ENG')}
-                      className={`w-full text-left px-4 py-2 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${language === 'ENG' ? 'text-brand-green' : 'text-brand-text-light-primary dark:text-gray-300'}`}
+                      className={`w-full text-left px-4 py-2 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${language === 'ENG' ? 'text-brand-green' : 'text-black dark:text-white'}`}
                     >
                       English
                     </button>
                     <button
                       onClick={() => handleLanguageChange('TAM')}
-                      className={`w-full text-left px-4 py-2 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${language === 'TAM' ? 'text-brand-green' : 'text-brand-text-light-primary dark:text-gray-300'}`}
+                      className={`w-full text-left px-4 py-2 text-xs font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${language === 'TAM' ? 'text-brand-green' : 'text-black dark:text-white'}`}
                     >
                       Tamil
                     </button>
@@ -154,78 +154,77 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
               </div>
             </div>
 
-            <h2 className="text-[clamp(18px,2vw,28px)] font-semibold text-brand-text-light-primary dark:text-white mb-2 leading-tight tracking-tight">{assessment.title}</h2>
+            <h2 className="text-[clamp(18px,2vw,28px)] font-semibold text-black dark:text-white mb-3 leading-tight tracking-tight">{assessment.title}</h2>
 
-            <p className="text-brand-text-light-secondary dark:text-gray-400 text-[clamp(11px,0.9vw,14px)] leading-relaxed mb-5">
+            <p className="text-black dark:text-white text-[clamp(11px,0.9vw,14px)] leading-relaxed mb-6">
               {assessment.description}
             </p>
 
             {/* Meta Info Box */}
-            <div className="bg-brand-light-primary dark:bg-white/5 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-6 border border-brand-light-tertiary dark:border-white/5 mb-5">
+            <div className="bg-brand-light-primary dark:bg-white/5 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-8 border border-brand-light-tertiary dark:border-white/5 mb-6">
 
               {/* Questions */}
               <div className="flex items-center gap-3 flex-1 w-full sm:w-auto">
                 <div className={`w-8 h-8 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
                   <CustomQuestionIcon className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
-                  {t.contains} <strong className="text-brand-text-light-primary dark:text-white font-bold">{assessment.totalQuestions} {t.questions}</strong>
+                <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-black dark:text-white">
+                  {t.contains} <strong className="text-black dark:text-white font-bold">{assessment.totalQuestions} {t.questions}</strong>
                 </span>
               </div>
 
-              <div className="w-full h-px sm:w-px sm:h-8 bg-brand-light-tertiary dark:bg-white/10 block"></div>
+              <div className="w-full h-px sm:w-px sm:h-10 bg-brand-light-tertiary dark:bg-white/10 block"></div>
 
               {/* Time */}
               <div className="flex items-center gap-3 flex-1 w-full sm:w-auto">
                 <div className={`w-8 h-8 rounded-full bg-brand-green flex items-center justify-center shrink-0`}>
                   <CustomTimeIcon className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-brand-text-light-secondary dark:text-gray-300">
-                  {t.averageTime} <strong className="text-brand-text-light-primary dark:text-white font-bold">{durationVal} {t.minutes}</strong>
+                <span className="text-[clamp(11px,0.9vw,14px)] font-medium text-black dark:text-white">
+                  {t.averageTime} <strong className="text-black dark:text-white font-bold">{durationVal} {t.minutes}</strong>
                 </span>
               </div>
 
             </div>
 
-            <h4 className="text-brand-text-light-primary dark:text-white font-semibold mb-2 text-[clamp(12px,1vw,15px)]">{t.readCarefully}</h4>
-            <ul className="space-y-1.5 mb-2">
-              <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
-                <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
+            <h4 className="text-black dark:text-white font-semibold mb-3 text-[clamp(12px,1vw,15px)]">{t.readCarefully}</h4>
+            <ul className="space-y-2.5 mb-6">
+              <li className="text-[clamp(10px,0.8vw,13px)] text-black dark:text-white flex items-start gap-3">
+                <span className="block w-1.5 h-1.5 rounded-full bg-black dark:bg-white mt-1.5 shrink-0"></span>
                 {isIatGen ? "This is a timed reaction block. Pause is unavailable once started." : t.point1}
               </li>
-              <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
-                <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
+              <li className="text-[clamp(10px,0.8vw,13px)] text-black dark:text-white flex items-start gap-3">
+                <span className="block w-1.5 h-1.5 rounded-full bg-black dark:bg-white mt-1.5 shrink-0"></span>
                 {t.point2}
               </li>
-              <li className="text-[clamp(10px,0.8vw,13px)] text-brand-text-light-secondary dark:text-gray-400 flex items-start gap-3">
-                <span className="block w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 mt-1.5 shrink-0"></span>
+              <li className="text-[clamp(10px,0.8vw,13px)] text-black dark:text-white flex items-start gap-3">
+                <span className="block w-1.5 h-1.5 rounded-full bg-black dark:bg-white mt-1.5 shrink-0"></span>
                 {t.point3}
               </li>
             </ul>
 
             {isIatGen && (
-              <div className="mb-4 rounded-2xl border border-brand-light-tertiary bg-brand-light-primary p-4 dark:border-white/10 dark:bg-white/5">
-                <h5 className="mb-3 text-[10.5px] font-bold uppercase tracking-wider text-brand-text-light-secondary dark:text-gray-400">
+              <div className="mb-6 rounded-2xl border border-brand-light-tertiary bg-brand-light-primary p-5 dark:border-white/10 dark:bg-white/5">
+                <h5 className="mb-4 text-[10.5px] font-bold uppercase tracking-wider text-black dark:text-white">
                   Keyboard Controls
                 </h5>
-                <div className="flex items-center justify-around gap-3">
+                <div className="grid grid-cols-2 gap-4 sm:gap-6">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 select-none items-center justify-center rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50 text-lg font-black text-brand-green shadow-[0_3px_0_#1A8A47] dark:border-white/10 dark:from-white/10 dark:to-white/[0.02]">
                       E
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-brand-text-light-primary dark:text-white">Left option</p>
-                      <p className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">Press E or tap the left card</p>
+                      <p className="text-xs font-bold text-black dark:text-white">Left option</p>
+                      <p className="text-[10px] text-black dark:text-white">Press E or tap the left card</p>
                     </div>
                   </div>
-                  <div className="h-8 w-px bg-brand-light-tertiary dark:bg-white/10" />
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 border-l border-brand-light-tertiary dark:border-white/10 pl-4 sm:pl-8">
                     <div className="flex h-10 w-10 select-none items-center justify-center rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50 text-lg font-black text-brand-green shadow-[0_3px_0_#1A8A47] dark:border-white/10 dark:from-white/10 dark:to-white/[0.02]">
                       I
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-brand-text-light-primary dark:text-white">Right option</p>
-                      <p className="text-[10px] text-brand-text-light-secondary dark:text-gray-400">Press I or tap the right card</p>
+                      <p className="text-xs font-bold text-black dark:text-white">Right option</p>
+                      <p className="text-[10px] text-black dark:text-white">Press I or tap the right card</p>
                     </div>
                   </div>
                 </div>
@@ -234,7 +233,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
 
             {/* Progress Bar for Continue State */}
             {isContinue && (
-              <div className="mb-4">
+              <div className="mb-6">
                 <div className="flex justify-between text-[10px] sm:text-xs font-bold mb-2">
                   <span className="text-brand-green">{assessment.completedQuestions}/{assessment.totalQuestions} {t.pending}</span>
                   <span className="text-brand-green">{progress}%</span>
@@ -248,17 +247,17 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-5 border-t border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#1A1D21]">
+        <div className="p-5 sm:p-6 border-t border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-[#1A1D21]">
           <div className="flex justify-end gap-3 sm:gap-4">
             <button
               onClick={onClose}
-              className="px-6 py-2 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white text-[clamp(11px,0.9vw,14px)] font-bold hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              className="px-6 py-2.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-black dark:text-white text-[clamp(11px,0.9vw,14px)] font-bold hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             >
               {t.goBack}
             </button>
             <button
               onClick={onStart}
-              className="px-8 py-2 rounded-full bg-brand-green text-white text-[clamp(11px,0.9vw,14px)] font-bold hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
+              className="px-8 py-2.5 rounded-full bg-brand-green text-white text-[clamp(11px,0.9vw,14px)] font-bold hover:bg-brand-green/90 transition-colors"
             >
               {isContinue ? t.continue : t.begin}
             </button>

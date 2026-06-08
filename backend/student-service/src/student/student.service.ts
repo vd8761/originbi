@@ -689,7 +689,7 @@ export class StudentService {
         id: attempt.id,
         stepName:
           assessmentKind === 'IAT_GEN'
-            ? 'Level 2 - IAT Gen'
+            ? 'IAT Gen'
             : level?.name || `Level ${level?.levelNumber}`,
         description: level?.description || '',
         status: status,
@@ -1330,7 +1330,7 @@ export class StudentService {
           mobileNumber: dto.mobile_number,
           countryCode: dto.country_code ?? '+91',
           gender: dto.gender,
-          hasChangedPassword: true,
+          hasChangedPassword: dto.registration_source === 'ADMIN' ? false : true,
           cognitoSub: cognitoSub,
           ...(dto.metadata || {}),
         },
@@ -1406,6 +1406,7 @@ export class StudentService {
               savedReg.metadata?.debrief === 'true',
             (savedReg.isTechAssessment as any) === 1 ||
               (savedReg.isTechAssessment as any) === 2,
+            dto.registration_source === 'ADMIN',
           );
           this.logger.log(
             `Tech welcome email sent successfully to ${dto.email}`,
@@ -2127,6 +2128,7 @@ export class StudentService {
     assessmentTitle?: string,
     isDebrief?: boolean,
     isTechAssessment?: boolean,
+    isTemporary?: boolean,
   ) {
     this.logger.log(`[Email Debug] AWS Config Check triggered for: ${to}`);
 
@@ -2163,7 +2165,7 @@ export class StudentService {
       : 'Welcome to OriginBI - Your Assessment is Ready!';
 
     const emailHtml = isTechAssessment
-      ? getTechWelcomeEmailTemplate(name, to, pass, frontendUrl, assets)
+      ? getTechWelcomeEmailTemplate(name, to, pass, frontendUrl, assets, isTemporary)
       : getStudentWelcomeEmailTemplate(
           name,
           to,
@@ -2173,6 +2175,7 @@ export class StudentService {
           startDateTime,
           assessmentTitle,
           isDebrief,
+          isTemporary,
         );
 
     const mailOptions: Record<string, any> = {

@@ -7,6 +7,7 @@ export const getStudentWelcomeEmailTemplate = (
   startDateTime?: Date | string,
   assessmentTitle?: string,
   isDebrief?: boolean,
+  isTemporary?: boolean,
 ) => `
 <!DOCTYPE html>
 <html>
@@ -156,7 +157,7 @@ export const getStudentWelcomeEmailTemplate = (
                     <td style="font-size: 14px; color: #000000; padding: 5px 0;">${to}</td>
                   </tr>
                   <tr>
-                    <td style="font-size: 14px; color: #707070; padding: 5px 0;">Password</td>
+                    <td style="font-size: 14px; color: #707070; padding: 5px 0;">${isTemporary ? 'Temporary Password' : 'Password'}</td>
                     <td style="font-size: 14px; color: #000000; padding: 5px 0;">${pass}</td>
                   </tr>
                 </table>

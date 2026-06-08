@@ -6,10 +6,12 @@ import { iatService, IatState } from "../../../lib/services/iat.service";
 import IatShell from "./components/IatShell";
 import IatInstructionsScreen from "./screens/IatInstructionsScreen";
 import IatTrialRunner, { RunnerTrial } from "./screens/IatTrialRunner";
+import IatModuleBriefingScreen, { extractBriefingData } from "./screens/IatModuleBriefingScreen";
 import IatModuleBreakScreen from "./screens/IatModuleBreakScreen";
 import IatCompletionScreen from "./screens/IatCompletionScreen";
+import { ElapsedClock } from "./components/primitives";
 
-type Screen = "instructions" | "practice" | "exam" | "break" | "done";
+type Screen = "instructions" | "practice" | "briefing" | "exam" | "break" | "done";
 
 const practiceTrials: RunnerTrial[] = [
   { wordShown: "Cloud", expectedKey: "E", leftLabel: "Sky", rightLabel: "Ground" },
@@ -48,6 +50,8 @@ export default function IatExam({
     elapsedLabel: string;
   } | null>(null);
   const [finishError, setFinishError] = useState("");
+  // Track wrong answers in the current module to re-show at module break
+  const [wrongTrials, setWrongTrials] = useState<{ word: string; correctKey: "E" | "I"; leftLabel: string; rightLabel: string }[]>([]);
 
   const finishingRef = useRef(false);
   const shownAtRef = useRef<number>(Date.now());
@@ -127,6 +131,9 @@ export default function IatExam({
 
   const modules = state?.modules || [];
   const trials = state?.trials || [];
+  const briefingData = useMemo(() => {
+    return extractBriefingData(trials);
+  }, [trials]);
   const completedModules = modules.filter((m) => m.status === "COMPLETED").length;
   const currentModule = useMemo(
     // currentModuleId arrives as a bigint string while module DTO ids are
@@ -143,6 +150,11 @@ export default function IatExam({
 
   const beginExam = useCallback(() => {
     moduleStatsRef.current = { answered: 0, correct: 0 };
+    setWrongTrials([]);
+    setScreen("briefing");
+  }, []);
+
+  const startModuleExam = useCallback(() => {
     moduleStartRef.current = Date.now();
     setScreen("exam");
     resetClock();
@@ -283,7 +295,18 @@ export default function IatExam({
 
       if (!isCorrect) {
         setWrongFlash(true);
-        window.setTimeout(() => setWrongFlash(false), 260);
+        // Track this wrong answer for module-end review (only first wrong press per trial)
+        if (screen === "exam" && currentTrial) {
+          setWrongTrials((prev) => {
+            if (prev.some((w) => w.word === currentTrial.wordShown)) return prev;
+            return [...prev, {
+              word: currentTrial.wordShown,
+              correctKey: trial.expectedKey,
+              leftLabel: String(trial.leftLabel || ""),
+              rightLabel: String(trial.rightLabel || ""),
+            }];
+          });
+        }
         return;
       }
 
@@ -379,6 +402,19 @@ export default function IatExam({
     );
   }
 
+  if (screen === "briefing") {
+    return (
+      <IatShell onExit={onExit}>
+        <IatModuleBriefingScreen
+          moduleNumber={completedModules + 1}
+          totalModules={modules.length || completedModules + 1}
+          data={briefingData}
+          onContinue={startModuleExam}
+        />
+      </IatShell>
+    );
+  }
+
   if (screen === "break" && breakInfo) {
     return (
       <IatShell onExit={onExit}>
@@ -389,6 +425,7 @@ export default function IatExam({
           accuracy={breakInfo.accuracy}
           elapsedLabel={breakInfo.elapsedLabel}
           saving={saving}
+          wrongTrials={wrongTrials}
           onContinue={() => {
             setBreakInfo(null);
             beginExam();
@@ -466,7 +503,10 @@ export default function IatExam({
     : `${completedModules + 1} of ${modules.length || 6}`;
 
   return (
-    <IatShell onExit={onExit}>
+    <IatShell
+      onExit={onExit}
+      headerContent={<ElapsedClock startMs={assessmentStartRef.current} />}
+    >
       <IatTrialRunner
         isPractice={isPractice}
         trial={displayTrial}
