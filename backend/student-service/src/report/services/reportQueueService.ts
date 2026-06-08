@@ -9,12 +9,13 @@ import {
   fetchUserAssessmentData,
 } from '../helpers/groupReportHelper';
 import { MergedReportData } from '../types/types';
-import { getPlacementDetails } from '../helpers/sqlHelper';
 import {
-  generateReportForUser,
-  generateShortReportForUser,
-} from '../helpers/reportFactory';
+  getMBAPlacementDetails,
+  getPlacementDetails,
+} from '../helpers/sqlHelper';
+import { generateReportForUser } from '../helpers/reportFactory';
 import { PlacementReport } from '../reports/placement/placementReport';
+import { MBAPlacementReport } from '../reports/placement/mbaPlacementReport';
 import { logger } from '../helpers/logger';
 
 // --- Setup Temp Directory ---
@@ -34,7 +35,7 @@ export interface JobState {
 }
 
 /**
- * File-based job store — persists job state as JSON files in TEMP_DIR so that
+ * File-based job store - persists job state as JSON files in TEMP_DIR so that
  * state survives a process restart (e.g. during a deployment while a job is
  * actively being polled by handleAssessmentCompletion).
  */
@@ -101,6 +102,7 @@ export const reportQueueService = {
     groupId: number,
     deptDegreeId: number,
     jobId: string,
+    reportTypeOverride?: 'standard' | 'mba',
   ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
@@ -135,20 +137,51 @@ export const reportQueueService = {
         progress: 'Generating PDF...',
       });
 
+      // Detect MBA departments - they get a specialization-based handbook by
+      // default. An explicit reportTypeOverride from the API (e.g. the admin
+      // chose "Standard Placement Report" for an MBA dept) wins over auto-detect.
+      const autoIsMBA =
+        placementData.department_name?.toUpperCase().includes('MBA') ||
+        placementData.group_name?.toUpperCase().includes('MBA') ||
+        placementData.report_title?.toUpperCase().includes('MBA');
+      const isMBA =
+        reportTypeOverride === 'mba'
+          ? true
+          : reportTypeOverride === 'standard'
+            ? false
+            : autoIsMBA;
+
       // 2. Generate PDF Name
       const safeGroup = placementData.group_name.replace(/[^a-zA-Z0-9]/g, '_');
       const safeDept = placementData.department_name.replace(
         /[^a-zA-Z0-9]/g,
         '_',
       );
-      const fileName = `Placement_Handbook_${safeGroup}_${safeDept}.pdf`;
+      const fileName = `${
+        isMBA ? 'MBA_Placement' : 'Placement_Handbook'
+      }_${safeGroup}_${safeDept}.pdf`;
       const filePath = path.join(jobDir, fileName);
 
       logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
 
-      // 3. Generate Report
-      const report = new PlacementReport(placementData);
-      await report.generate(filePath);
+      // 3. Generate Report - MBA cohorts use the specialization-based report;
+      // all others use the standard DISC-style placement handbook.
+      if (isMBA) {
+        const mbaData = await getMBAPlacementDetails(deptDegreeId, groupId);
+        if (mbaData && mbaData.total_students > 0) {
+          logger.info(
+            `[JOB:${jobId}] MBA department detected - using MBAPlacementReport (${mbaData.total_students} students).`,
+          );
+          await new MBAPlacementReport(mbaData).generate(filePath);
+        } else {
+          logger.warn(
+            `[JOB:${jobId}] MBA detected but no scored students; falling back to standard placement report.`,
+          );
+          await new PlacementReport(placementData).generate(filePath);
+        }
+      } else {
+        await new PlacementReport(placementData).generate(filePath);
+      }
 
       // 4. Complete
       logger.info(`[JOB:${jobId}] PDF Created.`);
@@ -170,7 +203,11 @@ export const reportQueueService = {
   // ============================================================================
   // WORKER 2: GROUP REPORTS (Bulk Generation & Zipping)
   // ============================================================================
-  async processGroupReports(groupId: string, jobId: string) {
+  async processGroupReports(
+    groupId: string,
+    jobId: string,
+    programId?: string,
+  ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
     let groupName: string = '';
@@ -189,8 +226,10 @@ export const reportQueueService = {
       fs.mkdirSync(jobDir, { recursive: true });
 
       logger.info(`[JOB:${jobId}] Fetching data...`);
-      const groupData: MergedReportData[] =
-        await fetchGroupAssessmentData(groupId);
+      const groupData: MergedReportData[] = await fetchGroupAssessmentData(
+        groupId,
+        programId,
+      );
       const totalUsers = groupData.length;
 
       if (totalUsers === 0) {
@@ -399,14 +438,18 @@ export const reportQueueService = {
   // ============================================================================
   // WORKER 4: SINGLE STUDENT REPORT (Single PDF Generation)
   // ============================================================================
-  async processSingleUserReport(userId: string, jobId: string) {
+  async processSingleUserReport(
+    userId: string,
+    jobId: string,
+    short: boolean = false,
+  ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
 
     try {
       jobStore.set(jobId, {
         status: 'PROCESSING',
-        progress: 'Fetching Student Data...',
+        progress: 'Fetching user data...',
       });
 
       // Ensure clean directory
@@ -424,7 +467,7 @@ export const reportQueueService = {
       if (!groupData || groupData.length === 0) {
         jobStore.set(jobId, {
           status: 'ERROR',
-          error: 'No completed assessment found for this student.',
+          error: 'No completed assessment found for this user.',
         });
         return;
       }
@@ -451,13 +494,15 @@ export const reportQueueService = {
         .replace(/_+/g, '_')
         .replace(/^_|_$/g, '');
 
-      // Naming convention: <full_name>_<report_number>.pdf
-      const fileName = `${formattedName}_${formattedReportNo}.pdf`;
+      // Naming convention: <full_name>_<report_number>[_short].pdf
+      const fileName = `${formattedName}_${formattedReportNo}${short ? '_short' : ''}.pdf`;
       const filePath = path.join(jobDir, fileName);
 
-      logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
+      logger.info(
+        `[JOB:${jobId}] Generating ${fileName}${short ? ' (SHORT)' : ''}...`,
+      );
 
-      const password = await generateReportForUser(user, filePath);
+      const password = await generateReportForUser(user, filePath, short);
 
       // Complete
       logger.info(`[JOB:${jobId}] PDF Created.`);
@@ -465,81 +510,6 @@ export const reportQueueService = {
         status: 'COMPLETED',
         filePath: filePath, // Store as single file path
         password: password,
-      });
-      scheduleCleanup(jobId, [jobDir]);
-    } catch (error) {
-      console.error(`[Report service]`, `[JOB:${jobId}] Failed:`, error);
-      jobStore.set(jobId, {
-        status: 'ERROR',
-        error: (error as Error).message,
-      });
-      scheduleCleanup(jobId, [jobDir]);
-    }
-  },
-
-  // ============================================================================
-  // WORKER 5: SINGLE STUDENT SHORT REPORT (Single PDF Generation)
-  // ============================================================================
-  async processSingleUserShortReport(userId: string, jobId: string) {
-    logger.info(`=================================================`);
-    const jobDir = path.join(TEMP_DIR, jobId);
-
-    try {
-      jobStore.set(jobId, {
-        status: 'PROCESSING',
-        progress: 'Fetching user data...',
-      });
-
-      // Ensure clean directory
-      if (!fs.existsSync(jobDir)) {
-        fs.mkdirSync(jobDir, { recursive: true });
-      }
-
-      logger.info(
-        `[JOB:${jobId}] Fetching data for user ${userId} (short report)...`,
-      );
-
-      // Reuse existing fetchUserAssessmentData which takes array
-      const groupData: MergedReportData[] = await fetchUserAssessmentData([
-        userId,
-      ]);
-
-      if (!groupData || groupData.length === 0) {
-        jobStore.set(jobId, {
-          status: 'ERROR',
-          error: 'No assessment data found for this user.',
-        });
-        return;
-      }
-
-      const user = groupData[0];
-
-      jobStore.set(jobId, {
-        status: 'PROCESSING',
-        progress: 'Generating Short PDF...',
-      });
-
-      // Naming convention: <full_name>_Short.pdf
-      const safeName = user.full_name
-        .replace(/[^a-zA-Z0-9 ]/g, '_')
-        .trim()
-        .replace(/\s+/g, '_');
-      const formattedReportNo = (user.exam_ref_no || '')
-        .replace(/[^a-zA-Z0-9]+/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-      const fileName = `${safeName}_${formattedReportNo}_Short.pdf`;
-      const filePath = path.join(jobDir, fileName);
-
-      logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
-
-      await generateShortReportForUser(user, filePath);
-
-      // Complete
-      logger.info(`[JOB:${jobId}] Short PDF Created.`);
-      jobStore.set(jobId, {
-        status: 'COMPLETED',
-        filePath: filePath,
       });
       scheduleCleanup(jobId, [jobDir]);
     } catch (error) {

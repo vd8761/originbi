@@ -931,7 +931,7 @@ export class CollegeReport extends BaseReport {
    * It highlights the specific "Level" (1-6) for each trait using a color map.
    */
   public generateWordSketch(): void {
-    /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+    /* eslint-disable @typescript-eslint/no-unsafe-member-access */
     this._useStdMargins = true;
 
     // 1. Configuration

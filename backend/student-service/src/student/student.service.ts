@@ -33,14 +33,21 @@ import {
 } from '@originbi/shared-entities';
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import * as PDFDocument from 'pdfkit';
+import * as fs from 'fs';
+import * as path from 'path';
+import axios from 'axios';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { getTechWelcomeEmailTemplate } from '../mail/templates/tech-welcome.template';
+import { getTechAssessmentCertificateTemplate } from '../mail/templates/tech-assessment-certificate.template';
 
 import { getDebriefTeamNotificationEmailTemplate } from '../mail/templates/debrief-team-notification.template';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 import { SmsService, SmsTemplate } from '../sms/sms.service';
 import { SubscriptionService } from './subscription.service';
+import { MetaphorGenerationService } from '../metaphor/metaphor-generation.service';
+import { IatEligibilityService } from '../iat/iat-eligibility.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -48,6 +55,7 @@ export interface AssessmentProgressItem {
   description: string;
   status: string;
   levelNumber?: number;
+  assessmentKind?: string;
   completedQuestions: number;
   totalQuestions: number;
   unlockTime: Date | null;
@@ -94,6 +102,8 @@ export class StudentService {
     private readonly whatsappTemplates: WhatsappTemplatesService,
     private readonly smsService: SmsService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly metaphorGeneration: MetaphorGenerationService,
+    private readonly iatEligibility: IatEligibilityService,
   ) {}
 
   /**
@@ -600,14 +610,50 @@ export class StudentService {
     let previousAttempt: AssessmentAttempt | null = null;
 
     for (const attempt of attempts) {
-      const answeredCount = await this.answerRepo.count({
+      const level = attempt.assessmentLevel;
+      const metadataAssessmentKind = attempt.metadata?.assessment_kind;
+      let assessmentKind: string =
+        (typeof metadataAssessmentKind === 'string'
+          ? metadataAssessmentKind.toUpperCase()
+          : '') || '';
+      if (!assessmentKind) {
+        if (level?.levelNumber === 1 || level?.patternType === 'DISC') {
+          assessmentKind = 'DISC';
+        } else if (
+          level?.levelNumber === 3 ||
+          level?.name?.toLowerCase().includes('metaphor') ||
+          String(level?.patternType || '').toUpperCase() === 'METAPHOR'
+        ) {
+          assessmentKind = 'METAPHOR';
+        } else if (
+          level?.levelNumber === 2 ||
+          String(level?.patternType || '').toUpperCase() === 'ACI'
+        ) {
+          assessmentKind =
+            await this.iatEligibility.getAssessmentKindForRegistration(
+              attempt.registrationId,
+            );
+        }
+      }
+
+      let answeredCount = await this.answerRepo.count({
         where: { assessmentAttemptId: attempt.id, status: 'ANSWERED' },
       });
-      const totalCount = await this.answerRepo.count({
+      let totalCount = await this.answerRepo.count({
         where: { assessmentAttemptId: attempt.id },
       });
 
-      const level = attempt.assessmentLevel;
+      if (assessmentKind === 'IAT_GEN') {
+        const rows = await this.sessionRepo.query(
+          `SELECT COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE status = 'COMPLETED')::int AS completed
+           FROM iat_attempt_modules
+           WHERE assessment_attempt_id = $1`,
+          [attempt.id],
+        );
+        totalCount = Number(rows?.[0]?.total || 6);
+        answeredCount = Number(rows?.[0]?.completed || 0);
+      }
       let status = attempt.status;
       let unlockTime: Date | null = null;
 
@@ -641,19 +687,25 @@ export class StudentService {
 
       progressData.push({
         id: attempt.id,
-        stepName: level?.name || `Level ${level?.levelNumber}`,
+        stepName:
+          assessmentKind === 'IAT_GEN'
+            ? 'Level 2 - IAT Gen'
+            : level?.name || `Level ${level?.levelNumber}`,
         description: level?.description || '',
         status: status,
         levelNumber: level?.levelNumber,
+        assessmentKind,
         completedQuestions: answeredCount,
         totalQuestions:
           totalCount > 0
             ? totalCount
-            : level?.levelNumber === 2 ||
-                level?.name.includes('ACI') ||
-                level?.patternType === 'ACI'
-              ? 25
-              : 60,
+            : assessmentKind === 'IAT_GEN'
+              ? 6
+              : level?.levelNumber === 2 ||
+                  level?.name.includes('ACI') ||
+                  level?.patternType === 'ACI'
+                ? 25
+                : 60,
         unlockTime: unlockTime,
         dateCompleted: attempt.completedAt || attempt.updatedAt,
         attemptId: attempt.id, // Ensure attemptId is passed
@@ -821,6 +873,28 @@ export class StudentService {
         // return { success: false, message: 'User already exists' };
         // idempotency? or throw error? For now, throw error.
         throw new BadRequestException('User already exists');
+      }
+
+      // 1b. Pre-flight: ensure active questions exist BEFORE creating anything.
+      // This self-registration flow is not transactional, so blocking early
+      // avoids orphaned Cognito/DB records when questions are unavailable.
+      {
+        const preflightProgramCode = dto.program_code || 'SCHOOL_STUDENT';
+        const preflightProgram = await this.sessionRepo.manager.findOne(
+          Program,
+          { where: { code: preflightProgramCode } },
+        );
+        if (!preflightProgram) {
+          throw new BadRequestException(
+            `Program ${preflightProgramCode} not found`,
+          );
+        }
+        const level1 = await this.levelRepo.findOne({
+          where: { isMandatory: true, levelNumber: 1 },
+        });
+        if (level1) {
+          await this.assertActiveQuestionsExist(preflightProgram.id, level1.id);
+        }
       }
 
       // 2. Create User in Cognito
@@ -1134,6 +1208,25 @@ export class StudentService {
             savedReg,
             level,
           );
+        }
+        // Generate Level 3 (Metaphor) questions — gated + NON-FATAL: a metaphor
+        // failure must never break the core registration / Level 1.
+        else if (
+          level.levelNumber === 3 ||
+          level.name?.includes('Metaphor') ||
+          (level as any).patternType === 'METAPHOR'
+        ) {
+          try {
+            await this.metaphorGeneration.generate(
+              savedAttempt,
+              this.sessionRepo.manager,
+            );
+          } catch (err) {
+            this.logger.error(
+              `[Metaphor] generation failed for attempt ${savedAttempt.id} (non-fatal):`,
+              err as Error,
+            );
+          }
         }
       }
 
@@ -1611,33 +1704,29 @@ export class StudentService {
     mainQuery += ` ORDER BY RANDOM() LIMIT 40`;
     const mainQuestions = await this.answerRepo.query(mainQuery, mainParams);
 
-    // Fetch OPEN Questions (Limit 20)
-    // Fetch OPEN Questions (Limit 20)
-    const openQuery = `
-      SELECT id FROM open_questions 
-      WHERE is_active = true 
-        AND is_deleted = false
-      ORDER BY RANDOM() LIMIT 20
-    `;
-    const openQuestions = await this.answerRepo.query(openQuery);
+    // Guard: never build an empty/partial assessment. If every main question is
+    // deactivated, block with a clear error (defense-in-depth; register() also
+    // pre-checks this before any persistence).
+    if (!mainQuestions || mainQuestions.length === 0) {
+      throw new Error('No active questions available for this program/level.');
+    }
 
-    // 4. Interleave Questions (2 Main : 1 Open)
-    const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] = [];
-    let mainIdx = 0;
-    let openIdx = 0;
+    // Fetch OPEN questions per the admin-configurable distribution
+    // (originbi_settings -> assessment.open_question_distribution).
+    const openQuestions = await this.selectOpenQuestionIds();
 
-    // We want 20 chunks of (2 Main + 1 Open) = 60 questions
-    for (let i = 0; i < 20; i++) {
-      if (mainIdx < mainQuestions.length)
-        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (mainIdx < mainQuestions.length)
-        finalQuestions.push({ id: mainQuestions[mainIdx++].id, type: 'MAIN' });
-      if (openIdx < openQuestions.length)
-        finalQuestions.push({ id: openQuestions[openIdx++].id, type: 'OPEN' });
+    // 4. Build the final order: all main questions, with the open/survey
+    // questions SCATTERED at random positions among them (no fixed ratio —
+    // they "appear anywhere in the exam").
+    const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] =
+      mainQuestions.map((q: any) => ({ id: q.id, type: 'MAIN' as const }));
+    for (const oq of openQuestions) {
+      const pos = Math.floor(Math.random() * (finalQuestions.length + 1));
+      finalQuestions.splice(pos, 0, { id: oq.id, type: 'OPEN' });
     }
 
     this.logger.log(
-      `[Assessment] Generated ${finalQuestions.length} interleaved questions (Main: ${mainIdx}, Open: ${openIdx})`,
+      `[Assessment] Generated ${finalQuestions.length} questions (Main: ${mainQuestions.length}, Open: ${openQuestions.length}, scattered)`,
     );
 
     // 5. Bulk Insert Answers
@@ -1658,6 +1747,126 @@ export class StudentService {
             ) VALUES ${values.join(',')}
         `;
       await this.answerRepo.query(insertQuery);
+    }
+  }
+
+  /**
+   * Selects the open (non-DISC) question IDs for a Level-1 assessment based on
+   * the admin-configurable distribution stored in originbi_settings
+   * (category 'assessment', key 'open_question_distribution').
+   *
+   * Falls back to the legacy behaviour (20 random, any type) if the setting is
+   * missing or malformed, so the assessment never silently breaks.
+   *
+   * NOTE: 'set_sequential' groups (linked survey sets) are currently picked in
+   * fixed id order (no shuffle). Full set-grouping selection is pending.
+   */
+  private async selectOpenQuestionIds(): Promise<{ id: number }[]> {
+    let groups: Array<{
+      questionType?: string | null;
+      count: number;
+      selection?: string;
+    }> = [{ questionType: null, count: 20, selection: 'random' }];
+
+    try {
+      const rows = await this.answerRepo.query(
+        `SELECT value_json FROM originbi_settings
+         WHERE category = 'assessment' AND setting_key = 'open_question_distribution'
+         LIMIT 1`,
+      );
+      const value = rows?.[0]?.value_json;
+      if (Array.isArray(value) && value.length > 0) {
+        groups = value;
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Could not read open_question_distribution setting, using legacy default (20 random). ${err?.message}`,
+      );
+    }
+
+    const picked: { id: number }[] = [];
+    for (const group of groups) {
+      const count = Number(group?.count) || 0;
+      if (count <= 0) continue;
+
+      // 'set_random': pick ONE random set for this type, then `count` random
+      // questions from within that set (the SURVEY rule).
+      if (group.selection === 'set_random') {
+        const setParams: any[] = [];
+        let setSql = `SELECT DISTINCT set_number FROM open_questions
+          WHERE is_active = true AND is_deleted = false AND set_number IS NOT NULL`;
+        if (group.questionType) {
+          setParams.push(group.questionType);
+          setSql += ` AND question_type = $${setParams.length}`;
+        }
+        const setRows = await this.answerRepo.query(setSql, setParams);
+        if (!setRows || setRows.length === 0) continue;
+        const chosen =
+          setRows[Math.floor(Math.random() * setRows.length)].set_number;
+
+        const qParams: any[] = [chosen];
+        let qSql = `SELECT id FROM open_questions
+          WHERE is_active = true AND is_deleted = false AND set_number = $1`;
+        if (group.questionType) {
+          qParams.push(group.questionType);
+          qSql += ` AND question_type = $${qParams.length}`;
+        }
+        qParams.push(count);
+        qSql += ` ORDER BY RANDOM() LIMIT $${qParams.length}`;
+        const rows = (await this.answerRepo.query(
+          qSql,
+          qParams,
+        )) as unknown as Array<{ id: number }>;
+        picked.push(...rows);
+        continue;
+      }
+
+      const params: any[] = [];
+      let sql = `SELECT id FROM open_questions WHERE is_active = true AND is_deleted = false`;
+      if (group.questionType) {
+        params.push(group.questionType);
+        sql += ` AND question_type = $${params.length}`;
+      }
+      // Linked/survey groups keep their authored order (no shuffle);
+      // legacy open questions are randomized.
+      sql +=
+        group.selection === 'set_sequential'
+          ? ` ORDER BY id ASC`
+          : ` ORDER BY RANDOM()`;
+      params.push(count);
+      sql += ` LIMIT $${params.length}`;
+
+      const rows = (await this.answerRepo.query(
+        sql,
+        params,
+      )) as unknown as Array<{ id: number }>;
+      picked.push(...rows);
+    }
+
+    return picked;
+  }
+
+  /**
+   * Pre-flight guard for self-registration: confirms at least one active main
+   * question exists for the given program + Level 1 BEFORE any user/registration
+   * is persisted (this flow is not transactional, so we must check up front to
+   * avoid orphaned records). Throws a clear error if questions are unavailable.
+   */
+  private async assertActiveQuestionsExist(
+    programId: number,
+    levelId: number,
+  ): Promise<void> {
+    const rows = await this.answerRepo.query(
+      `SELECT 1 FROM assessment_questions
+       WHERE program_id = $1 AND assessment_level_id = $2
+         AND is_active = true AND is_deleted = false
+       LIMIT 1`,
+      [programId, levelId],
+    );
+    if (!rows || rows.length === 0) {
+      throw new BadRequestException(
+        'Questions are currently unavailable for this program. Please contact the administrator.',
+      );
     }
   }
 
@@ -1934,7 +2143,7 @@ export class StudentService {
     } = await this.settingsService.getEmailConfig('registration_email_config');
     const ccEmail = ccAddresses.join(', ');
     const bccEmail = bccAddresses.join(', ');
-    const fromAddress = `"${fromName}" <${fromEmail}>`;
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
 
     this.logger.log(`[Email Debug] Sending from: ${fromAddress}, to: ${to}`);
 
@@ -1948,9 +2157,7 @@ export class StudentService {
     const defaultFrontendUrl =
       this.configService.get<string>('FRONTEND_URL') ??
       'https://mind.originbi.com/';
-    const techFrontendUrl =
-      this.configService.get<string>('TECH_FRONTEND_URL') ||
-      'http://localhost:3000';
+    const techFrontendUrl = 'https://evaluation.originbi.com';
     const frontendUrl = isTechAssessment ? techFrontendUrl : defaultFrontendUrl;
 
     const emailSubject = isTechAssessment
@@ -3164,5 +3371,349 @@ export class StudentService {
         err.message,
       );
     }
+  }
+  // --- Tech Assessment Certificate Email --------------------------------------
+
+  /**
+   * Sends a certificate email after a tech assessment is completed.
+   * Called via internal HTTP from assessment-service.
+   * Uses the existing AWS SES v2 transporter + tech-assessment-certificate template.
+   */
+  async sendTechCertificateEmail(payload: {
+    toEmail: string;
+    userName: string;
+    assessmentTitle: string;
+    assessmentModule: string;
+    overallScorePercent: number;
+    grade: string;
+    certificateId: string;
+    completedAt: string;
+    verifyUrl?: string;
+  }): Promise<void> {
+    const {
+      toEmail,
+      userName,
+      assessmentTitle,
+      assessmentModule,
+      overallScorePercent,
+      grade,
+      certificateId,
+      completedAt,
+      verifyUrl: incomingVerifyUrl,
+    } = payload;
+
+    const transporter = this.createEmailTransporter();
+
+    const {
+      fromName,
+      fromAddress: fromEmail,
+      ccAddresses,
+      bccAddresses,
+      replyToAddress,
+    } = await this.settingsService.getEmailConfig(
+      'tech_certificate_email_config',
+    );
+
+    const fromAddress = '"' + fromName + '" <' + fromEmail + '>';
+
+    const techFrontendUrl = 'https://evaluation.originbi.com';
+
+    const publicStudentApiUrl =
+      techFrontendUrl.replace(/\/$/, '') + '/student-api';
+
+    const assets = {
+      logo: `${techFrontendUrl}/Origin-BI-Logo-01.png`,
+      footer: `${publicStudentApiUrl}/assets/Email_Vector.png`,
+    };
+
+    const verifyUrl =
+      incomingVerifyUrl || `${techFrontendUrl}/verify/${certificateId}`;
+
+    const rawDate = completedAt ? new Date(completedAt) : new Date();
+    const validDate = isNaN(rawDate.getTime()) ? new Date() : rawDate;
+    const formattedDate = validDate.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const gradeLabel = this.getTechGradeLabel(grade);
+    const moduleLabel = this.getTechModuleLabel(assessmentModule);
+
+    const emailHtml = getTechAssessmentCertificateTemplate(
+      userName,
+      assessmentTitle,
+      moduleLabel,
+      overallScorePercent,
+      grade,
+      gradeLabel,
+      certificateId,
+      formattedDate,
+      verifyUrl,
+      techFrontendUrl,
+      assets,
+    );
+
+    const subjectRaw = `You have successfully completed the ${assessmentTitle} - Your Certificate is Ready \u{1F393}`;
+    const subject = `=?UTF-8?B?${Buffer.from(subjectRaw).toString('base64')}?=`;
+
+    // --- Generate Certificate PDF ---
+    let pdfBuffer: Buffer | null = null;
+    try {
+      this.logger.log(
+        `[TechCertEmail] Generating PDF certificate for ${toEmail}...`,
+      );
+
+      const getRootPath = () => {
+        return path.resolve(__dirname, '../..');
+      };
+
+      const rootPath = getRootPath();
+
+      // 1. Load background template image (first try local assets path, then fallback to HTTP)
+      let bgBuffer: Buffer;
+      const localPath = path.join(
+        rootPath,
+        'public/assets/certificate-template.jpg',
+      );
+      if (fs.existsSync(localPath)) {
+        this.logger.log(
+          `[TechCertEmail] Loading certificate background locally from ${localPath}`,
+        );
+        bgBuffer = fs.readFileSync(localPath);
+      } else {
+        this.logger.warn(
+          `Local certificate background not found at ${localPath}. Trying HTTP fetch...`,
+        );
+        try {
+          const response = await axios.get(
+            `${techFrontendUrl}/certificate-template.jpg`,
+            {
+              responseType: 'arraybuffer',
+              timeout: 5000,
+            },
+          );
+          bgBuffer = Buffer.from(response.data);
+        } catch (err) {
+          this.logger.error(
+            `Failed to fetch certificate background via HTTP: ${err.message}. Trying legacy local path fallback...`,
+          );
+          const legacyPath = path.resolve(
+            __dirname,
+            '../../../../OriginBi-Technical/frontend/public/certificate-template.jpg',
+          );
+          bgBuffer = fs.readFileSync(legacyPath);
+        }
+      }
+
+      // 2. Fetch/Generate QR Code image
+      let qrBuffer: Buffer | null = null;
+      try {
+        const qrResponse = await axios.get(
+          `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`,
+          { responseType: 'arraybuffer', timeout: 5000 },
+        );
+        qrBuffer = Buffer.from(qrResponse.data);
+      } catch (err) {
+        this.logger.error(
+          `Failed to fetch verification QR code: ${err.message}`,
+        );
+      }
+
+      // 3. Build the PDF document using pdfkit
+      const doc = new PDFDocument({
+        size: [842, 595], // A4 Landscape
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      });
+
+      // Register custom fonts matching the frontend CertificatePreviewModal
+      const fontsDir = path.join(rootPath, 'public/assets/fonts');
+      const dmSerifPath = path.join(fontsDir, 'DMSerifDisplay-Italic.ttf');
+      const openSansBoldPath = path.join(fontsDir, 'OpenSans-Bold.ttf');
+      const openSansRegularPath = path.join(fontsDir, 'OpenSans-Regular.ttf');
+
+      const hasDmSerif = fs.existsSync(dmSerifPath);
+      const hasOpenSansBold = fs.existsSync(openSansBoldPath);
+      const hasOpenSansRegular = fs.existsSync(openSansRegularPath);
+
+      if (hasDmSerif) doc.registerFont('DMSerif-Italic', dmSerifPath);
+      if (hasOpenSansBold) doc.registerFont('OpenSans-Bold', openSansBoldPath);
+      if (hasOpenSansRegular)
+        doc.registerFont('OpenSans-Regular', openSansRegularPath);
+
+      const titleFont = hasOpenSansBold ? 'OpenSans-Bold' : 'Helvetica-Bold';
+      const bodyFont = hasOpenSansRegular ? 'OpenSans-Regular' : 'Helvetica';
+      const nameFont = hasDmSerif ? 'DMSerif-Italic' : 'Times-Italic';
+
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+
+      const pdfPromise = new Promise<Buffer>((resolve, reject) => {
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', (err: any) =>
+          reject(err instanceof Error ? err : new Error(String(err))),
+        );
+      });
+
+      // Draw background template (matches frontend /certificate-template.jpg)
+      doc.image(bgBuffer, 0, 0, { width: 842, height: 595 });
+
+      // --- Positions calibrated to match frontend CertificatePreviewModal.tsx ---
+      // Frontend uses cqw (container query width) units; 100cqw = 842pt
+
+      // Date (right 7%, top 12%) — Open Sans Bold 2.8cqw ≈ 24pt
+      doc
+        .font(titleFont)
+        .fontSize(24)
+        .fillColor('#ffffff')
+        .text(formattedDate, 580, 71, { width: 203, align: 'right' });
+
+      // Assessment Title (left 7%, top 27%) — Open Sans Bold, 7cqw or 5.5cqw
+      const titleFontSize = assessmentTitle.length > 20 ? 46 : 59;
+      doc
+        .font(titleFont)
+        .fontSize(titleFontSize)
+        .fillColor('#ffffff')
+        .text(assessmentTitle, 59, 160, { width: 630, lineGap: -2 });
+
+      const domainPhrase = (() => {
+        const mod = assessmentModule;
+        if (mod.startsWith('coding:')) {
+          const lang = mod.slice('coding:'.length);
+          const langName = lang.charAt(0).toUpperCase() + lang.slice(1);
+          return `validating programming and problem-solving skills in ${langName}`;
+        }
+        switch (mod) {
+          case 'aptitude':
+            return 'evaluating logical reasoning and numerical agility';
+          case 'communication':
+          case 'grammar':
+            return 'assessing communication and professional writing skills';
+          case 'coding':
+            return 'validating programming and problem-solving skills';
+          case 'mnc':
+            return 'assessing aptitude and MNC professional readiness';
+          case 'role':
+            return 'evaluating role-based judgment and decision-making';
+          default:
+            return 'evaluating core competencies and professional skills';
+        }
+      })();
+
+      const part1 = `Awarded for successfully completing the ${assessmentTitle}, ${domainPhrase} with `;
+      const part2 = `Grade ${grade}`;
+      const part3 = ` and `;
+      const part4 = `${overallScorePercent}%`;
+      const part5 = ` score, demonstrating professional competency.`;
+
+      const descY = doc.y + 12;
+      doc.font(bodyFont).fontSize(17).fillColor('#e2e8f0'); // slate-200
+
+      // Draw description with Grade and Score highlighted in green matching the frontend preview
+      doc.text(part1, 59, descY, { width: 580, lineGap: 6, continued: true });
+      doc.fillColor('#34d399').font(titleFont).text(part2, { continued: true });
+      doc.fillColor('#e2e8f0').font(bodyFont).text(part3, { continued: true });
+      doc.fillColor('#34d399').font(titleFont).text(part4, { continued: true });
+      doc.fillColor('#e2e8f0').font(bodyFont).text(part5);
+
+      // Student Name — DM Serif Display Italic, 7.2cqw ≈ 61pt
+      // Frontend position: left 7%, top 54.0cqw (54% of container width = 454pt)
+      // Title-cased name
+      const titleCaseName = userName
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+      doc
+        .font(nameFont)
+        .fontSize(58)
+        .fillColor('#111827')
+        .text(titleCaseName, 59, 454, { width: 550 });
+
+      // QR Code (right 6.2%, top 74.5% → ~443pt from top)
+      if (qrBuffer) {
+        // White background padding behind QR (aligned to y = 443 to match frontend top: 74.5% exactly)
+        doc.rect(689, 443, 102, 102).fill('#ffffff');
+        // Center the 88pt QR code inside the 102pt white padding
+        doc.image(qrBuffer, 696, 450, { width: 88, height: 88 });
+      }
+
+      doc.end();
+      pdfBuffer = await pdfPromise;
+      this.logger.log(
+        `[TechCertEmail] Generated PDF successfully (${pdfBuffer.length} bytes)`,
+      );
+    } catch (pdfErr) {
+      this.logger.error(
+        `[TechCertEmail] Failed to generate PDF: ${pdfErr.message}`,
+        pdfErr.stack,
+      );
+    }
+
+    const mailOptions: Record<string, any> = {
+      from: fromAddress,
+      to: toEmail,
+      subject,
+      html: emailHtml,
+    };
+
+    if (pdfBuffer) {
+      const cleanFileName = `${userName.replace(/\s+/g, '_')}_${assessmentTitle.replace(/\s+/g, '_')}_Certificate.pdf`;
+      mailOptions.attachments = [
+        {
+          filename: cleanFileName,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ];
+    }
+
+    const ccEmail = ccAddresses.join(', ');
+    const bccEmail = bccAddresses.join(', ');
+    if (ccEmail) mailOptions.cc = ccEmail;
+    if (bccEmail) mailOptions.bcc = bccEmail;
+    if (replyToAddress) mailOptions.replyTo = replyToAddress;
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      this.logger.log(
+        `[TechCertEmail] Sent to ${toEmail} [${certificateId}]: ${JSON.stringify(info)}`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `[TechCertEmail] Failed to send to ${toEmail}: ${err.message}`,
+        err.stack,
+      );
+      throw err;
+    }
+  }
+
+  private getTechGradeLabel(grade: string): string {
+    const map: Record<string, string> = {
+      'A+': 'Outstanding',
+      A: 'Excellent',
+      'B+': 'Very Good',
+      B: 'Good',
+      C: 'Average',
+      D: 'Below Average',
+      F: 'Needs Improvement',
+    };
+    return map[grade] || grade;
+  }
+
+  private getTechModuleLabel(module: string): string {
+    if (module.startsWith('coding:')) {
+      const lang = module.slice('coding:'.length);
+      const name = lang.charAt(0).toUpperCase() + lang.slice(1);
+      return `${name} Coding Assessment`;
+    }
+    const map: Record<string, string> = {
+      aptitude: 'Technical Aptitude',
+      grammar: 'Communication Skills',
+      communication: 'Communication Skills',
+      mnc: 'MNC Readiness',
+      role: 'Role-Based Assessment',
+      coding: 'Coding Assessment',
+    };
+    return map[module] || module;
   }
 }

@@ -268,4 +268,27 @@ export class StudentController {
 
     return { message: 'Placement report email sending started' };
   }
+  /**
+   * Internal endpoint called by assessment-service after a tech assessment is submitted.
+   * Sends a certificate email to the student via AWS SES.
+   * POST /student/tech-certificate-email
+   */
+  @Post('tech-certificate-email')
+  async sendTechCertificateEmail(
+    @Body()
+    body: {
+      toEmail: string;
+      userName: string;
+      assessmentTitle: string;
+      assessmentModule: string;
+      overallScorePercent: number;
+      grade: string;
+      certificateId: string;
+      completedAt: string;
+      verifyUrl?: string;
+    },
+  ) {
+    await this.studentService.sendTechCertificateEmail(body);
+    return { success: true, message: 'Certificate email sent' };
+  }
 }

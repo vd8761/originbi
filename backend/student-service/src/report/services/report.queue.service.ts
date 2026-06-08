@@ -15,27 +15,33 @@ export class ReportQueueService {
     groupId: number,
     deptDegreeId: number,
     jobId: string,
+    reportTypeOverride?: 'standard' | 'mba',
   ): Promise<void> {
     return reportQueueService.processPlacementReport(
       groupId,
       deptDegreeId,
       jobId,
+      reportTypeOverride,
     );
   }
 
-  processGroupReports(groupId: string, jobId: string): Promise<void> {
-    return reportQueueService.processGroupReports(groupId, jobId);
+  processGroupReports(
+    groupId: string,
+    jobId: string,
+    programId?: string,
+  ): Promise<void> {
+    return reportQueueService.processGroupReports(groupId, jobId, programId);
   }
 
   processUserReports(userIds: string[], jobId: string): Promise<void> {
     return reportQueueService.processUserReports(userIds, jobId);
   }
 
-  processSingleUserReport(userId: string, jobId: string): Promise<void> {
-    return reportQueueService.processSingleUserReport(userId, jobId);
-  }
-
-  processSingleUserShortReport(userId: string, jobId: string): Promise<void> {
-    return reportQueueService.processSingleUserShortReport(userId, jobId);
+  processSingleUserReport(
+    userId: string,
+    jobId: string,
+    short: boolean = false,
+  ): Promise<void> {
+    return reportQueueService.processSingleUserReport(userId, jobId, short);
   }
 }

@@ -417,10 +417,11 @@ export class SubscriptionService {
       if (freshReg) {
         const meta = freshReg.metadata || {};
         meta.debriefTeamEmailSent = true;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-        await this.registrationRepo.update(registrationId, {
-          metadata: meta,
-        } as unknown as any);
+        const updatePayload: Partial<Registration> = {
+          metadata: meta as Registration['metadata'], // eslint-disable-line @typescript-eslint/no-unsafe-assignment
+        };
+
+        await this.registrationRepo.update(registrationId, updatePayload);
       }
     } catch (err: unknown) {
       this.logger.error(

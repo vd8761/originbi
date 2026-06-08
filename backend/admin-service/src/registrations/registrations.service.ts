@@ -19,10 +19,12 @@ import {
   Department,
   DepartmentDegree,
   DegreeType,
+  GroupAssessment,
 } from '@originbi/shared-entities';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { GroupsService } from '../groups/groups.service';
 import { AssessmentGenerationService } from '../assessment/assessment-generation.service';
+import { MetaphorGenerationService } from '../assessment/metaphor-generation.service';
 import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcome.template';
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
@@ -54,8 +56,12 @@ export class RegistrationsService {
     @InjectRepository(Registration)
     private readonly regRepo: Repository<Registration>,
 
+    @InjectRepository(GroupAssessment)
+    private readonly groupAssessmentRepo: Repository<GroupAssessment>,
+
     private readonly groupsService: GroupsService,
     private readonly assessmentGenService: AssessmentGenerationService,
+    private readonly metaphorGenService: MetaphorGenerationService,
 
     private readonly dataSource: DataSource,
     private readonly http: HttpService,
@@ -160,11 +166,34 @@ export class RegistrationsService {
 
   private normalizeSchoolStream(
     stream?: string | null,
-  ): 'PCMB' | 'PCB' | 'PCM' | 'PCBZ' | 'SCIENCE' | 'COMMERCE' | 'HUMANITIES' | null {
+  ):
+    | 'PCMB'
+    | 'PCB'
+    | 'PCM'
+    | 'PCBZ'
+    | 'SCIENCE'
+    | 'COMMERCE'
+    | 'HUMANITIES'
+    | null {
     if (!stream) return null;
     const v = stream.trim().toUpperCase();
-    return ['PCMB', 'PCB', 'PCM', 'PCBZ', 'SCIENCE', 'COMMERCE', 'HUMANITIES'].includes(v)
-      ? (v as 'PCMB' | 'PCB' | 'PCM' | 'PCBZ' | 'SCIENCE' | 'COMMERCE' | 'HUMANITIES')
+    return [
+      'PCMB',
+      'PCB',
+      'PCM',
+      'PCBZ',
+      'SCIENCE',
+      'COMMERCE',
+      'HUMANITIES',
+    ].includes(v)
+      ? (v as
+          | 'PCMB'
+          | 'PCB'
+          | 'PCM'
+          | 'PCBZ'
+          | 'SCIENCE'
+          | 'COMMERCE'
+          | 'HUMANITIES')
       : null;
   }
 
@@ -342,12 +371,53 @@ export class RegistrationsService {
           ? new Date(dto.examEnd)
           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // +7 days default
 
+        // E1. Find-or-create GroupAssessment so this user shows up in the
+        // Group Assessment dashboard (parity with bulk-registrations flow).
+        // Dedupe by (groupId, programId) with overlapping validity window so
+        // admins adding users one-by-one to the same cohort get a single
+        // assessment row with an incrementing candidate count.
+        let groupAssessmentId: number | null = dto.groupAssessmentId ?? null;
+        if (groupId && !groupAssessmentId) {
+          const gaRepo = manager.getRepository(GroupAssessment);
+          const existingGa = await gaRepo
+            .createQueryBuilder('ga')
+            .where('ga.group_id = :groupId', { groupId })
+            .andWhere('ga.program_id = :programId', { programId })
+            .andWhere(
+              '(ga.valid_to IS NULL OR ga.valid_to >= :from) AND (ga.valid_from IS NULL OR ga.valid_from <= :to)',
+              { from: validFrom, to: validTo },
+            )
+            .orderBy('ga.created_at', 'DESC')
+            .getOne();
+
+          if (existingGa) {
+            existingGa.totalCandidates = (existingGa.totalCandidates || 0) + 1;
+            const savedGa = await gaRepo.save(existingGa);
+            groupAssessmentId = Number(savedGa.id);
+          } else {
+            const newGa = gaRepo.create({
+              groupId: Number(groupId),
+              programId: Number(programId),
+              validFrom,
+              validTo,
+              totalCandidates: 1,
+              status: 'NOT_STARTED',
+              createdByUserId: this.ADMIN_USER_ID,
+              metadata: {
+                source: 'ADMIN_SINGLE',
+              },
+            });
+            const savedGa = await gaRepo.save(newGa);
+            groupAssessmentId = Number(savedGa.id);
+          }
+        }
+
         const session = manager.create(AssessmentSession, {
           userId: user.id,
           registrationId: registration.id,
           programId: programId,
           groupId: groupId ?? null,
-          groupAssessmentId: dto.groupAssessmentId ?? null,
+          groupAssessmentId: groupAssessmentId,
           status: 'NOT_STARTED',
           validFrom,
           validTo,
@@ -402,6 +472,23 @@ export class RegistrationsService {
               // CRITICAL: Re-throw to cause transaction rollback.
               // We cannot allow a registration without questions for Level 1.
               throw err;
+            }
+          }
+          // Generate Level 3 (Metaphor) — gated; skips silently if no bank.
+          // NON-FATAL: a metaphor failure must never roll back the core
+          // registration (Level 1). Toggling Level 3 can't break other levels.
+          else if (
+            level.levelNumber === 3 ||
+            level.name?.includes('Metaphor') ||
+            (level as any).patternType === 'METAPHOR'
+          ) {
+            try {
+              await this.metaphorGenService.generate(attempt, manager);
+            } catch (err) {
+              this.logger.error(
+                `Metaphor generation failed for Attempt ${attempt.id} (non-fatal):`,
+                err,
+              );
             }
           }
         }
@@ -610,6 +697,21 @@ export class RegistrationsService {
             throw err;
           }
         }
+        // Generate Level 3 (Metaphor) — gated + NON-FATAL (see create()).
+        else if (
+          level.levelNumber === 3 ||
+          level.name?.includes('Metaphor') ||
+          (level as any).patternType === 'METAPHOR'
+        ) {
+          try {
+            await this.metaphorGenService.generate(attempt, manager);
+          } catch (err) {
+            this.logger.error(
+              `Metaphor generation failed for Attempt ${attempt.id} (non-fatal):`,
+              err,
+            );
+          }
+        }
       }
 
       registration.status = 'COMPLETED';
@@ -660,7 +762,7 @@ export class RegistrationsService {
           'dd.degreeTypeId = deg.id',
         )
         .where('r.isDeleted = false');
-      
+
       if (tab === 'tech') {
         qb.andWhere('r.isTechAssessment IN (1, 2)');
       } else if (tab === 'both') {

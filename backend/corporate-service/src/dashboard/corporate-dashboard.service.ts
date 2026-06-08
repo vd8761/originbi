@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, ILike } from 'typeorm';
@@ -627,7 +628,9 @@ export class CorporateDashboardService {
     user.lastLoginIp = ip;
 
     await this.userRepo.save(user);
-    console.log(`[CorporateDashboardService] Recorded login audit for email: ${email} from IP: ${ip}`);
+    console.log(
+      `[CorporateDashboardService] Recorded login audit for email: ${email} from IP: ${ip}`,
+    );
   }
 
   async getProfile(email: string) {
@@ -1810,17 +1813,68 @@ export class CorporateDashboardService {
     reportNumberInput: string,
     corporateAccountId: number,
   ) {
-    let reportNumber = reportNumberInput.toUpperCase();
+    const buildReportNumberVariants = (input: string): string[] => {
+      const normalized = input.trim().toUpperCase();
+      if (!normalized) return [];
 
-    // Reverse the abbreviations used in the generated report PDFs
-    if (reportNumber.includes('-CS-')) {
-      reportNumber = reportNumber.replace('-CS-', '-COLLEGE_STUDENT-');
-    } else if (reportNumber.includes('-SS-')) {
-      reportNumber = reportNumber.replace('-SS-', '-SCHOOL_STUDENT-');
-    } else if (reportNumber.includes('-E-')) {
-      reportNumber = reportNumber.replace('-E-', '-EMPLOYEE-');
-    } else if (reportNumber.includes('-CG-')) {
-      reportNumber = reportNumber.replace('-CG-', '-CXO_GENERAL-');
+      const variants = new Set<string>();
+      const queue: string[] = [normalized];
+
+      const mappings: Array<[string, string]> = [
+        ['-CS-', '-COLLEGE_STUDENT-'],
+        ['-SS-', '-SCHOOL_STUDENT-'],
+        ['-E-', '-EMPLOYEE-'],
+        ['-CG-', '-CXO_GENERAL-'],
+      ];
+
+      while (queue.length > 0) {
+        const value = queue.shift();
+        if (!value || variants.has(value)) {
+          continue;
+        }
+        variants.add(value);
+
+        if (value.startsWith('OBL-')) {
+          queue.push(`OBI-${value.slice(4)}`);
+        }
+
+        if (!value.includes('/')) {
+          queue.push(value.replace(/(\d{2})-(\d{2})/, '$1/$2'));
+        } else {
+          queue.push(value.replace(/\//g, '-'));
+        }
+
+        for (const [shortCode, fullCode] of mappings) {
+          if (value.includes(shortCode)) {
+            queue.push(value.replace(shortCode, fullCode));
+          }
+          if (value.includes(fullCode)) {
+            queue.push(value.replace(fullCode, shortCode));
+          }
+        }
+
+        const shortSuffix = value.match(/-(\d{1,2})$/);
+        if (shortSuffix) {
+          queue.push(
+            value.replace(/-(\d{1,2})$/, `-${shortSuffix[1].padStart(3, '0')}`),
+          );
+        }
+
+        const longSuffix = value.match(/-(\d{3})$/);
+        if (longSuffix) {
+          const trimmed = String(Number(longSuffix[1]));
+          if (trimmed.length < 3) {
+            queue.push(value.replace(/-(\d{3})$/, `-${trimmed}`));
+          }
+        }
+      }
+
+      return Array.from(variants);
+    };
+
+    const reportNumbers = buildReportNumberVariants(reportNumberInput);
+    if (reportNumbers.length === 0) {
+      throw new BadRequestException('Report number is required');
     }
 
     const query = `
@@ -1847,7 +1901,8 @@ export class CorporateDashboardService {
         p.name as program_name,
         p.assessment_title,
         dpt.name as department_name,
-        dt.name as degree_type_name
+        dt.name as degree_type_name,
+        r.corporate_account_id
       FROM assessment_reports ar
       JOIN assessment_attempts aa ON aa.assessment_session_id = ar.assessment_session_id
       JOIN registrations r ON aa.registration_id = r.id
@@ -1857,22 +1912,34 @@ export class CorporateDashboardService {
       LEFT JOIN department_degrees dd ON r.department_degree_id = dd.id
       LEFT JOIN departments dpt ON dd.department_id = dpt.id
       LEFT JOIN degree_types dt ON dd.degree_type_id = dt.id
-      WHERE ar.report_number = $1
-        AND r.corporate_account_id = $2
+      WHERE (
+        ar.report_number = ANY($1::text[])
+        OR regexp_replace(ar.report_number, '^OBI-G[0-9]+-', 'OBI-') = ANY($1::text[])
+      )
       ORDER BY aa.dominant_trait_id DESC NULLS LAST
       LIMIT 1
     `;
 
-    const result = await this.dataSource.query(query, [
-      reportNumber,
-      corporateAccountId,
-    ]);
+    const result = await this.dataSource.query(query, [reportNumbers]);
 
     if (!result || result.length === 0) {
-      throw new NotFoundException(`Report not found for ID: ${reportNumber}`);
+      throw new NotFoundException(
+        `No report found for ID: ${reportNumberInput.trim().toUpperCase()}`,
+      );
     }
 
     const row = result[0];
+
+    // Check account restriction
+    if (
+      corporateAccountId &&
+      row.corporate_account_id &&
+      Number(row.corporate_account_id) !== Number(corporateAccountId)
+    ) {
+      throw new ForbiddenException(
+        `This candidate is registered under another company and their report cannot be viewed.`,
+      );
+    }
 
     // Parse DISC scores from attempt metadata
     const attemptMeta = row.attempt_metadata || {};

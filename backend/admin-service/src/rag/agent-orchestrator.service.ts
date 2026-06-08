@@ -694,11 +694,13 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       };
     }
 
-    // Career report
+    // Career report vs. General test report
+    const isCareerQuery = /\b(career|fitment|readiness|future\s*role|role\s*readiness)\b/i.test(q);
     if ((/\breport\b/i.test(q) && !!this.extractNameFromQuestion(question)) || /\b(generate|create|show)\b.*\breport\b/i.test(q)) {
+      const tool = isCareerQuery ? 'career_report' : 'person_lookup';
       return {
-        steps: [{ tool: 'career_report', params: { name: this.extractNameFromQuestion(question) || question }, reason: 'Report request' }],
-        reasoning: 'Keyword match: report request → career_report',
+        steps: [{ tool, params: { name: this.extractNameFromQuestion(question) || question }, reason: 'Report request' }],
+        reasoning: `Keyword match: report request → ${tool}`,
         requiresSynthesis: false,
       };
     }

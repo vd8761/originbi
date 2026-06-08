@@ -619,20 +619,20 @@ export default function AiCounsellorChat() {
                     <div className="max-w-3xl mx-auto p-6 space-y-5">
                         {messages.map((m, idx) => (
                             <div key={m.id} className="animate-chatSlideIn" style={{ animationDelay: `${Math.min(idx * 50, 300)}ms` }}>
-                                <div className={`flex gap-3.5 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                                <div className={`flex gap-3.5 items-start ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                                     {m.role === 'assistant' ? (
-                                        <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-200/40 dark:shadow-emerald-900/30">
+                                        <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md shadow-emerald-200/40 dark:shadow-emerald-900/30 self-start">
                                             <Brain className="w-4 h-4 text-white" />
                                         </div>
                                     ) : (
-                                        <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-white/10 dark:to-white/5 flex items-center justify-center border border-gray-200 dark:border-white/10">
+                                        <div className="flex-shrink-0 w-9 h-9 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-white/10 dark:to-white/5 flex items-center justify-center border border-gray-200 dark:border-white/10 self-start">
                                             <User className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                                         </div>
                                     )}
 
                                     <div className={`group flex flex-col max-w-[85%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                                         <div className={`rounded-2xl px-4 py-3 ${m.role === 'user'
-                                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-200/40 dark:shadow-emerald-900/30 rounded-tr-md'
+                                            ? 'bg-emerald-500/[0.08] dark:bg-[#1ED36A]/[0.06] border border-emerald-500/20 dark:border-[#1ED36A]/15 text-gray-900 dark:text-[#0DF09E] rounded-2xl font-semibold leading-relaxed shadow-sm'
                                             : 'bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 shadow-sm rounded-tl-md'
                                             }`}>
                                             {m.role === 'assistant' ? (
