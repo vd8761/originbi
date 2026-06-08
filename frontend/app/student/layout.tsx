@@ -157,6 +157,12 @@ export default function StudentLayout({
     // Detect special modes for Header. The Level 3 metaphor exam lives at
     // /student/metaphor — treat it as an assessment page (full-screen, no nav)
     // so the assessment-mode redirect doesn't bounce the student off it.
+    // The IAT and Metaphor exams draw their own full-screen top bar, so the
+    // global header stays hidden there to avoid a double header. The standard
+    // assessment surfaces (Level 1 runner, assessment dashboard) still get the
+    // global header; its hideNav flag strips the nav links so students stay
+    // locked in. AssessmentLayout already reserves the header's height, so no
+    // extra spacing is needed.
     const isStandardAssessmentPage = pathname?.includes('/student/assessment');
     const isAssessmentPage = isStandardAssessmentPage || pathname?.includes('/student/metaphor') || pathname?.includes('/student/iat');
     const isUpgradePage = pathname?.includes('/student/upgrade');

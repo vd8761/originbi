@@ -4,52 +4,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react";
 import { iatService, IatState } from "../../../lib/services/iat.service";
 import IatShell from "./components/IatShell";
-import IatInstructionsScreen from "./screens/IatInstructionsScreen";
+import IatStudyIntroScreen from "./screens/IatStudyIntroScreen";
+import IatModuleIntroScreen from "./screens/IatModuleIntroScreen";
 import IatTrialRunner, { RunnerTrial } from "./screens/IatTrialRunner";
 import IatModuleBriefingScreen, { extractBriefingData } from "./screens/IatModuleBriefingScreen";
-import IatModuleBreakScreen from "./screens/IatModuleBreakScreen";
 import IatCompletionScreen from "./screens/IatCompletionScreen";
 import { ElapsedClock } from "./components/primitives";
 
-type Screen = "instructions" | "practice" | "briefing" | "exam" | "break" | "done";
-
-const practiceTrials: RunnerTrial[] = [
-  { wordShown: "Cloud", expectedKey: "E", leftLabel: "Sky", rightLabel: "Ground" },
-  { wordShown: "Stone", expectedKey: "I", leftLabel: "Sky", rightLabel: "Ground" },
-  { wordShown: "Rain", expectedKey: "E", leftLabel: "Sky", rightLabel: "Ground" },
-  { wordShown: "Soil", expectedKey: "I", leftLabel: "Sky", rightLabel: "Ground" },
-  { wordShown: "Wind", expectedKey: "E", leftLabel: "Sky", rightLabel: "Ground" },
-];
-
-const formatTime = (seconds: number) => {
-  const m = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const s = String(seconds % 60).padStart(2, "0");
-  return `${m}:${s}`;
-};
-
-const practiceStorageKey = (attemptId: number | string) =>
-  `originbi:iat:${attemptId}:practice-completed`;
-
-const hasCompletedPractice = (attemptId: number | string) => {
-  if (typeof window === "undefined") return false;
-
-  try {
-    return window.localStorage.getItem(practiceStorageKey(attemptId)) === "true";
-  } catch {
-    return false;
-  }
-};
-
-const markPracticeCompleted = (attemptId: number | string) => {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(practiceStorageKey(attemptId), "true");
-  } catch {
-    // localStorage can be blocked in some browsers; saved attempt progress
-    // still lets us skip practice after the first real response is recorded.
-  }
-};
+type Screen = "study-intro" | "module-intro" | "part-briefing" | "exam" | "done";
 
 export default function IatExam({
   attemptId,
@@ -61,35 +23,30 @@ export default function IatExam({
   const [state, setState] = useState<IatState | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [screen, setScreen] = useState<Screen>("instructions");
+  const [screen, setScreen] = useState<Screen>("study-intro");
   const [trialIndex, setTrialIndex] = useState(0);
-  const [practiceIndex, setPracticeIndex] = useState(0);
   const [wrongFlash, setWrongFlash] = useState(false);
   const [correctFlash, setCorrectFlash] = useState<"E" | "I" | null>(null);
   const [saving, setSaving] = useState(false);
-  const [breakInfo, setBreakInfo] = useState<{
-    moduleNumber: number;
-    answered: number;
-    accuracy: number;
-    elapsedLabel: string;
-  } | null>(null);
   const [finishError, setFinishError] = useState("");
-  // Track wrong answers in the current module to re-show at module break
-  const [wrongTrials, setWrongTrials] = useState<{ word: string; correctKey: "E" | "I"; leftLabel: string; rightLabel: string }[]>([]);
+  // Words passed (answered correctly on a fresh press) in the current part.
+  // Progress is driven by this, not by raw position, so a wrong answer holds
+  // the bar back until it's re-asked and answered correctly.
+  const [partPassed, setPartPassed] = useState(0);
+
   // Re-ask gate: a part only completes once every word missed in it has been
   // answered correctly on the first press. Misses are queued here and re-asked
   // at the end of the part. Re-ask presses are NOT sent to the server, so they
   // never affect the scored first-presentation timings.
   const [retryTrial, setRetryTrial] = useState<RunnerTrial | null>(null);
   const retryQueueRef = useRef<RunnerTrial[]>([]);
-  const pendingTransitionRef = useRef<{ type: "next-part" | "finish"; nextIndex: number } | null>(null);
+  const pendingTransitionRef = useRef<{ type: "next-part" | "finish" } | null>(null);
   // True while a missed re-ask word is waiting for its corrective key press.
   const awaitingCorrectionRef = useRef(false);
 
   const finishingRef = useRef(false);
   const shownAtRef = useRef<number>(Date.now());
   const keyCountRef = useRef<Record<number, number>>({});
-  const moduleStatsRef = useRef({ answered: 0, correct: 0 });
   const moduleTimingStartedRef = useRef(false);
   // Overall elapsed-time anchor; the visible clock ticks inside <ElapsedClock>
   // so the heavy exam tree never re-renders just to advance the timer.
@@ -147,13 +104,17 @@ export default function IatExam({
       const firstPending = next.trials.findIndex((t) => t.status !== "ANSWERED");
       setTrialIndex(firstPending >= 0 ? firstPending : next.trials.length);
       const hasSavedTrialProgress = next.trials.some((t) => t.status === "ANSWERED");
-      const hasModuleProgress = next.modules.some((m) => m.status !== "NOT_STARTED");
-      const skipPractice =
-        hasCompletedPractice(attemptId) || hasSavedTrialProgress || hasModuleProgress;
-      if (skipPractice) markPracticeCompleted(attemptId);
 
-      if (next.attempt.status === "COMPLETED") setScreen("done");
-      else setScreen(skipPractice ? "briefing" : "instructions");
+      if (next.attempt.status === "COMPLETED") {
+        setScreen("done");
+      } else if (hasSavedTrialProgress) {
+        // Resuming mid-module: drop the student back onto the current part's
+        // instructions so they re-read the (changed) key mapping before going on.
+        moduleTimingStartedRef.current = false;
+        setScreen("part-briefing");
+      } else {
+        setScreen("study-intro");
+      }
 
       shownAtRef.current = Date.now();
     } catch (error: any) {
@@ -189,29 +150,36 @@ export default function IatExam({
     [modules, state?.currentModuleId],
   );
   const currentTrial = trials[trialIndex] || null;
-  const activePractice = practiceTrials[practiceIndex] || null;
+
+  const totalParts = moduleStepNumbers.length || 7;
+  const activeStep = retryTrial?.stepNumber ?? currentTrial?.stepNumber ?? moduleStepNumbers[0] ?? 1;
+  const partIndex = moduleStepNumbers.indexOf(activeStep);
+  const partNumber = partIndex >= 0 ? partIndex + 1 : 1;
+  const partCount = useMemo(
+    () => trials.filter((t) => t.stepNumber === activeStep).length,
+    [trials, activeStep],
+  );
+  // Total questions for this part includes the words that have to be re-asked
+  // because they were missed — so the bar only fills once everything (misses
+  // included) has been answered correctly.
+  const partTotal = partCount + retryQueueRef.current.length + (retryTrial ? 1 : 0);
+  const partProgress = partTotal ? Math.min(100, (partPassed / partTotal) * 100) : 0;
 
   const resetClock = () => {
     shownAtRef.current = Date.now();
   };
-
-  const beginExam = useCallback(() => {
-    moduleStatsRef.current = { answered: 0, correct: 0 };
-    moduleTimingStartedRef.current = false;
-    setWrongTrials([]);
-    setScreen("briefing");
-  }, []);
 
   const startModuleExam = useCallback(() => {
     if (!moduleTimingStartedRef.current) {
       moduleStartRef.current = Date.now();
       moduleTimingStartedRef.current = true;
     }
-    // Each part starts with a clean re-ask gate.
+    // Each part starts with a clean re-ask gate and progress counter.
     retryQueueRef.current = [];
     pendingTransitionRef.current = null;
     awaitingCorrectionRef.current = false;
     setRetryTrial(null);
+    setPartPassed(0);
     setScreen("exam");
     resetClock();
   }, []);
@@ -258,9 +226,6 @@ export default function IatExam({
     setSaving(true);
     setFinishError("");
     try {
-      const moduleNumber = completedModules + 1;
-      const stats = moduleStatsRef.current;
-      const moduleElapsedSec = Math.round((Date.now() - moduleStartRef.current) / 1000);
       // Make sure every buffered keypress is persisted before the module is scored.
       await flushEvents();
       await iatService.completeModule(attemptId, currentModule.id);
@@ -273,15 +238,11 @@ export default function IatExam({
         setState(finalState);
         setScreen("done");
       } else {
+        // Next module starts with its own intro screen and a fresh timer.
+        moduleTimingStartedRef.current = false;
         const firstPending = nextState.trials.findIndex((t) => t.status !== "ANSWERED");
         setTrialIndex(firstPending >= 0 ? firstPending : 0);
-        setBreakInfo({
-          moduleNumber,
-          answered: stats.answered,
-          accuracy: stats.answered ? (stats.correct / stats.answered) * 100 : 100,
-          elapsedLabel: formatTime(Math.max(0, moduleElapsedSec)),
-        });
-        setScreen("break");
+        setScreen("module-intro");
       }
     } catch (err: any) {
       // Don't dead-end on a network blip (e.g. backend restarting): surface a
@@ -293,7 +254,7 @@ export default function IatExam({
       setSaving(false);
       finishingRef.current = false;
     }
-  }, [attemptId, completedModules, currentModule, flushEvents, state]);
+  }, [attemptId, currentModule, flushEvents, state]);
 
   // Move to the next queued re-ask word, or — when the queue is empty — run the
   // transition that was deferred while the student cleared their misses.
@@ -313,7 +274,7 @@ export default function IatExam({
       setTrialIndex(trials.length);
       void finishModuleOrAttempt();
     } else if (pending?.type === "next-part") {
-      setScreen("briefing");
+      setScreen("part-briefing");
       resetClock();
     }
   }, [finishModuleOrAttempt, trials.length]);
@@ -333,26 +294,13 @@ export default function IatExam({
   }, [advanceRetry]);
 
   const handleCorrect = useCallback(async () => {
-    if (screen === "practice") {
-      if (practiceIndex >= practiceTrials.length - 1) {
-        markPracticeCompleted(attemptId);
-        setPracticeIndex(0);
-        beginExam();
-      } else {
-        setPracticeIndex((i) => i + 1);
-        resetClock();
-      }
-      setWrongFlash(false);
-      return;
-    }
-
     if (screen !== "exam" || !currentTrial) return;
 
     // End of this module's trials: re-ask any words missed in this final part
     // before scoring, otherwise complete the module.
     if (trialIndex >= trials.length - 1) {
       if (retryQueueRef.current.length > 0) {
-        pendingTransitionRef.current = { type: "finish", nextIndex: trials.length };
+        pendingTransitionRef.current = { type: "finish" };
         startRetryPhase();
       } else {
         setTrialIndex(trials.length);
@@ -369,12 +317,12 @@ export default function IatExam({
     if (crossesPart) {
       setTrialIndex(nextIndex); // point the next briefing at the upcoming part
       if (retryQueueRef.current.length > 0) {
-        pendingTransitionRef.current = { type: "next-part", nextIndex };
+        pendingTransitionRef.current = { type: "next-part" };
         startRetryPhase();
       } else {
         setWrongFlash(false);
         resetClock();
-        setScreen("briefing");
+        setScreen("part-briefing");
       }
       return;
     }
@@ -383,7 +331,7 @@ export default function IatExam({
     setTrialIndex(nextIndex);
     setWrongFlash(false);
     resetClock();
-  }, [attemptId, beginExam, currentTrial, finishModuleOrAttempt, practiceIndex, screen, startRetryPhase, trialIndex, trials]);
+  }, [currentTrial, finishModuleOrAttempt, screen, startRetryPhase, trialIndex, trials]);
 
   // Drives the re-ask rounds at the end of a part. Nothing here is persisted —
   // it only enforces that every missed word is eventually answered correctly.
@@ -408,6 +356,7 @@ export default function IatExam({
 
       if (isCorrect) {
         // Cleared on the first press of the re-ask: this word is done.
+        setPartPassed((p) => p + 1);
         setCorrectFlash(key);
         window.setTimeout(() => setCorrectFlash(null), 180);
         advanceRetry();
@@ -428,70 +377,55 @@ export default function IatExam({
         handleRetryKey(key);
         return;
       }
-      const trial = screen === "practice" ? activePractice : currentTrial;
-      if (!trial) return;
+      const trial = currentTrial;
+      if (screen !== "exam" || !trial) return;
 
       const isCorrect = key === trial.expectedKey;
       const elapsed = Math.max(1, Math.round(Date.now() - shownAtRef.current));
 
-      if (screen === "exam" && currentTrial) {
-        const count = (keyCountRef.current[currentTrial.id] || 0) + 1;
-        keyCountRef.current[currentTrial.id] = count;
-        if (count === 1) {
-          moduleStatsRef.current.answered += 1;
-          if (isCorrect) moduleStatsRef.current.correct += 1;
-        }
-        // Buffer the event and save in the background — never block the advance
-        // on the network. This is what keeps fast/repeated key presses snappy
-        // and stops them from spilling into the next trial.
-        eventBufferRef.current.push({
-          trialId: currentTrial.id,
-          keyPressed: key,
-          responseTimeMs: elapsed,
-          eventSequence: count,
-          shownAt: new Date(shownAtRef.current).toISOString(),
-          answeredAt: new Date().toISOString(),
-        });
-        scheduleFlush();
-      }
+      const count = (keyCountRef.current[trial.id] || 0) + 1;
+      keyCountRef.current[trial.id] = count;
+      // Buffer the event and save in the background — never block the advance
+      // on the network. This is what keeps fast/repeated key presses snappy
+      // and stops them from spilling into the next trial.
+      eventBufferRef.current.push({
+        trialId: trial.id,
+        keyPressed: key,
+        responseTimeMs: elapsed,
+        eventSequence: count,
+        shownAt: new Date(shownAtRef.current).toISOString(),
+        answeredAt: new Date().toISOString(),
+      });
+      scheduleFlush();
 
       if (!isCorrect) {
         setWrongFlash(true);
-        // Track this wrong answer for module-end review (only first wrong press per trial)
-        if (screen === "exam" && currentTrial) {
-          setWrongTrials((prev) => {
-            if (prev.some((w) => w.word === currentTrial.wordShown)) return prev;
-            return [...prev, {
-              word: currentTrial.wordShown,
-              correctKey: trial.expectedKey,
-              leftLabel: String(trial.leftLabel || ""),
-              rightLabel: String(trial.rightLabel || ""),
-            }];
+        // Queue this word to be re-asked at the end of the part. The part
+        // won't complete until it's answered correctly on the first press.
+        if (!retryQueueRef.current.some((w) => w.wordShown === trial.wordShown)) {
+          retryQueueRef.current.push({
+            wordShown: trial.wordShown,
+            leftLabel: trial.leftLabel,
+            rightLabel: trial.rightLabel,
+            expectedKey: trial.expectedKey,
+            stepNumber: trial.stepNumber,
           });
-          // Queue this word to be re-asked at the end of the part. The part
-          // won't complete until it's answered correctly on the first press.
-          if (!retryQueueRef.current.some((w) => w.wordShown === currentTrial.wordShown)) {
-            retryQueueRef.current.push({
-              wordShown: currentTrial.wordShown,
-              leftLabel: currentTrial.leftLabel,
-              rightLabel: currentTrial.rightLabel,
-              expectedKey: trial.expectedKey,
-              stepNumber: currentTrial.stepNumber,
-            });
-          }
         }
         return;
       }
 
+      // Count as passed only when the very first press on this word is correct;
+      // a corrective press after a miss does not count (it'll be re-asked).
+      if (count === 1) setPartPassed((p) => p + 1);
       setCorrectFlash(key);
       window.setTimeout(() => setCorrectFlash(null), 180);
       void handleCorrect();
     },
-    [activePractice, currentTrial, handleCorrect, handleRetryKey, retryTrial, saving, scheduleFlush, screen],
+    [currentTrial, handleCorrect, handleRetryKey, retryTrial, saving, scheduleFlush, screen],
   );
 
   useEffect(() => {
-    if (screen !== "practice" && screen !== "exam") return;
+    if (screen !== "exam") return;
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toUpperCase();
       if (key !== "E" && key !== "I") return;
@@ -515,6 +449,7 @@ export default function IatExam({
   useEffect(() => {
     if (
       screen === "exam" &&
+      !retryTrial &&
       trials.length > 0 &&
       trialIndex >= trials.length &&
       !saving &&
@@ -522,7 +457,7 @@ export default function IatExam({
     ) {
       void finishModuleOrAttempt();
     }
-  }, [screen, trials.length, trialIndex, saving, finishError, finishModuleOrAttempt]);
+  }, [screen, retryTrial, trials.length, trialIndex, saving, finishError, finishModuleOrAttempt]);
 
   // ---- Render ----
 
@@ -557,61 +492,43 @@ export default function IatExam({
     );
   }
 
-  if (screen === "instructions") {
+  if (screen === "study-intro") {
     return (
       <IatShell onExit={onExit}>
-        <IatInstructionsScreen
-          title="Practice round"
-          description="We'll start with a short, unscored practice block so you get comfortable with the keys. Match each word to the correct category as fast as you can."
-          ctaLabel="Start practice"
-          onStart={() => {
-            setPracticeIndex(0);
-            setScreen("practice");
-            resetClock();
+        <IatStudyIntroScreen onContinue={() => setScreen("module-intro")} onBack={onExit} />
+      </IatShell>
+    );
+  }
+
+  if (screen === "module-intro") {
+    return (
+      <IatShell onExit={onExit}>
+        <IatModuleIntroScreen
+          moduleNumber={completedModules + 1}
+          totalModules={modules.length || completedModules + 1}
+          moduleName={currentModule?.displayName || currentModule?.name || "This module"}
+          totalParts={totalParts}
+          moduleTableData={briefingData}
+          onContinue={() => {
+            moduleTimingStartedRef.current = false;
+            setScreen("part-briefing");
           }}
-          onBack={onExit}
         />
       </IatShell>
     );
   }
 
-  if (screen === "briefing") {
-    const activeStep = currentTrial?.stepNumber ?? moduleStepNumbers[0] ?? 1;
-    const partIndex = moduleStepNumbers.indexOf(activeStep);
-    const partNumber = partIndex >= 0 ? partIndex + 1 : activeStep;
-
+  if (screen === "part-briefing") {
     return (
       <IatShell onExit={onExit}>
         <IatModuleBriefingScreen
           moduleNumber={completedModules + 1}
           totalModules={modules.length || completedModules + 1}
           partNumber={partNumber}
-          totalParts={moduleStepNumbers.length || 1}
+          totalParts={totalParts}
           leftLabel={currentTrial?.leftLabel || "Left"}
           rightLabel={currentTrial?.rightLabel || "Right"}
-          moduleTableData={briefingData}
-          showModuleTable={partNumber === 1}
           onContinue={startModuleExam}
-        />
-      </IatShell>
-    );
-  }
-
-  if (screen === "break" && breakInfo) {
-    return (
-      <IatShell onExit={onExit}>
-        <IatModuleBreakScreen
-          moduleNumber={breakInfo.moduleNumber}
-          totalModules={modules.length || breakInfo.moduleNumber + 1}
-          answered={breakInfo.answered}
-          accuracy={breakInfo.accuracy}
-          elapsedLabel={breakInfo.elapsedLabel}
-          saving={saving}
-          wrongTrials={wrongTrials}
-          onContinue={() => {
-            setBreakInfo(null);
-            beginExam();
-          }}
         />
       </IatShell>
     );
@@ -662,29 +579,18 @@ export default function IatExam({
     );
   }
 
-  // practice | exam
-  const isPractice = screen === "practice";
-  const total = isPractice ? practiceTrials.length : trials.length;
-  const current = isPractice
-    ? practiceIndex + 1
-    : Math.min(trialIndex + 1, trials.length);
-  const progress = total ? Math.round((current / total) * 100) : 0;
-  const displayTrial: RunnerTrial | null = isPractice
-    ? activePractice
-    : retryTrial
-      ? retryTrial
-      : currentTrial
-        ? {
-            wordShown: currentTrial.wordShown,
-            leftLabel: currentTrial.leftLabel,
-            rightLabel: currentTrial.rightLabel,
-            expectedKey: currentTrial.expectedKey,
-            stepNumber: currentTrial.stepNumber,
-          }
-        : null;
-  const moduleLabel = isPractice
-    ? "Practice"
-    : `${completedModules + 1} of ${modules.length || 6}`;
+  const displayTrial: RunnerTrial | null = retryTrial
+    ? retryTrial
+    : currentTrial
+      ? {
+          wordShown: currentTrial.wordShown,
+          leftLabel: currentTrial.leftLabel,
+          rightLabel: currentTrial.rightLabel,
+          expectedKey: currentTrial.expectedKey,
+          stepNumber: currentTrial.stepNumber,
+        }
+      : null;
+  const moduleLabel = `${completedModules + 1} of ${modules.length || 6}`;
 
   return (
     <IatShell
@@ -692,14 +598,13 @@ export default function IatExam({
       headerContent={<ElapsedClock startMs={assessmentStartRef.current} />}
     >
       <IatTrialRunner
-        isPractice={isPractice}
-        isRetry={!!retryTrial}
+        isPractice={false}
         trial={displayTrial}
-        current={current}
-        total={total}
         moduleLabel={moduleLabel}
+        partNumber={partNumber}
+        totalParts={totalParts}
+        partProgress={partProgress}
         startMs={assessmentStartRef.current}
-        progress={progress}
         flashKey={correctFlash}
         wrong={wrongFlash}
         modules={modules}

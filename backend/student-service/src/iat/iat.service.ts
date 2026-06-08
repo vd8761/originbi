@@ -542,8 +542,9 @@ export class IatService {
       rightKeys: string[],
       leftLabel: string,
       rightLabel: string,
+      count?: number,
     ) => {
-      const blockStimuli = [
+      const pool = [
         ...this.stimuliForKeys(byConcept, leftKeys).map((s) => ({
           s,
           key: 'E',
@@ -553,7 +554,19 @@ export class IatService {
           key: 'I',
         })),
       ];
-      for (const item of this.shuffle(blockStimuli)) {
+      if (pool.length === 0) return;
+      // Repeat the (re-shuffled) word pool until we reach the target trial
+      // count. Word repetition within a block is expected in an IAT; when the
+      // count is a multiple of the pool size the E/I split stays balanced.
+      const target = count && count > 0 ? count : pool.length;
+      const items: { s: IatStimulus; key: string }[] = [];
+      while (items.length < target) {
+        for (const item of this.shuffle(pool)) {
+          if (items.length >= target) break;
+          items.push(item);
+        }
+      }
+      for (const item of items) {
         rows.push({
           assessmentAttemptId: attempt.id,
           iatAttemptModuleId: Number(attemptModule.id),
@@ -571,63 +584,72 @@ export class IatService {
         });
       }
     };
-    const leftConcept = this.title(module.leftConceptKey);
-    const rightConcept = this.title(module.rightConceptKey);
-    // Attribute categories are the non-target keys in the compatible pairing
-    // (e.g. for the gender module: Domestic on the left, Executive on the right).
-    const attributeLeftKeys = (module.compatibleLeftKeys || []).filter(
-      (key) => key !== module.leftConceptKey,
-    );
-    const attributeRightKeys = (module.compatibleRightKeys || []).filter(
-      (key) => key !== module.rightConceptKey,
-    );
-    addStimuli(
-      1,
-      'PRACTICE_LEFT_RIGHT',
-      [module.leftConceptKey],
-      [],
-      leftConcept,
-      rightConcept,
-    );
-    addStimuli(
-      2,
-      'PRACTICE_LEFT_RIGHT',
-      [],
-      [module.rightConceptKey],
-      leftConcept,
-      rightConcept,
-    );
+    // Standard 7-part IAT sequence. Targets stay on fixed sides throughout
+    // (target A on E, target B on I); the attribute sides flip at the halfway
+    // point, which is what makes the two combined tests compatible vs
+    // incompatible. Everything is derived from the module's compatible pairing
+    // so the scored pairings match the IAT guide without any DB changes.
+    //
+    //   target A  = the target paired on the right of the compatible block
+    //   target B  = the target paired on the left of the compatible block
+    //   attr A    = the attribute paired with target A when compatible
+    //   attr B    = the attribute paired with target B when compatible
+    const targetA = module.rightConceptKey;
+    const targetB = module.leftConceptKey;
+    const attrA =
+      (module.compatibleRightKeys || []).find((key) => key !== targetA) || '';
+    const attrB =
+      (module.compatibleLeftKeys || []).find((key) => key !== targetB) || '';
+
+    // Per-part trial counts (the word pool is repeated to reach these). The
+    // combined tests/practice in the second half run longer, matching standard
+    // IAT block sizing. Each count is a multiple of its pool size so the E/I
+    // split stays balanced.
+    // Part 1 — attribute practice (incompatible-half arrangement): attr B / attr A
+    addStimuli(1, 'PRACTICE_ATTRIBUTE', [attrB], [attrA], this.title(attrB), this.title(attrA), 20);
+    // Part 2 — target practice: target A / target B
+    addStimuli(2, 'PRACTICE_TARGET', [targetA], [targetB], this.title(targetA), this.title(targetB), 20);
+    // Part 3 — combined practice (incompatible pairing): A+attrB / B+attrA
     addStimuli(
       3,
-      'PRACTICE_ATTRIBUTE',
-      attributeLeftKeys,
-      attributeRightKeys,
-      this.labelForKeys(attributeLeftKeys),
-      this.labelForKeys(attributeRightKeys),
+      'PRACTICE_COMBINED',
+      [targetA, attrB],
+      [targetB, attrA],
+      this.labelForKeys([targetA, attrB]),
+      this.labelForKeys([targetB, attrA]),
+      20,
     );
+    // Part 4 — incompatible test (scored): A+attrB / B+attrA
     addStimuli(
       4,
-      'COMPATIBLE',
-      module.compatibleLeftKeys || [],
-      module.compatibleRightKeys || [],
-      this.labelForKeys(module.compatibleLeftKeys || []),
-      this.labelForKeys(module.compatibleRightKeys || []),
+      'INCOMPATIBLE',
+      [targetA, attrB],
+      [targetB, attrA],
+      this.labelForKeys([targetA, attrB]),
+      this.labelForKeys([targetB, attrA]),
+      40,
     );
-    addStimuli(
-      5,
-      'SWITCH',
-      [module.rightConceptKey],
-      [module.leftConceptKey],
-      rightConcept,
-      leftConcept,
-    );
+    // Part 5 — attribute practice (compatible-half arrangement): attr A / attr B
+    addStimuli(5, 'PRACTICE_ATTRIBUTE', [attrA], [attrB], this.title(attrA), this.title(attrB), 30);
+    // Part 6 — combined practice (compatible pairing): A+attrA / B+attrB
     addStimuli(
       6,
-      'INCOMPATIBLE',
-      module.incompatibleLeftKeys || [],
-      module.incompatibleRightKeys || [],
-      this.labelForKeys(module.incompatibleLeftKeys || []),
-      this.labelForKeys(module.incompatibleRightKeys || []),
+      'PRACTICE_COMBINED',
+      [targetA, attrA],
+      [targetB, attrB],
+      this.labelForKeys([targetA, attrA]),
+      this.labelForKeys([targetB, attrB]),
+      40,
+    );
+    // Part 7 — compatible test (scored): A+attrA / B+attrB
+    addStimuli(
+      7,
+      'COMPATIBLE',
+      [targetA, attrA],
+      [targetB, attrB],
+      this.labelForKeys([targetA, attrA]),
+      this.labelForKeys([targetB, attrB]),
+      40,
     );
     return rows;
   }

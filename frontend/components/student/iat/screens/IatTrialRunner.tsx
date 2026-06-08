@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import IatModuleStepper from "../components/IatModuleStepper";
+import { IatProgressBar } from "../components/primitives";
 import type { IatModuleProgress } from "../../../../lib/services/iat.service";
 
 export interface RunnerTrial {
@@ -57,12 +58,11 @@ function isAttributeWord(word: string, moduleLabel: string): boolean {
 
 export default function IatTrialRunner({
   isPractice,
-  isRetry = false,
   trial,
-  current,
-  total,
   moduleLabel,
-  progress: _progress,
+  partNumber,
+  totalParts,
+  partProgress,
   flashKey,
   wrong,
   modules,
@@ -70,13 +70,12 @@ export default function IatTrialRunner({
   onKey,
 }: {
   isPractice: boolean;
-  isRetry?: boolean;
   trial: RunnerTrial | null;
-  current: number;
-  total: number;
   moduleLabel: string;
+  partNumber: number;
+  totalParts: number;
+  partProgress: number;
   startMs: number;
-  progress: number;
   flashKey: "E" | "I" | null;
   wrong: boolean;
   modules: IatModuleProgress[];
@@ -120,26 +119,21 @@ export default function IatTrialRunner({
         <div className="w-full overflow-hidden rounded-3xl border border-brand-light-tertiary bg-white/50 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-white/[0.02] dark:shadow-none">
           <div className="flex flex-col gap-2 px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold leading-none text-black dark:text-white">
-              <span>{isPractice ? "Practice Block" : `Module: ${moduleLabel}`}</span>
-              {isRetry && (
-                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                  Re-check
+              <span>Module: {moduleLabel}</span>
+              <span className="font-medium text-gray-400 dark:text-white/30">|</span>
+              <span className="text-brand-green">Part {partNumber} of {totalParts}</span>
+              {activeModuleName && (
+                <span className="max-w-[180px] truncate font-medium text-black/45 dark:text-white/40 sm:hidden">
+                  {activeModuleName}
                 </span>
-              )}
-              {isPractice ? (
-                <span className="font-medium text-gray-400 dark:text-white/30">({current} / {total})</span>
-              ) : (
-                <>
-                  <span className="font-medium text-gray-400 dark:text-white/30 sm:hidden">|</span>
-                  <span className="max-w-[200px] truncate font-bold text-brand-green sm:hidden">
-                    {activeModuleName}
-                  </span>
-                </>
               )}
             </div>
 
-            {!isPractice && modules.length > 0 && (
-              <div className="mt-1 flex w-full gap-1.5 lg:hidden">
+            {/* Per-part progress — quiet and thin so it doesn't pull focus. */}
+            <IatProgressBar value={partProgress} />
+
+            {modules.length > 0 && (
+              <div className="mt-0.5 flex w-full gap-1.5 lg:hidden">
                 {modules.map((m) => {
                   const isCompleted = m.status === "COMPLETED";
                   const isCurrent = String(m.id) === String(currentModuleId);
@@ -213,7 +207,7 @@ export default function IatTrialRunner({
 
               <div className="flex min-h-[190px] w-full items-center justify-center px-2 py-8 sm:min-h-[250px] sm:py-12">
                 <span
-                  key={`${isPractice ? "p" : "e"}-${current}-${trial?.wordShown}`}
+                  key={`p${partNumber}-${trial?.wordShown}`}
                   className={`animate-fade-in-fast text-center font-bold leading-none ${
                     isAttributeWord(trial?.wordShown || "", moduleLabel)
                       ? "text-brand-green"
