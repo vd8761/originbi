@@ -1088,6 +1088,7 @@ export class RegistrationsService {
       assets,
       startDateTime,
       assessmentTitle,
+      true,
     );
 
     // Attachments removed in favor of hosted images

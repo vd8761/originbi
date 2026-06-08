@@ -82,8 +82,18 @@ export class IatService {
     await this.ensureAttemptStarted(attempt);
     await this.ensureAttemptModulesAndTrials(attempt);
 
-    const intake = await this.getOrCreateIntake(attempt);
-    const modules = await this.getAttemptModules(attemptId);
+    // Fetch the independent reads in parallel. With the DB in a different
+    // region from the API, sequential round-trips dominate getState latency
+    // (this runs at exam start and at every module boundary), so collapsing
+    // them into a single round-trip is what removes the perceived "question
+    // loading" delay in production.
+    const [intake, modules, report, job] = await Promise.all([
+      this.getOrCreateIntake(attempt),
+      this.getAttemptModules(attemptId),
+      this.reportRepo.findOne({ where: { assessmentAttemptId: attemptId } }),
+      this.jobRepo.findOne({ where: { assessmentAttemptId: attemptId } }),
+    ]);
+
     const currentModule =
       modules.find((m) => m.status !== 'COMPLETED') ||
       modules[modules.length - 1] ||
@@ -95,13 +105,6 @@ export class IatService {
           order: { trialSequence: 'ASC' },
         })
       : [];
-
-    const report = await this.reportRepo.findOne({
-      where: { assessmentAttemptId: attemptId },
-    });
-    const job = await this.jobRepo.findOne({
-      where: { assessmentAttemptId: attemptId },
-    });
 
     return {
       attempt: this.toAttemptDto(attempt),

@@ -26,11 +26,11 @@ export default function IatInstructionsScreen({
           <Keyboard className="h-6 w-6" />
         </div>
         <h1 className="text-[clamp(22px,3vw,32px)] font-bold">{title}</h1>
-        <p className="mt-3 text-sm leading-7 text-brand-text-light-secondary dark:text-white/60">
+        <p className="mt-3 text-sm leading-7 text-black dark:text-white">
           {description}
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex items-center gap-3 rounded-2xl border border-brand-light-tertiary bg-white/60 p-4 dark:border-white/10 dark:bg-white/[0.04]">
             <KeyHint keyLabel="E" />
             <span className="text-sm font-semibold">Left category</span>
@@ -41,12 +41,21 @@ export default function IatInstructionsScreen({
           </div>
         </div>
 
-        <p className="mt-4 text-xs leading-6 text-brand-text-light-secondary dark:text-white/45">
+        <p className="mt-4 text-xs leading-6 text-black dark:text-white">
           Respond as quickly and accurately as you can. If you press the wrong key, just press the
           correct one to continue.
         </p>
 
-        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex items-center justify-center rounded-full border border-brand-light-tertiary px-6 py-3 text-sm font-semibold text-black transition hover:brightness-95 dark:border-white/10 dark:text-white"
+            >
+              Back to dashboard
+            </button>
+          )}
           <button
             type="button"
             disabled={saving}
@@ -56,15 +65,6 @@ export default function IatInstructionsScreen({
             {ctaLabel}
             <ArrowRight className="h-4 w-4" />
           </button>
-          {onBack && (
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center justify-center rounded-full border border-brand-light-tertiary px-6 py-3 text-sm font-semibold text-brand-text-light-secondary transition hover:text-brand-text-light-primary dark:border-white/10 dark:text-white/60 dark:hover:text-white"
-            >
-              Back to dashboard
-            </button>
-          )}
         </div>
       </div>
     </div>
