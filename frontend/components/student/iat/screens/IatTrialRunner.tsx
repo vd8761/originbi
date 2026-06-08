@@ -1,9 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import {
-  StatPill,
-} from "../components/primitives";
+import React, { useEffect, useState } from "react";
 import IatModuleStepper from "../components/IatModuleStepper";
 import type { IatModuleProgress } from "../../../../lib/services/iat.service";
 
@@ -26,33 +23,33 @@ function isAttributeWord(word: string, moduleLabel: string): boolean {
   const moduleNum = match ? parseInt(match[1], 10) : 1;
 
   if (moduleNum === 1) {
-    const strategic = ['Visionary', 'Decision-maker', 'Innovative', 'Autonomy', 'Architect'];
-    const dependent = ['Assistant', 'Implementer', 'Follower', 'Execution', 'Trainee'];
+    const strategic = ["Visionary", "Decision-maker", "Innovative", "Autonomy", "Architect"];
+    const dependent = ["Assistant", "Implementer", "Follower", "Execution", "Trainee"];
     return strategic.includes(cleanWord) || dependent.includes(cleanWord);
   }
   if (moduleNum === 2) {
-    const high = ['Exceptional', 'Top-performer', 'Strategic Asset', 'Visionary', 'High-potential'];
-    const average = ['Ordinary', 'Mediocre', 'Standard', 'Replaceable', 'Baseline'];
+    const high = ["Exceptional", "Top-performer", "Strategic Asset", "Visionary", "High-potential"];
+    const average = ["Ordinary", "Mediocre", "Standard", "Replaceable", "Baseline"];
     return high.includes(cleanWord) || average.includes(cleanWord);
   }
   if (moduleNum === 3) {
-    const executive = ['Boardroom', 'P&L Owner', 'Global Project', 'Scale', 'Strategy'];
-    const domestic = ['Childcare', 'Household', 'Marriage', 'Leave', 'Maternity'];
+    const executive = ["Boardroom", "P&L Owner", "Global Project", "Scale", "Strategy"];
+    const domestic = ["Childcare", "Household", "Marriage", "Leave", "Maternity"];
     return executive.includes(cleanWord) || domestic.includes(cleanWord);
   }
   if (moduleNum === 4) {
-    const leader = ['Authority', 'Strategist', 'Key Thinker', 'Decision-maker', 'Director'];
-    const back_office = ['Executor', 'Coder', 'Data Entry', 'Support', 'Support-staff'];
-    return leader.includes(cleanWord) || back_office.includes(cleanWord);
+    const leader = ["Authority", "Strategist", "Key Thinker", "Decision-maker", "Director"];
+    const backOffice = ["Executor", "Coder", "Data Entry", "Support", "Support-staff"];
+    return leader.includes(cleanWord) || backOffice.includes(cleanWord);
   }
   if (moduleNum === 5) {
-    const always_correct = ['Infallible', 'Absolute', 'Command', 'Final Word', 'Definite'];
-    const open_to_critique = ['Feedback', 'Disagreement', 'Debate', 'Challenged', 'Questioned'];
-    return always_correct.includes(cleanWord) || open_to_critique.includes(cleanWord);
+    const alwaysCorrect = ["Infallible", "Absolute", "Command", "Final Word", "Definite"];
+    const openToCritique = ["Feedback", "Disagreement", "Debate", "Challenged", "Questioned"];
+    return alwaysCorrect.includes(cleanWord) || openToCritique.includes(cleanWord);
   }
   if (moduleNum === 6) {
-    const leadership = ['Director', 'Founder', 'Manager', 'Strategist', 'Leader'];
-    const support = ['Helper', 'Cleaner', 'Assistant', 'Attendant', 'Labourer'];
+    const leadership = ["Director", "Founder", "Manager", "Strategist", "Leader"];
+    const support = ["Helper", "Cleaner", "Assistant", "Attendant", "Labourer"];
     return leadership.includes(cleanWord) || support.includes(cleanWord);
   }
   return false;
@@ -64,8 +61,7 @@ export default function IatTrialRunner({
   current,
   total,
   moduleLabel,
-  startMs,
-  progress,
+  progress: _progress,
   flashKey,
   wrong,
   modules,
@@ -87,7 +83,6 @@ export default function IatTrialRunner({
 }) {
   const leftParts = splitLabel(trial?.leftLabel);
   const rightParts = splitLabel(trial?.rightLabel);
-  const step = trial?.stepNumber ?? 1;
   const currentModule = modules.find((m) => String(m.id) === String(currentModuleId));
   const activeModuleName = currentModule ? (currentModule.displayName || currentModule.name) : "";
   const flash = wrong ? "wrong" : flashKey ? "correct" : null;
@@ -103,6 +98,7 @@ export default function IatTrialRunner({
       const key = e.key.toUpperCase();
       if (key === "E" || key === "I") setPressedKey(null);
     };
+
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
     return () => {
@@ -113,75 +109,31 @@ export default function IatTrialRunner({
 
   const leftShown = leftParts.length ? leftParts : ["Left"];
   const rightShown = rightParts.length ? rightParts : ["Right"];
-
   const isLeftActive = flashKey === "E" || pressedKey === "E";
   const isRightActive = flashKey === "I" || pressedKey === "I";
 
-  /* ── Inline category chip (used inside the container on desktop) ── */
-  const categoryChip = (
-    side: "left" | "right",
-    keyLabel: "E" | "I",
-    parts: string[],
-    active: boolean,
-  ) => (
-    <button
-      type="button"
-      onClick={() => onKey(keyLabel)}
-      className={`flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl border transition-all duration-100 ${
-        active
-          ? "border-brand-green bg-brand-green/10 scale-[0.97]"
-          : "border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-white/[0.04] shadow-sm dark:shadow-none hover:border-brand-green/40"
-      } ${side === "right" ? "flex-row-reverse" : ""}`}
-    >
-      <span
-        className={`grid h-7 w-7 sm:h-8 sm:w-8 place-items-center rounded-lg font-black text-xs sm:text-sm shrink-0 transition-all duration-75 ${
-          active ? "bg-white text-brand-green" : "bg-brand-green text-white"
-        }`}
-      >
-        {keyLabel}
-      </span>
-      <div className={`flex flex-wrap items-center gap-1 text-sm sm:text-base font-bold leading-tight ${side === "right" ? "justify-end" : ""}`}>
-        {parts.map((part, i) => (
-          <React.Fragment key={`${part}-${i}`}>
-            {i > 0 && <span className="text-[11px] font-bold text-black dark:text-white px-0.5 lowercase">or</span>}
-            <span className={i > 0 ? "text-brand-green" : "text-black dark:text-white"}>
-              {part}
-            </span>
-          </React.Fragment>
-        ))}
-      </div>
-    </button>
-  );
-
   return (
     <div className={`grid grid-cols-1 gap-0 ${isPractice ? "" : "lg:grid-cols-[minmax(0,1fr)_260px] lg:gap-8"}`}>
-      {/* Main trial area */}
-      <div className="flex flex-col gap-0 pt-[5vh] sm:pt-4">
-
-        {/* ═══ Single unified container ═══ */}
-        <div className="w-full rounded-3xl border border-brand-light-tertiary dark:border-white/10 bg-white/50 dark:bg-white/[0.02] shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:shadow-none overflow-hidden">
-
-          {/* Top section: Module label + Name (no container) */}
-          <div className="flex flex-col gap-2 px-4 sm:px-6 py-3 sm:py-4">
-            <div className="text-sm font-bold text-black dark:text-white flex flex-wrap items-center gap-1.5 leading-none">
+      <div className="flex flex-col gap-0 pb-28 pt-[5vh] sm:pb-0 sm:pt-4">
+        <div className="w-full overflow-hidden rounded-3xl border border-brand-light-tertiary bg-white/50 shadow-[0_2px_12px_rgba(0,0,0,0.06)] dark:border-white/10 dark:bg-white/[0.02] dark:shadow-none">
+          <div className="flex flex-col gap-2 px-4 py-3 sm:px-6 sm:py-4">
+            <div className="flex flex-wrap items-center gap-1.5 text-sm font-bold leading-none text-black dark:text-white">
               <span>{isPractice ? "Practice Block" : `Module: ${moduleLabel}`}</span>
               {isPractice ? (
-                <span className="text-gray-400 dark:text-white/30 font-medium">({current} / {total})</span>
+                <span className="font-medium text-gray-400 dark:text-white/30">({current} / {total})</span>
               ) : (
                 <>
-                  {/* On mobile: show active module name */}
-                  <span className="sm:hidden text-gray-400 dark:text-white/30 font-medium">|</span>
-                  <span className="sm:hidden text-brand-green font-bold truncate max-w-[200px]">
+                  <span className="font-medium text-gray-400 dark:text-white/30 sm:hidden">|</span>
+                  <span className="max-w-[200px] truncate font-bold text-brand-green sm:hidden">
                     {activeModuleName}
                   </span>
                 </>
               )}
             </div>
 
-            {/* Mobile/Tablet Segmented Progress Bar */}
             {!isPractice && modules.length > 0 && (
-              <div className="w-full flex gap-1.5 mt-1 lg:hidden">
-                {modules.map((m, idx) => {
+              <div className="mt-1 flex w-full gap-1.5 lg:hidden">
+                {modules.map((m) => {
                   const isCompleted = m.status === "COMPLETED";
                   const isCurrent = String(m.id) === String(currentModuleId);
                   return (
@@ -201,41 +153,30 @@ export default function IatTrialRunner({
             )}
           </div>
 
-          {/* Separator line */}
           <div className="h-px bg-brand-light-tertiary dark:bg-white/[0.06]" />
 
-          {/* Content section */}
-          <div className="px-4 sm:px-6 py-4 sm:py-5">
-
-            {/* Desktop: Categories at top */}
-            <div className="hidden sm:flex items-start justify-between gap-3">
-              {categoryChip("left", "E", leftShown, isLeftActive)}
-              {categoryChip("right", "I", rightShown, isRightActive)}
-            </div>
-
-            {/* Error message — persistent until correct */}
+          <div className="px-4 py-4 sm:px-6 sm:py-5">
             {wrong && (
-              <div className="mt-3 sm:mt-3 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-brand-red/10 border border-brand-red/20">
-                <svg className="h-4 w-4 text-brand-red shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="mb-3 flex items-center justify-center gap-2 rounded-xl border border-brand-red/20 bg-brand-red/10 px-4 py-2">
+                <svg className="h-4 w-4 shrink-0 text-brand-red" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 <span className="text-sm font-semibold text-brand-red">
-                  You made a mistake , click the other one to continue
+                  You made a mistake, click the other one to continue
                 </span>
               </div>
             )}
 
-            {/* Stimulus word */}
             <div
-              className={`mt-4 sm:mt-4 flex items-center justify-center w-full rounded-2xl border px-6 py-10 sm:py-14 transition-all duration-150 shadow-[0_1px_6px_rgba(0,0,0,0.04)] dark:shadow-none ${
+              className={`transition-all duration-150 ${
                 flash === "correct"
-                  ? "border-brand-green bg-brand-green/5 dark:bg-brand-green/[0.04]"
+                  ? "rounded-2xl bg-brand-green/5 dark:bg-brand-green/[0.04]"
                   : flash === "wrong"
-                    ? "border-brand-red bg-brand-red/5 dark:bg-brand-red/[0.04] iat-animate-shake"
-                    : "border-brand-light-tertiary dark:border-white/[0.06] bg-white/80 dark:bg-[#1A1D21]/60"
+                    ? "rounded-2xl bg-brand-red/5 dark:bg-brand-red/[0.04] iat-animate-shake"
+                    : ""
               }`}
             >
-              <style dangerouslySetInnerHTML={{__html: `
+              <style dangerouslySetInnerHTML={{ __html: `
                 @keyframes iat-shake {
                   0%, 100% { transform: translateX(0); }
                   15%, 45%, 75% { transform: translateX(-8px); }
@@ -244,80 +185,151 @@ export default function IatTrialRunner({
                 .iat-animate-shake {
                   animation: iat-shake 0.35s ease-in-out;
                 }
-              `}} />
-              <span
-                key={`${isPractice ? "p" : "e"}-${current}-${trial?.wordShown}`}
-                className={`animate-fade-in-fast font-bold leading-none text-center ${
-                  isAttributeWord(trial?.wordShown || "", moduleLabel)
-                    ? "text-brand-green"
-                    : "text-black dark:text-white"
-                } ${
-                  String(trial?.wordShown || "").length > 18
-                    ? "text-[clamp(28px,5vw,56px)]"
-                    : "text-[clamp(36px,7vw,80px)]"
-                }`}
-              >
-                {trial?.wordShown}
-              </span>
+              ` }} />
+
+              <div className="grid grid-cols-2 gap-4 px-1 pt-1 sm:gap-8 sm:px-2 sm:pt-2">
+                <CategoryPrompt
+                  side="left"
+                  keyLabel="E"
+                  parts={leftShown}
+                  active={isLeftActive}
+                  onClick={() => onKey("E")}
+                />
+                <CategoryPrompt
+                  side="right"
+                  keyLabel="I"
+                  parts={rightShown}
+                  active={isRightActive}
+                  onClick={() => onKey("I")}
+                />
+              </div>
+
+              <div className="flex min-h-[190px] w-full items-center justify-center px-2 py-8 sm:min-h-[250px] sm:py-12">
+                <span
+                  key={`${isPractice ? "p" : "e"}-${current}-${trial?.wordShown}`}
+                  className={`animate-fade-in-fast text-center font-bold leading-none ${
+                    isAttributeWord(trial?.wordShown || "", moduleLabel)
+                      ? "text-brand-green"
+                      : "text-black dark:text-white"
+                  } ${
+                    String(trial?.wordShown || "").length > 18
+                      ? "text-[clamp(34px,6vw,68px)]"
+                      : "text-[clamp(48px,8vw,96px)]"
+                  }`}
+                >
+                  {trial?.wordShown}
+                </span>
+              </div>
             </div>
 
-            {/* Desktop: Bottom hint text */}
-            <p className="mt-3 text-center text-xs font-medium text-black/40 dark:text-white/30 hidden sm:block">
-              Press <strong className="text-brand-green">E</strong> for left,{" "}
-              <strong className="text-brand-green">I</strong> for right — or tap a category.
+            <p className="mt-3 hidden text-center text-xs font-medium text-black/40 dark:text-white/30 sm:block">
+              If you make a mistake, a red indicator will appear. Press the other option to proceed.
             </p>
           </div>
         </div>
 
-        {/* ═══ Mobile: Large category buttons OUTSIDE the container ═══ */}
-        <div className="flex sm:hidden items-stretch gap-3 mt-[6vh] px-1">
-          <button
-            type="button"
+        <div className="fixed inset-x-0 bottom-0 z-40 flex gap-3 border-t border-brand-light-tertiary bg-brand-light-primary/95 p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] backdrop-blur dark:border-white/10 dark:bg-[#19211C]/95 sm:hidden">
+          <MobileKeyButton
+            keyLabel="E"
+            parts={leftShown}
+            active={isLeftActive}
             onClick={() => onKey("E")}
-            className={`flex-1 flex flex-col items-center justify-center py-4 px-2 rounded-2xl border-2 transition-all duration-100 ${
-              isLeftActive
-                ? "border-brand-green bg-brand-green text-white scale-[0.97]"
-                : "border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-white/[0.04] text-black dark:text-white shadow-sm dark:shadow-none active:scale-[0.97]"
-            }`}
-          >
-            <span className="text-sm font-bold">{leftShown[0]}</span>
-            {leftShown.length > 1 && (
-              <>
-                <span className={`text-[10px] font-bold uppercase my-0.5 ${isLeftActive ? "text-white" : "text-black dark:text-white"}`}>or</span>
-                <span className={`text-sm font-bold ${isLeftActive ? "text-white" : "text-brand-green"}`}>
-                  {leftShown[1]}
-                </span>
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
+          />
+          <MobileKeyButton
+            keyLabel="I"
+            parts={rightShown}
+            active={isRightActive}
             onClick={() => onKey("I")}
-            className={`flex-1 flex flex-col items-center justify-center py-4 px-2 rounded-2xl border-2 transition-all duration-100 ${
-              isRightActive
-                ? "border-brand-green bg-brand-green text-white scale-[0.97]"
-                : "border-brand-light-tertiary dark:border-white/10 bg-white dark:bg-white/[0.04] text-black dark:text-white shadow-sm dark:shadow-none active:scale-[0.97]"
-            }`}
-          >
-            <span className="text-sm font-bold">{rightShown[0]}</span>
-            {rightShown.length > 1 && (
-              <>
-                <span className={`text-[10px] font-bold uppercase my-0.5 ${isRightActive ? "text-white" : "text-black dark:text-white"}`}>or</span>
-                <span className={`text-sm font-bold ${isRightActive ? "text-white" : "text-brand-green"}`}>
-                  {rightShown[1]}
-                </span>
-              </>
-            )}
-          </button>
+          />
         </div>
-
       </div>
 
-      {/* Sidebar module stepper — only for non-practice */}
       {!isPractice && (
         <IatModuleStepper modules={modules} currentModuleId={currentModuleId} variant="sidebar" />
       )}
     </div>
+  );
+}
+
+function CategoryPrompt({
+  side,
+  keyLabel,
+  parts,
+  active,
+  onClick,
+}: {
+  side: "left" | "right";
+  keyLabel: "E" | "I";
+  parts: string[];
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-[88px] flex-col items-center text-center transition-all duration-100 sm:min-h-[110px] ${
+        active
+          ? "scale-[0.98]"
+          : "hover:text-brand-green"
+      } ${side === "right" ? "ml-auto" : "mr-auto"}`}
+    >
+      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-black/45 dark:text-white/45 sm:text-xs">
+        Press <span className="text-brand-green">{keyLabel}</span> for
+      </p>
+      <div className="mt-2 flex flex-col items-center gap-1">
+        {parts.map((part, index) => (
+          <React.Fragment key={`${keyLabel}-${part}-${index}`}>
+            {index > 0 && (
+              <span className="text-xs font-bold lowercase text-black/45 dark:text-white/45 sm:text-sm">
+                or
+              </span>
+            )}
+            <span
+              className={`max-w-full break-words text-[clamp(18px,3vw,34px)] font-black leading-tight ${
+                index > 0 ? "text-brand-green" : "text-black dark:text-white"
+              }`}
+            >
+              {part}
+            </span>
+          </React.Fragment>
+        ))}
+      </div>
+    </button>
+  );
+}
+
+function MobileKeyButton({
+  keyLabel,
+  parts,
+  active,
+  onClick,
+}: {
+  keyLabel: "E" | "I";
+  parts: string[];
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-16 flex-1 items-center gap-3 rounded-2xl border-2 px-3 py-2 text-left transition-all duration-100 ${
+        active
+          ? "border-brand-green bg-brand-green text-white scale-[0.98]"
+          : "border-brand-light-tertiary bg-white text-black shadow-sm active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+      }`}
+    >
+      <span
+        className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl font-black ${
+          active ? "bg-white text-brand-green" : "bg-brand-green text-white"
+        }`}
+      >
+        {keyLabel}
+      </span>
+      <span className="min-w-0 text-sm font-black leading-tight">
+        {parts.join(" / ")}
+      </span>
+    </button>
   );
 }

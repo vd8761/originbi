@@ -27,6 +27,30 @@ const formatTime = (seconds: number) => {
   return `${m}:${s}`;
 };
 
+const practiceStorageKey = (attemptId: number | string) =>
+  `originbi:iat:${attemptId}:practice-completed`;
+
+const hasCompletedPractice = (attemptId: number | string) => {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return window.localStorage.getItem(practiceStorageKey(attemptId)) === "true";
+  } catch {
+    return false;
+  }
+};
+
+const markPracticeCompleted = (attemptId: number | string) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(practiceStorageKey(attemptId), "true");
+  } catch {
+    // localStorage can be blocked in some browsers; saved attempt progress
+    // still lets us skip practice after the first real response is recorded.
+  }
+};
+
 export default function IatExam({
   attemptId,
   onExit,
@@ -57,6 +81,7 @@ export default function IatExam({
   const shownAtRef = useRef<number>(Date.now());
   const keyCountRef = useRef<Record<number, number>>({});
   const moduleStatsRef = useRef({ answered: 0, correct: 0 });
+  const moduleTimingStartedRef = useRef(false);
   // Overall elapsed-time anchor; the visible clock ticks inside <ElapsedClock>
   // so the heavy exam tree never re-renders just to advance the timer.
   const assessmentStartRef = useRef<number>(Date.now());
@@ -110,12 +135,17 @@ export default function IatExam({
 
       setState(next);
 
-      // Intake collection was removed — go straight to the practice briefing.
-      if (next.attempt.status === "COMPLETED") setScreen("done");
-      else setScreen("instructions");
-
       const firstPending = next.trials.findIndex((t) => t.status !== "ANSWERED");
       setTrialIndex(firstPending >= 0 ? firstPending : next.trials.length);
+      const hasSavedTrialProgress = next.trials.some((t) => t.status === "ANSWERED");
+      const hasModuleProgress = next.modules.some((m) => m.status !== "NOT_STARTED");
+      const skipPractice =
+        hasCompletedPractice(attemptId) || hasSavedTrialProgress || hasModuleProgress;
+      if (skipPractice) markPracticeCompleted(attemptId);
+
+      if (next.attempt.status === "COMPLETED") setScreen("done");
+      else setScreen(skipPractice ? "briefing" : "instructions");
+
       shownAtRef.current = Date.now();
     } catch (error: any) {
       setLoadError(error?.message || "Failed to load the IAT assessment.");
@@ -131,8 +161,16 @@ export default function IatExam({
 
   const modules = state?.modules || [];
   const trials = state?.trials || [];
-  const briefingData = useMemo(() => {
-    return extractBriefingData(trials);
+  const briefingData = useMemo(() => extractBriefingData(trials), [trials]);
+  const moduleStepNumbers = useMemo(() => {
+    const seen = new Set<number>();
+    return trials.reduce<number[]>((steps, trial) => {
+      if (!seen.has(trial.stepNumber)) {
+        seen.add(trial.stepNumber);
+        steps.push(trial.stepNumber);
+      }
+      return steps;
+    }, []);
   }, [trials]);
   const completedModules = modules.filter((m) => m.status === "COMPLETED").length;
   const currentModule = useMemo(
@@ -150,12 +188,16 @@ export default function IatExam({
 
   const beginExam = useCallback(() => {
     moduleStatsRef.current = { answered: 0, correct: 0 };
+    moduleTimingStartedRef.current = false;
     setWrongTrials([]);
     setScreen("briefing");
   }, []);
 
   const startModuleExam = useCallback(() => {
-    moduleStartRef.current = Date.now();
+    if (!moduleTimingStartedRef.current) {
+      moduleStartRef.current = Date.now();
+      moduleTimingStartedRef.current = true;
+    }
     setScreen("exam");
     resetClock();
   }, []);
@@ -242,6 +284,7 @@ export default function IatExam({
   const handleCorrect = useCallback(async () => {
     if (screen === "practice") {
       if (practiceIndex >= practiceTrials.length - 1) {
+        markPracticeCompleted(attemptId);
         setPracticeIndex(0);
         beginExam();
       } else {
@@ -257,11 +300,16 @@ export default function IatExam({
       setTrialIndex(trials.length);
       await finishModuleOrAttempt();
     } else {
-      setTrialIndex((i) => i + 1);
+      const nextIndex = trialIndex + 1;
+      const nextTrial = trials[nextIndex];
+      setTrialIndex(nextIndex);
       setWrongFlash(false);
       resetClock();
+      if (nextTrial && nextTrial.stepNumber !== currentTrial.stepNumber) {
+        setScreen("briefing");
+      }
     }
-  }, [beginExam, currentTrial, finishModuleOrAttempt, practiceIndex, screen, trialIndex, trials.length]);
+  }, [attemptId, beginExam, currentTrial, finishModuleOrAttempt, practiceIndex, screen, trialIndex, trials]);
 
   const handleKey = useCallback(
     (key: "E" | "I") => {
@@ -403,12 +451,21 @@ export default function IatExam({
   }
 
   if (screen === "briefing") {
+    const activeStep = currentTrial?.stepNumber ?? moduleStepNumbers[0] ?? 1;
+    const partIndex = moduleStepNumbers.indexOf(activeStep);
+    const partNumber = partIndex >= 0 ? partIndex + 1 : activeStep;
+
     return (
       <IatShell onExit={onExit}>
         <IatModuleBriefingScreen
           moduleNumber={completedModules + 1}
           totalModules={modules.length || completedModules + 1}
-          data={briefingData}
+          partNumber={partNumber}
+          totalParts={moduleStepNumbers.length || 1}
+          leftLabel={currentTrial?.leftLabel || "Left"}
+          rightLabel={currentTrial?.rightLabel || "Right"}
+          moduleTableData={briefingData}
+          showModuleTable={partNumber === 1}
           onContinue={startModuleExam}
         />
       </IatShell>
