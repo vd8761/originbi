@@ -689,7 +689,7 @@ export class StudentService {
         id: attempt.id,
         stepName:
           assessmentKind === 'IAT_GEN'
-            ? 'Level 2 - IAT Gen'
+            ? 'IAT Gen'
             : level?.name || `Level ${level?.levelNumber}`,
         description: level?.description || '',
         status: status,
