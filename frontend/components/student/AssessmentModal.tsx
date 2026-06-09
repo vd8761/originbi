@@ -94,6 +94,16 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
     };
   }, [isLangDropdownOpen]);
 
+  // Lock the page behind the modal so the dashboard can't scroll while open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isOpen]);
+
   if (!isOpen || !assessment) return null;
 
   const isContinue = assessment.status === 'in-progress';
@@ -117,7 +127,7 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 sm:px-6">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 sm:px-6 py-6 sm:py-8 overflow-y-auto overscroll-contain">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity animate-fade-in"
@@ -125,10 +135,12 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
       />
 
       {/* Modal Content - Compact Layout */}
-      <div className="relative w-full max-w-xl bg-white dark:bg-[#1A1D21] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[90vh] animate-fade-in overflow-hidden transition-colors duration-300">
+      <div className="relative w-full max-w-xl my-auto bg-white dark:bg-[#1A1D21] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[calc(100dvh-3rem)] animate-fade-in overflow-hidden transition-colors duration-300">
 
-        {/* Scrollable Body - Increased Padding/Margins to give breathing space */}
-        <div className="overflow-y-auto custom-scrollbar flex-1">
+        {/* Scrollable Body - Increased Padding/Margins to give breathing space.
+            min-h-0 lets the flex child actually shrink so the footer with the
+            Begin/Continue button is always visible. */}
+        <div className="overflow-y-auto custom-scrollbar flex-1 min-h-0">
           <div className="p-6 sm:p-8">
             {/* Header Section */}
             <div className="flex justify-between items-start mb-6">
