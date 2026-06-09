@@ -89,24 +89,22 @@ export class MetaphorGenerationService {
 
     if (selectionMode === 'random_all_sets') {
       // Pick random N questions from ALL active sets combined.
-      questions = await manager
+      const allQs = await manager
         .createQueryBuilder(MetaphorQuestion, 'mq')
         .where('mq.is_active = true')
         .andWhere('mq.is_deleted = false')
-        .orderBy('RANDOM()')
-        .limit(count)
         .getMany();
+      questions = this.pickDistinctRandom(allQs, count);
     } else {
       // Default: pick a random set, then pick random N from that set.
       const chosenSet = sets[Math.floor(Math.random() * sets.length)];
-      questions = await manager
+      const setQs = await manager
         .createQueryBuilder(MetaphorQuestion, 'mq')
         .where('mq.is_active = true')
         .andWhere('mq.is_deleted = false')
         .andWhere('mq.set_number = :sn', { sn: chosenSet })
-        .orderBy('RANDOM()')
-        .limit(count)
         .getMany();
+      questions = this.pickDistinctRandom(setQs, count);
     }
 
     if (questions.length === 0) return;
@@ -129,5 +127,28 @@ export class MetaphorGenerationService {
     this.logger.log(
       `[Metaphor] Generated ${rows.length} questions (${modeLabel}) for attempt ${attempt.id}.`,
     );
+  }
+
+  private pickDistinctRandom(allQs: MetaphorQuestion[], count: number): MetaphorQuestion[] {
+    const map = new Map<string, MetaphorQuestion>();
+    for (const q of allQs) {
+      const key = q.questionNumber != null ? `${q.setNumber}_${q.questionNumber}` : `id_${q.id}`;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, q);
+      } else {
+        if (q.imageUrl && !existing.imageUrl) {
+          map.set(key, q);
+        }
+      }
+    }
+
+    const distinct = Array.from(map.values());
+    for (let i = distinct.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [distinct[i], distinct[j]] = [distinct[j], distinct[i]];
+    }
+
+    return distinct.slice(0, count);
   }
 }

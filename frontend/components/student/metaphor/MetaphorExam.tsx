@@ -50,7 +50,7 @@ export default function MetaphorExam({
     const [, setExpired] = useState(false);
     const [zoom, setZoom] = useState(false);
     const [showInstructions, setShowInstructions] = useState(false);
-    const [confirmEmpty, setConfirmEmpty] = useState(false);
+    const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [finished, setFinished] = useState(false);
     const [saving, setSaving] = useState(false);
     const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -198,13 +198,34 @@ export default function MetaphorExam({
         await persistAnswer(answer, audioBlob);
         setSaving(false);
         if (isLast) {
+            const unansweredIdx = questions.findIndex((qq) => {
+                const isCurrent = qq.questionId === q.questionId;
+                if (isCurrent) return false;
+                const hasSaved = !!savedAnswers[qq.questionId]?.trim();
+                const hasWorking = !!workingRef.current[qq.questionId]?.trim();
+                return !hasSaved && !hasWorking;
+            });
+
+            if (unansweredIdx !== -1) {
+                setAlertMessage("Please answer all questions before submitting. Taking you to an unanswered question.");
+                switchTo(unansweredIdx);
+                return;
+            }
+
             try { await metaphorService.finish(attemptId); } catch { /* sweep retries */ }
             setFinished(true);
             return;
         }
         switchTo(idx + 1);
     };
-    const handleSaveNext = () => { if (!assemble()) { setConfirmEmpty(true); return; } void goNext(); };
+
+    const handleSaveNext = () => {
+        if (!assemble() && !savedAnswers[q.questionId]) {
+            setAlertMessage("Please provide an answer before continuing.");
+            return;
+        }
+        void goNext();
+    };
 
     const blocked = micState === "denied" || micState === "unsupported";
     const textSizeClass = (prefix: "context" | "question", text: string) => {
@@ -530,15 +551,14 @@ export default function MetaphorExam({
                 </div>
             )}
 
-            {/* CONFIRM EMPTY */}
-            {confirmEmpty && (
+            {/* ALERT MESSAGE */}
+            {alertMessage && (
                 <div className="modal-scrim"><div className="modal">
                     <div className="modal__icon warn"><WarnIcon /></div>
-                    <h2>Submit without an answer?</h2>
-                    <p>You haven’t captured or spoken anything for this question. Go back and answer, or skip it and continue.</p>
+                    <h2>Attention</h2>
+                    <p>{alertMessage}</p>
                     <div className="modal__actions row">
-                        <button className="btn-outline" onClick={() => setConfirmEmpty(false)}>Keep answering</button>
-                        <button className="btn-solid" onClick={() => { setConfirmEmpty(false); void goNext(); }}>Skip &amp; continue</button>
+                        <button className="btn-solid" onClick={() => setAlertMessage(null)}>OK</button>
                     </div>
                 </div></div>
             )}
