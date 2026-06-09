@@ -651,7 +651,17 @@ export class StudentService {
            WHERE assessment_attempt_id = $1`,
           [attempt.id],
         );
-        totalCount = Number(rows?.[0]?.total || 6);
+        totalCount = Number(rows?.[0]?.total || 0);
+        answeredCount = Number(rows?.[0]?.completed || 0);
+      } else if (assessmentKind === 'METAPHOR') {
+        const rows = await this.answerRepo.query(
+          `SELECT COUNT(*)::int AS total,
+                  COUNT(*) FILTER (WHERE status = 'ANSWERED')::int AS completed
+           FROM metaphor_answers
+           WHERE assessment_attempt_id = $1`,
+          [attempt.id],
+        );
+        totalCount = Number(rows?.[0]?.total || 0);
         answeredCount = Number(rows?.[0]?.completed || 0);
       }
       let status = attempt.status;
@@ -696,16 +706,7 @@ export class StudentService {
         levelNumber: level?.levelNumber,
         assessmentKind,
         completedQuestions: answeredCount,
-        totalQuestions:
-          totalCount > 0
-            ? totalCount
-            : assessmentKind === 'IAT_GEN'
-              ? 6
-              : level?.levelNumber === 2 ||
-                  level?.name.includes('ACI') ||
-                  level?.patternType === 'ACI'
-                ? 25
-                : 60,
+        totalQuestions: totalCount,
         unlockTime: unlockTime,
         dateCompleted: attempt.completedAt || attempt.updatedAt,
         attemptId: attempt.id, // Ensure attemptId is passed
