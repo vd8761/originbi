@@ -127,7 +127,17 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 sm:px-6 py-6 sm:py-8 overflow-y-auto overscroll-contain">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4 sm:px-6 overflow-y-auto overscroll-contain"
+      style={{
+        // Push the modal start point BELOW the fixed global student header so
+        // scrolling the modal up never hides its top behind it (the header is
+        // opaque and sits at top:0). Matches the StudentLayout main padding-top
+        // and gives a small bottom margin to breathe.
+        paddingTop: 'clamp(78px, 8.5vh, 112px)',
+        paddingBottom: 'clamp(20px, 3vh, 40px)',
+      }}
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity animate-fade-in"
@@ -135,7 +145,14 @@ const AssessmentModal: React.FC<AssessmentModalProps> = ({ isOpen, onClose, onSt
       />
 
       {/* Modal Content - Compact Layout */}
-      <div className="relative w-full max-w-xl my-auto bg-white dark:bg-[#1A1D21] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col max-h-[calc(100dvh-3rem)] animate-fade-in overflow-hidden transition-colors duration-300">
+      <div
+        className="relative w-full max-w-xl my-auto bg-white dark:bg-[#1A1D21] rounded-3xl shadow-2xl border border-brand-light-tertiary dark:border-white/10 flex flex-col animate-fade-in overflow-hidden transition-colors duration-300"
+        style={{
+          // Stay inside the visible region between the header and the bottom
+          // padding (mirrors the outer wrapper's paddingTop/paddingBottom).
+          maxHeight: 'calc(100dvh - clamp(98px, 11.5vh, 152px))',
+        }}
+      >
 
         {/* Scrollable Body - Increased Padding/Margins to give breathing space.
             min-h-0 lets the flex child actually shrink so the footer with the
