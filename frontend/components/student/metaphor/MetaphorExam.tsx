@@ -7,6 +7,8 @@
    ============================================================ */
 import React, { useEffect, useRef, useState } from "react";
 import "./metaphor-exam.css";
+import ThemeToggle from "../../ui/ThemeToggle";
+import { useTheme } from "../../../contexts/ThemeContext";
 import {
     metaphorService,
     MetaphorConfig,
@@ -40,7 +42,7 @@ export default function MetaphorExam({
 
     const [idx, setIdx] = useState(0);
     const [readLang, setReadLang] = useState<"EN" | "TA">("EN");
-    const [speakLang, setSpeakLang] = useState("auto");
+    const [speakLang, setSpeakLang] = useState("ta-IN");
 
     const [langOpen, setLangOpen] = useState(false);
 
@@ -53,6 +55,7 @@ export default function MetaphorExam({
     const [saving, setSaving] = useState(false);
     const [recordingSeconds, setRecordingSeconds] = useState(0);
     const [imageFailed, setImageFailed] = useState(false);
+    const [showExitModal, setShowExitModal] = useState(false);
 
     const workingRef = useRef<Record<number, string>>({});
     const langRef = useRef<HTMLDivElement>(null);
@@ -62,6 +65,7 @@ export default function MetaphorExam({
     const langs = config?.supportedLanguages ?? [];
 
     const sttProvider = config?.sttProvider?.provider || "web_speech";
+    const { theme, toggleTheme } = useTheme();
     const speech = useMetaphorSpeech({ provider: sttProvider, lang: speakLang });
     const { finalText: liveText, interim, listening, micState, audioLevel, spectrum } = speech;
 
@@ -91,7 +95,9 @@ export default function MetaphorExam({
                 setSavedAnswers(saved);
                 const firstUnanswered = data.questions.findIndex((qq) => !qq.answered);
                 setIdx(firstUnanswered === -1 ? Math.max(0, data.questions.length - 1) : firstUnanswered);
-                setSpeakLang("auto");
+                // Default to Tamil unless the candidate already picked another supported language.
+                const hasTamil = data.config.supportedLanguages?.some((l) => l.code === "ta-IN");
+                setSpeakLang(hasTamil ? "ta-IN" : data.config.supportedLanguages?.[0]?.code || "ta-IN");
             } catch (e: any) {
                 if (active) setLoadError(e?.message || "Failed to load the assessment.");
             } finally {
@@ -211,15 +217,18 @@ export default function MetaphorExam({
 
     // ---- render ----
     if (loading) {
-        return <div className="exam" data-theme="dark"><div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", color: "#9aa" }}>Loading…</div></div>;
+        return <div className="exam" data-theme={theme}><div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", color: "var(--fg-2)" }}>Loading...</div></div>;
     }
     if (loadError || !q) {
-        return <div className="exam" data-theme="dark"><div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", color: "#e88" }}>{loadError || "No metaphor questions for this attempt."}</div></div>;
+        return <div className="exam" data-theme={theme}><div style={{ display: "flex", height: "100vh", alignItems: "center", justifyContent: "center", color: "var(--red-300)" }}>{loadError || "No metaphor questions for this attempt."}</div></div>;
     }
 
     const pct = Math.round((idx / total) * 100);
     const tcls = timeLeft <= 0 ? "is-out" : timeLeft <= 120 ? "is-low" : "";
-    const speechLanguages = [{ code: "auto", label: "Auto detect", native: "Auto" }, ...langs];
+    // Pick list excludes "auto" — students choose a real spoken language; default = Tamil.
+    const speechLanguages = langs.length > 0
+        ? langs
+        : [{ code: "ta-IN", label: "Tamil", native: "தமிழ்" }, { code: "en-IN", label: "English", native: "English" }];
     const curLang = speechLanguages.find((l) => l.code === speakLang) || speechLanguages[0];
     const ctx = T(q.contextEn, q.contextTa);
     const imageDesc = T(q.imageDescEn, q.imageDescTa);
@@ -232,11 +241,12 @@ export default function MetaphorExam({
         i === idx ? "current" : (savedAnswers[qq.questionId]?.trim() || workingRef.current[qq.questionId]?.trim()) ? "done" : "todo");
 
     return (
-        <div className="exam layout-two-col" data-theme="dark">
+        <div className="exam layout-two-col" data-theme={theme}>
             {/* TOP BAR */}
             <header className="topbar">
                 <div className="topbar__brand">
                     <img className="topbar__logo is-white" src="/metaphor-assets/Origin-BI-white-logo.png" alt="Origin BI" />
+                    <img className="topbar__logo is-color" src="/metaphor-assets/Origin-BI-Logo-01.png" alt="Origin BI" />
                 </div>
                 <div className="topbar__progress">
                     <div className="topbar__progress-row">
@@ -263,7 +273,15 @@ export default function MetaphorExam({
                             <span className="mic-status__dot" />{micState === "denied" ? "Mic not working" : "Mic not supported"}
                         </div>
                     )}
+                    <div className="theme-toggle-wrap">
+                        <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+                    </div>
                     <button className="pill-btn" onClick={() => setShowInstructions(true)} title="How this works"><InfoIcon /><span>Instructions</span></button>
+                    {onExit && (
+                        <button className="leave-btn" onClick={() => setShowExitModal(true)} title="Leave assessment">
+                            <CloseIcon /><span>Leave</span>
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -368,7 +386,7 @@ export default function MetaphorExam({
                     <div className={`transcript transcript--floating ${listening ? "is-live" : ""} ${hasTranscript ? "has-text" : ""}`}>
                         <div className="transcript__head">
                             <span>Live Transcript</span>
-                            {speakLang === "auto" && <em>Auto detect</em>}
+                            {curLang?.native && <em>{curLang.native}</em>}
                         </div>
                         <div className="transcript__body" ref={transcriptBodyRef}>
                             {(liveText || interim || listening) ? (
@@ -521,6 +539,19 @@ export default function MetaphorExam({
                     <div className="modal__actions row">
                         <button className="btn-outline" onClick={() => setConfirmEmpty(false)}>Keep answering</button>
                         <button className="btn-solid" onClick={() => { setConfirmEmpty(false); void goNext(); }}>Skip &amp; continue</button>
+                    </div>
+                </div></div>
+            )}
+
+            {/* CONFIRM EXIT */}
+            {showExitModal && (
+                <div className="modal-scrim"><div className="modal">
+                    <div className="modal__icon warn"><WarnIcon /></div>
+                    <h2>Leave assessment?</h2>
+                    <p>Your saved answers will remain available. Any unsaved speech on the current question may be lost.</p>
+                    <div className="modal__actions row">
+                        <button className="btn-outline" onClick={() => setShowExitModal(false)}>Stay</button>
+                        <button className="btn-solid danger" onClick={() => { setShowExitModal(false); onExit?.(); }}>Leave</button>
                     </div>
                 </div></div>
             )}

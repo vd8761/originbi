@@ -74,7 +74,10 @@ const SuccessModal: React.FC<{
   onBack: () => void;
   onDashboard: () => void;
   showDashboard?: boolean;
-}> = ({ onBack, onDashboard, showDashboard = false }) => (
+  /** True only when this was the LAST mandatory level. Drives the "report by
+   *  email" copy — otherwise we tell the student they still have more to do. */
+  isFinal?: boolean;
+}> = ({ onBack, onDashboard, showDashboard = false, isFinal = false }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
     <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
     <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center animate-notice-pop">
@@ -92,10 +95,12 @@ const SuccessModal: React.FC<{
       </div>
 
       <h2 className="text-2xl font-bold text-brand-text-light-primary dark:text-white mb-2">
-        Assessment Completed!
+        {isFinal ? "Assessment Completed!" : "Level Completed!"}
       </h2>
       <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm leading-relaxed">
-        You&apos;ve successfully completed the assessment. Your report is being processed and will be shared to your registered mail ID.
+        {isFinal
+          ? "You've successfully completed all assessments. Your report is being processed and will be shared to your registered mail ID."
+          : "Great work — your responses have been saved. Head back to the assessments screen to continue with the next level."}
       </p>
 
       <div className="flex flex-col gap-3 w-full">
@@ -964,6 +969,10 @@ const AssessmentRunner: React.FC<AssessmentRunnerProps> = ({
           <SuccessModal
             onBack={onBack}
             onDashboard={handleGoToDashboard}
+            isFinal={
+              isFinalCompletion === true ||
+              (isFinalCompletion === null && isLastLevel)
+            }
             showDashboard={
               isFinalCompletion === true ||
               (isFinalCompletion === null && isLastLevel)

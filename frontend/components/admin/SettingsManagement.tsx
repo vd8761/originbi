@@ -329,6 +329,21 @@ export default function SettingsManagement() {
         }
 
         if (item.valueType === 'string' || item.valueType === 'number') {
+            if (item.category === 'metaphor' && item.key === 'question_selection_mode') {
+                return (
+                    <select
+                        id={item.key}
+                        disabled={item.isReadonly}
+                        value={String(item.value || 'random_single_set')}
+                        onChange={(e) => handleValueChange(item.category, item.key, e.target.value)}
+                        className={`block w-full max-w-lg rounded-xl border-0 py-2.5 px-4 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm sm:leading-6 transition-all cursor-pointer ${item.isReadonly ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-black/20' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
+                    >
+                        <option value="random_single_set">Pick random N questions from a random single set</option>
+                        <option value="random_all_sets">Pick random N questions from all sets</option>
+                    </select>
+                );
+            }
+
             if (item.category === 'metaphor' && item.key === 'gemini_model') {
                 return (
                     <GeminiModelSelect

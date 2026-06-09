@@ -607,6 +607,16 @@ const isIatGenAssessment = (assessment: Pick<AssessmentData, 'assessmentKind' | 
   return kind === 'IAT_GEN' || /iat\s*gen/i.test(assessment.title || '');
 };
 
+const toCount = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+};
+
+const calculateAssessmentProgress = (completedQuestions: number, totalQuestions: number) => {
+  if (totalQuestions <= 0) return 0;
+  return Math.min(100, Math.round((completedQuestions / totalQuestions) * 100));
+};
+
 interface AssessmentCardProps extends AssessmentData {
   progress: number;
   onAction: (id: string) => void;
@@ -1026,16 +1036,20 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
       // Robust ID Mapping
       const foundAttemptId = step.id || step.attempt_id || step.assessment_attempt_id || step.uuid;
+      const totalQuestions = toCount(step.totalQuestions);
+      const completedFromApi = toCount(step.completedQuestions);
+      const completedQuestions =
+        status === 'completed' && totalQuestions > 0
+          ? totalQuestions
+          : Math.min(completedFromApi, totalQuestions || completedFromApi);
 
       return {
         id: String(step.levelNumber || index + 1),
         attemptId: foundAttemptId,
         title: step.stepName,
         description: isIatGen ? IAT_GEN_DESCRIPTION : (step.description || step.stepName),
-        totalQuestions: step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : (step.levelNumber === 2 || step.stepName.includes('ACI') ? 25 : 40)),
-        completedQuestions: status === 'completed'
-          ? (step.totalQuestions || ((step.levelNumber === 1 || step.stepName.includes('Level 1')) ? 60 : (step.levelNumber === 2 || step.stepName.includes('ACI') ? 25 : 40)))
-          : (step.completedQuestions || 0),
+        totalQuestions,
+        completedQuestions,
         status: status,
         unlockTime: step.unlockTime,
         dateCompleted: step.dateCompleted,
@@ -1141,8 +1155,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     return {
       label: assessment.title,
       status,
-      progress: Math.round(
-        (assessment.completedQuestions / assessment.totalQuestions) * 100
+      progress: calculateAssessmentProgress(
+        assessment.completedQuestions,
+        assessment.totalQuestions,
       ),
     };
   }), [assessments]);
@@ -1811,8 +1826,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
             <AssessmentCard
               key={assessment.id}
               {...assessment}
-              progress={Math.round(
-                (assessment.completedQuestions / assessment.totalQuestions) * 100
+              progress={calculateAssessmentProgress(
+                assessment.completedQuestions,
+                assessment.totalQuestions,
               )}
               onAction={handleCardAction}
             />

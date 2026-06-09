@@ -34,6 +34,17 @@ export class MetaphorGenerationService {
     attempt: MetaphorAttemptCtx,
     manager: EntityManager,
   ): Promise<void> {
+    // ── Guard: skip if questions were already generated for this attempt ──
+    const existingCount = await manager.count(MetaphorAnswer, {
+      where: { assessmentAttemptId: attempt.id },
+    });
+    if (existingCount > 0) {
+      this.logger.log(
+        `[Metaphor] Attempt ${attempt.id} already has ${existingCount} questions — skipping duplicate generation.`,
+      );
+      return;
+    }
+
     // How many questions to show (admin setting, default 20).
     let count = 20;
     try {
@@ -44,6 +55,18 @@ export class MetaphorGenerationService {
       if (typeof v === 'number' && v > 0) count = Math.floor(v);
     } catch {
       /* default 20 */
+    }
+
+    // Question selection mode: 'random_single_set' (default) or 'random_all_sets'.
+    let selectionMode = 'random_single_set';
+    try {
+      const modeSetting = await manager.findOne(OriginbiSetting, {
+        where: { category: 'metaphor', settingKey: 'question_selection_mode' },
+      });
+      const modeVal = modeSetting?.value as unknown;
+      if (modeVal === 'random_all_sets') selectionMode = 'random_all_sets';
+    } catch {
+      /* default random_single_set */
     }
 
     // Distinct active sets in the bank.
@@ -62,16 +85,29 @@ export class MetaphorGenerationService {
       return; // skip silently — never blocks the main flow
     }
 
-    const chosenSet = sets[Math.floor(Math.random() * sets.length)];
+    let questions: MetaphorQuestion[];
 
-    const questions = await manager
-      .createQueryBuilder(MetaphorQuestion, 'mq')
-      .where('mq.is_active = true')
-      .andWhere('mq.is_deleted = false')
-      .andWhere('mq.set_number = :sn', { sn: chosenSet })
-      .orderBy('RANDOM()')
-      .limit(count)
-      .getMany();
+    if (selectionMode === 'random_all_sets') {
+      // Pick random N questions from ALL active sets combined.
+      questions = await manager
+        .createQueryBuilder(MetaphorQuestion, 'mq')
+        .where('mq.is_active = true')
+        .andWhere('mq.is_deleted = false')
+        .orderBy('RANDOM()')
+        .limit(count)
+        .getMany();
+    } else {
+      // Default: pick a random set, then pick random N from that set.
+      const chosenSet = sets[Math.floor(Math.random() * sets.length)];
+      questions = await manager
+        .createQueryBuilder(MetaphorQuestion, 'mq')
+        .where('mq.is_active = true')
+        .andWhere('mq.is_deleted = false')
+        .andWhere('mq.set_number = :sn', { sn: chosenSet })
+        .orderBy('RANDOM()')
+        .limit(count)
+        .getMany();
+    }
 
     if (questions.length === 0) return;
 
@@ -89,8 +125,9 @@ export class MetaphorGenerationService {
     }));
 
     await manager.getRepository(MetaphorAnswer).insert(rows);
+    const modeLabel = selectionMode === 'random_all_sets' ? 'all sets' : `set ${questions[0]?.setNumber ?? '?'}`;
     this.logger.log(
-      `[Metaphor] Generated ${rows.length} questions (set ${chosenSet}) for attempt ${attempt.id}.`,
+      `[Metaphor] Generated ${rows.length} questions (${modeLabel}) for attempt ${attempt.id}.`,
     );
   }
 }
