@@ -497,6 +497,9 @@ export class StudentService {
       }
     }
 
+    const showReportSetting = await this.settingsService.getValue<boolean>('report', 'show_report_preview_after_exam');
+    const showReportPreviewAfterExam = showReportSetting !== null ? showReportSetting : true;
+
     return {
       ...user,
       fullName:
@@ -509,6 +512,7 @@ export class StudentService {
       personalityTrait: trait,
       programCode,
       academicDetails,
+      showReportPreviewAfterExam,
       ...(impactData || {}),
     };
   }

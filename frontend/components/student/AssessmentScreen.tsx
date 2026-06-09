@@ -981,6 +981,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const reportGenerationLockRef = useRef(false);
   // Track if cache restore has been attempted this mount
   const cacheRestoreAttemptedRef = useRef(false);
+  const [showReportPreviewAfterExam, setShowReportPreviewAfterExam] = useState(true);
 
   // Dynamic API URL for Mobile Support
 
@@ -1003,6 +1004,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           }
           if (profileData?.id) {
             setStudentId(Number(profileData.id));
+          }
+          if (profileData && profileData.showReportPreviewAfterExam !== undefined) {
+            setShowReportPreviewAfterExam(profileData.showReportPreviewAfterExam);
           }
         } catch (err) {
           console.error("Error fetching assessment data:", err);
@@ -1075,7 +1079,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     // count — so enabling Level 3/4 keeps the student in the assessment until done.
     const reportReady =
       assessments.length > 0 && completedAssessmentCount >= assessments.length;
-    setForceReportPageMode(reportReady);
+    setForceReportPageMode(reportReady && showReportPreviewAfterExam);
 
     if (typeof window !== 'undefined') {
       if (reportReady) {
@@ -1102,8 +1106,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const overallPercentage = totalQuestions > 0 ? Math.round((totalCompleted / totalQuestions) * 100) : 0;
 
   const isReportPageMode =
-    (assessments.length > 0 && completedAssessmentCount >= assessments.length) ||
-    forceReportPageMode;
+    ((assessments.length > 0 && completedAssessmentCount >= assessments.length) ||
+    forceReportPageMode) && showReportPreviewAfterExam;
   const loadPdfIntoViewer = async (
     absoluteDownloadUrl: string,
     authContext: SessionAuthContext,
