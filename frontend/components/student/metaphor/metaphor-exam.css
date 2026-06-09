@@ -683,8 +683,12 @@ button { font-family: inherit; }
 
 /* ===================== QUESTION RAIL ===================== */
 .qrail {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  /* justify-content: flex-start — when the content is taller than the column
+     'center' pushes the top arrow ABOVE the visible area (and visually under
+     the sticky topbar at high browser zoom). Start anchors it cleanly. */
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
   gap: 16px; padding: 4px 0 16px; min-height: 0; align-self: stretch;
+  overflow: hidden;   /* internal list scrolls; arrows stay pinned */
 }
 .qrail__arrow {
   width: 42px; height: 42px; flex-shrink: 0;
@@ -1083,6 +1087,25 @@ html:has(.modal-scrim) { overflow: hidden; }
   .topbar__tools { gap: 8px; }
   .pill-btn span, .leave-btn span { display: none; }   /* icons only when tight */
   .qtimer__label { display: none; }
+
+  /* Shrink the voice answer head + mic + status so the live transcript has
+     room to breathe instead of getting smashed at this scale. */
+  .voice-floating-head { padding: 10px 12px; box-shadow: none; }
+  .voice-floating-head .answer__title h3 { font-size: 13px; gap: 7px; }
+  .voice-floating-head .answer__title h3 svg { width: 15px; height: 15px; }
+  .voice-floating-head .answer__title span { font-size: 10.5px; }
+  .voice-floating-head .lang-select__btn { padding: 6px 10px; font-size: 12px; }
+  .mic-float {
+    min-height: 132px;
+    margin-top: 2px;
+    padding: 10px 0 8px;
+    gap: 12px;
+  }
+  .mic-fab { width: clamp(64px, 6.4vw, 84px); border-width: 5px; }
+  .mic-fab svg { width: clamp(24px, 2.2vw, 32px); height: clamp(24px, 2.2vw, 32px); }
+  .voice-status { gap: 3px; }
+  .voice-status span { font-size: 14px; }
+  .voice-status b { font-size: 12px; }
 }
 
 /* Tablet / small laptop: stack the columns, rail becomes a horizontal strip on top */
