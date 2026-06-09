@@ -66,6 +66,8 @@
   --fg-3: var(--txt-d-3);
   --field: rgba(255,255,255,0.04);
   --field-hover: rgba(255,255,255,0.07);
+  /* Theme-aware "deep field" for mic/qnav gradients (dark = near-black, light = soft cream). */
+  --field-deep: var(--field-deep);
   --grid-line: rgba(30,211,106,0.07);
 }
 
@@ -80,6 +82,7 @@
   --fg-3: #5a6675;
   --field: #F1F5F3;
   --field-hover: #E9EFEB;
+  --field-deep: #E1ECE4;
   --grid-line: rgba(30,211,106,0.10);
 }
 
@@ -126,10 +129,14 @@ button { font-family: inherit; }
   gap: 22px;
   padding: 0 clamp(18px, 2.4vw, 40px);
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  z-index: 40;
+  /* Stick so high browser zoom (e.g. 150%) can't let content slide UNDER the
+     bar when the page scrolls. */
+  position: sticky;
+  top: 0;
+  z-index: 60;
 }
 .topbar__brand { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 .topbar__logo { height: 26px; width: auto; display: block; }
@@ -424,7 +431,7 @@ button { font-family: inherit; }
   justify-content: center;
   border-radius: 50%;
   border: 8px solid color-mix(in srgb, var(--green-500) 72%, transparent);
-  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--green-500) 10%, var(--dark-500)), var(--dark-500) 68%);
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--green-500) 10%, var(--field-deep)), var(--field-deep) 68%);
   color: #fff;
   cursor: pointer;
   box-shadow:
@@ -632,7 +639,7 @@ button { font-family: inherit; }
   justify-content: center;
   border: 6px solid color-mix(in srgb, var(--green-500) 78%, transparent);
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--green-500) 12%, var(--dark-500)), var(--dark-500) 70%);
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--green-500) 12%, var(--field-deep)), var(--field-deep) 70%);
   color: #fff;
   cursor: pointer;
   box-shadow:
@@ -738,7 +745,7 @@ button { font-family: inherit; }
 }
 .qnav--done::after { background: var(--green-400); box-shadow: 0 0 10px color-mix(in srgb, var(--green-500) 42%, transparent); }
 .qnav--current {
-  background: color-mix(in srgb, var(--fg-2) 12%, var(--dark-500));
+  background: color-mix(in srgb, var(--fg-2) 12%, var(--field-deep));
   border-color: color-mix(in srgb, var(--green-500) 28%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green-500) 10%, transparent);
 }
@@ -1092,7 +1099,14 @@ html:has(.modal-scrim) { overflow: hidden; }
   .exam__body .stimulus { order: 0; }
   .exam__body .answer { order: 1; }
   .stimulus__scroll { overflow: visible; }
-  .imgframe { flex: none; aspect-ratio: 16 / 10; }
+  /* Cap the image so the question + answer stay visible on tablets and
+     high-browser-zoom desktops without forcing a long scroll. */
+  .imgframe {
+    flex: none;
+    aspect-ratio: 16 / 10;
+    max-height: min(46dvh, 360px);
+  }
+  .imgframe img { width: 100%; height: 100%; object-fit: cover; }
   .answer { min-height: 460px; }
   .voice-answer {
     min-height: auto;
@@ -1104,11 +1118,13 @@ html:has(.modal-scrim) { overflow: hidden; }
 
   /* rail horizontal */
   .qrail {
-    position: sticky; top: 0; z-index: 35;
+    /* Sit BELOW the sticky topbar (68px) — not at top:0 — so the rail and the
+       topbar don't pile up at high zoom. */
+    position: sticky; top: 68px; z-index: 55;
     flex-direction: row; align-items: center; justify-content: stretch;
     gap: 10px; padding: 9px 10px;
     margin: -4px -10px 0;
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
     border-bottom: 1px solid var(--line);
     backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   }
@@ -1236,26 +1252,41 @@ html:has(.modal-scrim) { overflow: hidden; }
     padding: 12px;
     overflow: visible;
   }
+  /* On mobile, keep the voice answer panel INLINE in the flow (was fixed at
+     the bottom, which hid the mic + transcript entirely). The whole answer
+     panel — mic button, status, and floating transcript — stays visible. */
   .voice-answer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 90;
-    align-items: center;
-    gap: 0;
-    padding: 0;
-    border: none;
-    background: transparent;
-    pointer-events: none;
+    position: static;
+    z-index: auto;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: var(--radius-3xl);
+    pointer-events: auto;
   }
-  .voice-answer > * { pointer-events: auto; }
-  .voice-floating-head,
-  .mic-float,
-  .voice-status,
-  .voice-actions,
-  .voice-card__intro {
-    display: none;
+  .voice-floating-head { display: flex; padding-bottom: 6px; }
+  .voice-floating-head .answer__title h3 { font-size: 14px; }
+  .voice-floating-head .answer__title span { font-size: 11px; }
+  .mic-float {
+    display: flex;
+    margin: 4px auto;
+    transform: scale(0.78);
+    transform-origin: center;
+  }
+  .voice-status { display: flex; }
+  .voice-actions, .voice-card__intro { display: none; }
+  /* Floating transcript always visible on mobile so students can read what
+     they said even before the recognizer flushes. */
+  .transcript--floating {
+    display: flex !important;
+    position: static;
+    width: 100%;
+    margin: 0;
+    background: var(--field);
+    box-shadow: none;
+    border: 1px solid var(--line);
   }
   .cps { margin-bottom: 9px; }
   .cps__head { margin-bottom: 7px; }
@@ -1336,7 +1367,7 @@ html:has(.modal-scrim) { overflow: hidden; }
     width: 66px;
     height: 66px;
     border: 5px solid color-mix(in srgb, var(--green-500) 70%, transparent);
-    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--green-500) 12%, var(--dark-500)), var(--dark-500) 70%);
+    background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--green-500) 12%, var(--field-deep)), var(--field-deep) 70%);
     box-shadow: 0 0 0 10px color-mix(in srgb, var(--green-500) 9%, transparent), 0 10px 28px rgba(0,0,0,0.34);
   }
   .mobile-voice-nav__record.is-live {
