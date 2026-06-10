@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MetaphorReportStatus, assessmentService } from '../../lib/services/assessment.service';
+import { studentService } from '../../lib/services/student.service';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -25,6 +26,8 @@ interface MetaphorReportPanelProps {
         program: string;
         type: string;
     };
+    isStudent?: boolean;
+    studentEmail?: string;
 }
 
 const InfoItem = ({ icon: Icon, label, value }: { icon: any; label: string; value: React.ReactNode }) => (
@@ -282,6 +285,8 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
     formatDate,
     stats,
     displayData,
+    isStudent = false,
+    studentEmail,
 }) => {
     const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -294,7 +299,15 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
         if (!data?.attempt?.id || !report?.markdown) return;
         try {
             setDownloadingPdf(true);
-            const blob = await assessmentService.downloadMetaphorReportPdf(data.attempt.id);
+            let blob: Blob;
+            if (isStudent) {
+                if (!studentEmail) {
+                    throw new Error('Student email is required to download report');
+                }
+                blob = await studentService.downloadMetaphorReportPdf(data.attempt.id, studentEmail);
+            } else {
+                blob = await assessmentService.downloadMetaphorReportPdf(data.attempt.id);
+            }
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -378,7 +391,7 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                                         Download PDF
                                     </button>
                                 )}
-                                {exhausted && (
+                                {exhausted && !isStudent && (
                                     <button
                                         onClick={onRetry}
                                         disabled={retrying}
@@ -396,13 +409,13 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                             <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/10 p-6">
                                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                                     {exhausted
-                                        ? 'Report generation failed after all retries.'
+                                        ? (isStudent ? 'Report generation failed. Please contact support.' : 'Report generation failed after all retries.')
                                         : data?.readyForReport
                                             ? 'Report generation is queued or processing.'
                                             : 'Waiting for all generated questions to be accounted for.'}
                                 </p>
-                                {job?.lastError && <p className="text-xs text-red-500 mt-2">{job.lastError}</p>}
-                                {job?.nextRetryAt && !exhausted && (
+                                {job?.lastError && !isStudent && <p className="text-xs text-red-500 mt-2">{job.lastError}</p>}
+                                {job?.nextRetryAt && !exhausted && !isStudent && (
                                     <p className="text-xs text-amber-500 mt-2">Retry scheduled in {formatRetryEta(job.nextRetryAt)}.</p>
                                 )}
                             </div>
@@ -415,9 +428,13 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                     <div className="border-t border-gray-200 dark:border-white/10" />
                     <SidebarItem label="Program Level" value={displayData.program} />
                     <SidebarItem label="Exam Type" value={displayData.type} />
-                    <div className="border-t border-gray-200 dark:border-white/10" />
-                    <SidebarItem label="Claude Model" value={report?.model || '--'} small />
-                    <SidebarItem label="Report Attempts" value={job ? `${job.retryCount || 0}/${job.maxRetries || 5}` : '--'} />
+                    {!isStudent && (
+                        <>
+                            <div className="border-t border-gray-200 dark:border-white/10" />
+                            <SidebarItem label="Claude Model" value={report?.model || '--'} small />
+                            <SidebarItem label="Report Attempts" value={job ? `${job.retryCount || 0}/${job.maxRetries || 5}` : '--'} />
+                        </>
+                    )}
                 </div>
             </div>
 

@@ -1,12 +1,15 @@
 import {
   Controller,
   Post,
+  Get,
+  Param,
+  Res,
   Body,
   Logger,
   Req,
   BadRequestException,
 } from '@nestjs/common';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { PgBossService } from '@wavezync/nestjs-pgboss';
 import { StudentService } from './student.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
@@ -148,6 +151,34 @@ export class StudentController {
       body.levelNumber,
     );
     return { success: true };
+  }
+
+  @Post('metaphor-report')
+  async getMetaphorReport(@Body() body: { email: string }) {
+    return this.studentService.getMetaphorReport(body.email);
+  }
+
+  @Post('iat-report')
+  async getIatReport(@Body() body: { email: string }) {
+    return this.studentService.getIatReport(body.email);
+  }
+
+  @Post('metaphor/:attemptId/report/pdf')
+  async downloadMetaphorReportPdf(
+    @Param('attemptId') attemptId: string,
+    @Body('email') email: string,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.studentService.generateMetaphorReportPdfForStudent(
+      Number(attemptId),
+      email,
+    );
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="metaphor-report-${attemptId}.pdf"`,
+    );
+    res.send(pdf);
   }
 
   @Post('affiliate/validate')
