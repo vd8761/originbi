@@ -178,7 +178,7 @@ export default function StudentLayout({
         <div className={`relative min-h-screen w-full ${pageBaseBackgroundClass} font-sans selection:bg-brand-green/20 overflow-x-hidden`}>
             <div className={`w-full min-h-screen ${shouldApplyZoom ? 'lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0]' : ''}`}>
                 {isPublic ? (
-                    <div className="relative z-10 w-full min-h-screen px-4 sm:px-6 lg:px-8 2xl:px-12 max-w-[2000px] mx-auto transition-all duration-300 relative">
+                    <div className="relative z-10 w-full min-h-screen transition-all duration-300">
                         {children}
                     </div>
                 ) : (

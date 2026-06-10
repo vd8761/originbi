@@ -147,10 +147,8 @@ export default function CorporateLayout({
                     </RequireCorporate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */
-                    <div className="relative z-10 w-full min-h-screen">
-                        <div className="w-full h-full max-w-[2000px] mx-auto transition-all duration-300 relative">
-                            {children}
-                        </div>
+                    <div className="relative z-10 w-full min-h-screen transition-all duration-300">
+                        {children}
                     </div>
                 )}
             </div>
