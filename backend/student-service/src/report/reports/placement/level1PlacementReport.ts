@@ -11,7 +11,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import PDFDocument = require('pdfkit');
+import PDFDocument from 'pdfkit';
 
 import {
   Level1CohortResult,
@@ -409,7 +409,7 @@ export class Level1PlacementReport {
         return (spec?.roles ?? []).slice(0, ROLES_TO_SHOW).join('  ·  ');
       default:
         return spec
-          ? String((spec as unknown as Record<string, unknown>)[col.key])
+          ? String((spec as unknown as Record<string, number | string>)[col.key])
           : '—';
     }
   }
