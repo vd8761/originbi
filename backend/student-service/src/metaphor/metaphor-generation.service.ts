@@ -123,16 +123,25 @@ export class MetaphorGenerationService {
     }));
 
     await manager.getRepository(MetaphorAnswer).insert(rows);
-    const modeLabel = selectionMode === 'random_all_sets' ? 'all sets' : `set ${questions[0]?.setNumber ?? '?'}`;
+    const modeLabel =
+      selectionMode === 'random_all_sets'
+        ? 'all sets'
+        : `set ${questions[0]?.setNumber ?? '?'}`;
     this.logger.log(
       `[Metaphor] Generated ${rows.length} questions (${modeLabel}) for attempt ${attempt.id}.`,
     );
   }
 
-  private pickDistinctRandom(allQs: MetaphorQuestion[], count: number): MetaphorQuestion[] {
+  private pickDistinctRandom(
+    allQs: MetaphorQuestion[],
+    count: number,
+  ): MetaphorQuestion[] {
     const map = new Map<string, MetaphorQuestion>();
     for (const q of allQs) {
-      const key = q.questionNumber != null ? `${q.setNumber}_${q.questionNumber}` : `id_${q.id}`;
+      const key =
+        q.questionNumber != null
+          ? `${q.setNumber}_${q.questionNumber}`
+          : `id_${q.id}`;
       const existing = map.get(key);
       if (!existing) {
         map.set(key, q);

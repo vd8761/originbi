@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MetaphorReportStatus, assessmentService } from '../../lib/services/assessment.service';
+import { studentService } from '../../lib/services/student.service';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
@@ -25,6 +26,8 @@ interface MetaphorReportPanelProps {
         program: string;
         type: string;
     };
+    isStudent?: boolean;
+    studentEmail?: string;
 }
 
 const InfoItem = ({ icon: Icon, label, value }: { icon: any; label: string; value: React.ReactNode }) => (
@@ -54,6 +57,27 @@ const formatRetryEta = (value?: string | null) => {
     if (minutes < 60) return `${minutes} min`;
     const hours = Math.ceil(minutes / 60);
     return `${hours} hr`;
+};
+
+const cleanMarkdownForStudent = (markdown: string): string => {
+    let clean = markdown;
+
+    // 1. Remove the top main title or change it
+    clean = clean.replace(/#\s+DISC\s+Behaviour\s+Analysis\s+Report/gi, '# Metaphor Analysis Report');
+
+    // 2. Remove the DISC Scores section (up to the next heading)
+    clean = clean.replace(/##\s+DISC\s+Scores[\s\S]*?(?=##)/gi, '');
+
+    // 3. Remove the Final DISC Pattern section (up to the next heading)
+    clean = clean.replace(/##\s+Final\s+DISC\s+Pattern[\s\S]*?(?=##)/gi, '');
+
+    // 4. Remove the DISC Pattern item in Behavioural Dimensions
+    clean = clean.replace(/\*\*DISC\s+Pattern\*\*[\s\S]*?(?=\n\s*\n|\n\s*\*\*|\n\s*##)/gi, '');
+
+    // Clean up multiple consecutive newlines
+    clean = clean.replace(/\n{3,}/g, '\n\n');
+
+    return clean.trim();
 };
 
 const answerStatusBadge = (answer: MetaphorAnswer) => {
@@ -282,6 +306,8 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
     formatDate,
     stats,
     displayData,
+    isStudent = false,
+    studentEmail,
 }) => {
     const [selectedAnswerIndex, setSelectedAnswerIndex] = useState<number | null>(null);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -294,7 +320,15 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
         if (!data?.attempt?.id || !report?.markdown) return;
         try {
             setDownloadingPdf(true);
-            const blob = await assessmentService.downloadMetaphorReportPdf(data.attempt.id);
+            let blob: Blob;
+            if (isStudent) {
+                if (!studentEmail) {
+                    throw new Error('Student email is required to download report');
+                }
+                blob = await studentService.downloadMetaphorReportPdf(data.attempt.id, studentEmail);
+            } else {
+                blob = await assessmentService.downloadMetaphorReportPdf(data.attempt.id);
+            }
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
@@ -360,49 +394,51 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                     </div>
 
                     <div className="border-t border-gray-200 dark:border-white/10 pt-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                            <div>
-                                <h3 className="text-sm font-semibold text-[#150089] dark:text-white">Claude Markdown Report</h3>
-                                {report?.generatedAt && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Generated {formatDate(report.generatedAt || undefined)}</p>
-                                )}
+                        {!isStudent && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-[#150089] dark:text-white">Claude Markdown Report</h3>
+                                    {report?.generatedAt && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Generated {formatDate(report.generatedAt || undefined)}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {report?.markdown && (
+                                        <button
+                                            onClick={handleDownloadPdf}
+                                            disabled={downloadingPdf}
+                                            className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
+                                        >
+                                            {downloadingPdf ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <DownloadIcon className="w-3 h-3" />}
+                                            Download PDF
+                                        </button>
+                                    )}
+                                    {exhausted && (
+                                        <button
+                                            onClick={onRetry}
+                                            disabled={retrying}
+                                            className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
+                                        >
+                                            {retrying ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <ClockIcon className="w-3 h-3" />}
+                                            Retry Report
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {report?.markdown && (
-                                    <button
-                                        onClick={handleDownloadPdf}
-                                        disabled={downloadingPdf}
-                                        className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
-                                    >
-                                        {downloadingPdf ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <DownloadIcon className="w-3 h-3" />}
-                                        Download PDF
-                                    </button>
-                                )}
-                                {exhausted && (
-                                    <button
-                                        onClick={onRetry}
-                                        disabled={retrying}
-                                        className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
-                                    >
-                                        {retrying ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <ClockIcon className="w-3 h-3" />}
-                                        Retry Report
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                        )}
                         {report?.markdown ? (
-                            <MarkdownPreview markdown={report.markdown} />
+                            <MarkdownPreview markdown={isStudent ? cleanMarkdownForStudent(report.markdown) : report.markdown} />
                         ) : (
                             <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/10 p-6">
                                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
                                     {exhausted
-                                        ? 'Report generation failed after all retries.'
+                                        ? (isStudent ? 'Report generation failed. Please contact support.' : 'Report generation failed after all retries.')
                                         : data?.readyForReport
                                             ? 'Report generation is queued or processing.'
                                             : 'Waiting for all generated questions to be accounted for.'}
                                 </p>
-                                {job?.lastError && <p className="text-xs text-red-500 mt-2">{job.lastError}</p>}
-                                {job?.nextRetryAt && !exhausted && (
+                                {job?.lastError && !isStudent && <p className="text-xs text-red-500 mt-2">{job.lastError}</p>}
+                                {job?.nextRetryAt && !exhausted && !isStudent && (
                                     <p className="text-xs text-amber-500 mt-2">Retry scheduled in {formatRetryEta(job.nextRetryAt)}.</p>
                                 )}
                             </div>
@@ -415,9 +451,13 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                     <div className="border-t border-gray-200 dark:border-white/10" />
                     <SidebarItem label="Program Level" value={displayData.program} />
                     <SidebarItem label="Exam Type" value={displayData.type} />
-                    <div className="border-t border-gray-200 dark:border-white/10" />
-                    <SidebarItem label="Claude Model" value={report?.model || '--'} small />
-                    <SidebarItem label="Report Attempts" value={job ? `${job.retryCount || 0}/${job.maxRetries || 5}` : '--'} />
+                    {!isStudent && (
+                        <>
+                            <div className="border-t border-gray-200 dark:border-white/10" />
+                            <SidebarItem label="Claude Model" value={report?.model || '--'} small />
+                            <SidebarItem label="Report Attempts" value={job ? `${job.retryCount || 0}/${job.maxRetries || 5}` : '--'} />
+                        </>
+                    )}
                 </div>
             </div>
 
