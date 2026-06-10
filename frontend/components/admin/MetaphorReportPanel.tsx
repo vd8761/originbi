@@ -80,9 +80,12 @@ const cleanMarkdownForStudent = (markdown: string): string => {
     return clean.trim();
 };
 
-const answerStatusBadge = (answer: MetaphorAnswer) => {
+const answerStatusBadge = (answer: MetaphorAnswer, isStudent = false) => {
     if (answer.status === 'NOT_ANSWERED') {
         return { label: 'Not submitted', className: 'bg-gray-500/10 text-gray-500 border-gray-400/30' };
+    }
+    if (isStudent) {
+        return { label: 'Submitted', className: 'bg-brand-green/10 text-brand-green border-brand-green/30' };
     }
     if (answer.transcriptionStatus === 'PROCESSING') {
         return { label: 'Processing audio', className: 'bg-amber-500/10 text-amber-500 border-amber-500/30' };
@@ -215,14 +218,16 @@ const AnswerModal = ({
     index,
     onClose,
     onNavigate,
+    isStudent = false,
 }: {
     answers: MetaphorAnswer[];
     index: number;
     onClose: () => void;
     onNavigate: (index: number) => void;
+    isStudent?: boolean;
 }) => {
     const answer = answers[index];
-    const badge = answer ? answerStatusBadge(answer) : null;
+    const badge = answer ? answerStatusBadge(answer, isStudent) : null;
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -260,16 +265,22 @@ const AnswerModal = ({
                             ) : (
                                 <div className="rounded-xl border border-dashed border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-black/20 p-8 text-center text-sm text-gray-500">No image attached</div>
                             )}
-                            {answer.imageDescriptionEn && <TranscriptBlock label="Image Description" value={answer.imageDescriptionEn} />}
+                            {!isStudent && answer.imageDescriptionEn && <TranscriptBlock label="Image Description" value={answer.imageDescriptionEn} />}
                         </div>
 
                         <div className="space-y-4">
                             <TranscriptBlock label="Context" value={answer.contextEn || answer.contextTa} />
                             <TranscriptBlock label="Question" value={answer.questionEn || answer.questionTa} />
-                            <TranscriptBlock label="Final Transcript" value={answer.finalTranscript} />
-                            <TranscriptBlock label="English Translation" value={answer.englishText} />
-                            <TranscriptBlock label="Browser Fallback Transcript" value={answer.webTranscript} />
-                            {answer.transcriptionError && <TranscriptBlock label="Processing Error" value={answer.transcriptionError} />}
+                            {isStudent ? (
+                                <TranscriptBlock label="Your Answer" value={answer.finalTranscript || answer.webTranscript || answer.englishText} />
+                            ) : (
+                                <>
+                                    <TranscriptBlock label="Final Transcript" value={answer.finalTranscript} />
+                                    <TranscriptBlock label="English Translation" value={answer.englishText} />
+                                    <TranscriptBlock label="Browser Fallback Transcript" value={answer.webTranscript} />
+                                    {answer.transcriptionError && <TranscriptBlock label="Processing Error" value={answer.transcriptionError} />}
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -351,21 +362,25 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                 <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-6">
                     {stats}
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <InfoItem icon={ProfileIcon} label="Generated Questions" value={data?.total != null ? String(data.total) : '--'} />
-                        <InfoItem icon={CheckIcon} label="Submitted" value={data?.answered != null ? String(data.answered) : '--'} />
-                        <InfoItem icon={BanIcon} label="Missing" value={data?.missing != null ? String(data.missing) : '--'} />
-                        <InfoItem icon={ClockIcon} label="Report Status" value={report ? 'Generated' : job?.status?.replace(/_/g, ' ') || 'Waiting'} />
-                    </div>
+                    {!isStudent && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <InfoItem icon={ProfileIcon} label="Generated Questions" value={data?.total != null ? String(data.total) : '--'} />
+                            <InfoItem icon={CheckIcon} label="Submitted" value={data?.answered != null ? String(data.answered) : '--'} />
+                            <InfoItem icon={BanIcon} label="Missing" value={data?.missing != null ? String(data.missing) : '--'} />
+                            <InfoItem icon={ClockIcon} label="Report Status" value={report ? 'Generated' : job?.status?.replace(/_/g, ' ') || 'Waiting'} />
+                        </div>
+                    )}
 
                     <div>
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-sm font-semibold text-[#150089] dark:text-white">Answer Processing</h3>
+                            <h3 className="text-sm font-semibold text-[#150089] dark:text-white">
+                                {isStudent ? "Your Responses" : "Answer Processing"}
+                            </h3>
                             {loading && <LoadingIcon className="w-4 h-4 animate-spin text-brand-green" />}
                         </div>
                         <div className="rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
                             {answers.map((answer, index) => {
-                                const badge = answerStatusBadge(answer);
+                                const badge = answerStatusBadge(answer, isStudent);
                                 return (
                                     <button
                                         key={answer.id}
@@ -467,6 +482,7 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                     index={selectedAnswerIndex}
                     onClose={() => setSelectedAnswerIndex(null)}
                     onNavigate={setSelectedAnswerIndex}
+                    isStudent={isStudent}
                 />
             )}
         </>

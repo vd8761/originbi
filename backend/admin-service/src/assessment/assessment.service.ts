@@ -703,6 +703,32 @@ export class AssessmentService {
         );
       });
 
+    const imageBaseSetting = await this.dataSource.query(
+      `SELECT value_string FROM originbi_settings WHERE setting_key = $1 LIMIT 1`,
+      ['image_base_url'],
+    );
+    const imageBase = String(imageBaseSetting?.[0]?.value_string || '').replace(
+      /\/+$/,
+      '',
+    );
+
+    const buildImageUrl = (p: string | null): string | null => {
+      if (!p) return null;
+      if (/^https?:\/\//i.test(p)) return p;
+      if (!imageBase) return p;
+      return `${imageBase}${p.startsWith('/') ? '' : '/'}${p}`;
+    };
+
+    const formattedAnswers = (answers as any[]).map(
+      (a: any): Record<string, unknown> => {
+        const row = a as Record<string, unknown>;
+        return {
+          ...row,
+          imageUrl: buildImageUrl(row.imageUrl as string | null),
+        };
+      },
+    );
+
     return {
       attempt: {
         id: attemptId,
@@ -714,7 +740,7 @@ export class AssessmentService {
       answered,
       missing,
       readyForReport,
-      answers,
+      answers: formattedAnswers,
       job: jobRows[0] || null,
       report: reportRows[0] || null,
     };
