@@ -13,9 +13,14 @@ import {
   getMBAPlacementDetails,
   getPlacementDetails,
 } from '../helpers/sqlHelper';
-import { generateReportForUser } from '../helpers/reportFactory';
+import {
+  generateReportForUser,
+  ReportVariant,
+} from '../helpers/reportFactory';
 import { PlacementReport } from '../reports/placement/placementReport';
 import { MBAPlacementReport } from '../reports/placement/mbaPlacementReport';
+import { Level1PlacementReport } from '../reports/placement/level1PlacementReport';
+import { fetchLevel1Cohort } from '../helpers/level1CohortHelper';
 import { logger } from '../helpers/logger';
 
 // --- Setup Temp Directory ---
@@ -102,7 +107,7 @@ export const reportQueueService = {
     groupId: number,
     deptDegreeId: number,
     jobId: string,
-    reportTypeOverride?: 'standard' | 'mba',
+    reportTypeOverride?: 'standard' | 'mba' | 'level1',
   ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
@@ -116,6 +121,48 @@ export const reportQueueService = {
       // Ensure clean directory
       if (!fs.existsSync(jobDir)) {
         fs.mkdirSync(jobDir, { recursive: true });
+      }
+
+      // ── Level 1 Placement Report ─────────────────────────────────────────
+      // Group-level specialization & trait mapping report driven by raw DISC
+      // Level-1 scores. Doesn't use getPlacementDetails (which is shaped for
+      // the standard/MBA placement handbooks) — it pulls raw cohort data via
+      // fetchLevel1Cohort.
+      if (reportTypeOverride === 'level1') {
+        logger.info(`[JOB:${jobId}] Generating Level 1 Placement Report...`);
+        const cohort = await fetchLevel1Cohort(groupId, deptDegreeId);
+        if (cohort.students.length === 0) {
+          jobStore.set(jobId, {
+            status: 'ERROR',
+            error:
+              'No students with a completed Level 1 assessment were found for this group/department.',
+          });
+          scheduleCleanup(jobId, [jobDir]);
+          return;
+        }
+
+        jobStore.set(jobId, {
+          status: 'PROCESSING',
+          progress: `Generating PDF for ${cohort.students.length} students...`,
+        });
+
+        const safeGroup = cohort.groupName.replace(/[^a-zA-Z0-9]/g, '_');
+        const safeDept = (cohort.departmentName || 'Dept').replace(
+          /[^a-zA-Z0-9]/g,
+          '_',
+        );
+        const fileName = `Level1_Placement_${safeGroup}_${safeDept}.pdf`;
+        const filePath = path.join(jobDir, fileName);
+
+        await new Level1PlacementReport(cohort).generate(filePath);
+
+        logger.info(`[JOB:${jobId}] Level 1 PDF Created: ${fileName}`);
+        jobStore.set(jobId, {
+          status: 'COMPLETED',
+          filePath,
+        });
+        scheduleCleanup(jobId, [jobDir]);
+        return;
       }
 
       logger.info(`[JOB:${jobId}] Fetching placement details...`);
@@ -207,6 +254,7 @@ export const reportQueueService = {
     groupId: string,
     jobId: string,
     programId?: string,
+    variant: ReportVariant = 'full',
   ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
@@ -229,6 +277,7 @@ export const reportQueueService = {
       const groupData: MergedReportData[] = await fetchGroupAssessmentData(
         groupId,
         programId,
+        variant,
       );
       const totalUsers = groupData.length;
 
@@ -254,7 +303,9 @@ export const reportQueueService = {
 
         const safeName = user.full_name.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
         const deptStr = 'dept_code' in user ? user.dept_code : 'GENERAL';
-        const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}.pdf`;
+        const variantSuffix =
+          variant === 'short' ? '_short' : variant === 'level1' ? '_level1' : '';
+        const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}${variantSuffix}.pdf`;
         const groupStr = 'group_name' in user ? user.group_name : 'NoGroup';
         groupName = groupStr?.replace(' ', '_');
         const filePath = path.join(jobDir, fileName);
@@ -265,7 +316,7 @@ export const reportQueueService = {
         );
 
         try {
-          await generateReportForUser(user, filePath);
+          await generateReportForUser(user, filePath, variant);
           generatedFiles.push(fileName);
         } catch (err) {
           logger.error(
@@ -329,7 +380,11 @@ export const reportQueueService = {
   // ============================================================================
   // WORKER 3: USER REPORTS (Bulk Generation & Zipping)
   // ============================================================================
-  async processUserReports(userIds: string[], jobId: string) {
+  async processUserReports(
+    userIds: string[],
+    jobId: string,
+    variant: ReportVariant = 'full',
+  ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
     try {
@@ -347,7 +402,7 @@ export const reportQueueService = {
 
       logger.info(`[JOB:${jobId}] Fetching data...`);
       const groupData: MergedReportData[] =
-        await fetchUserAssessmentData(userIds);
+        await fetchUserAssessmentData(userIds, variant);
       const totalUsers = groupData.length;
 
       if (totalUsers === 0) {
@@ -371,7 +426,9 @@ export const reportQueueService = {
 
         const safeName = user.full_name.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
         const deptStr = 'dept_code' in user ? user.dept_code : 'GENERAL';
-        const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}.pdf`;
+        const variantSuffix =
+          variant === 'short' ? '_short' : variant === 'level1' ? '_level1' : '';
+        const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}${variantSuffix}.pdf`;
         const filePath = path.join(jobDir, fileName);
 
         console.log(
@@ -380,7 +437,7 @@ export const reportQueueService = {
         );
 
         try {
-          await generateReportForUser(user, filePath);
+          await generateReportForUser(user, filePath, variant);
           generatedFiles.push(fileName);
         } catch (err) {
           logger.error(
@@ -441,7 +498,7 @@ export const reportQueueService = {
   async processSingleUserReport(
     userId: string,
     jobId: string,
-    short: boolean = false,
+    variant: ReportVariant = 'full',
   ) {
     logger.info(`=================================================`);
     const jobDir = path.join(TEMP_DIR, jobId);
@@ -460,9 +517,10 @@ export const reportQueueService = {
       logger.info(`[JOB:${jobId}] Fetching data for user ${userId}...`);
 
       // Reuse existing fetchUserAssessmentData which takes array
-      const groupData: MergedReportData[] = await fetchUserAssessmentData([
-        userId,
-      ]);
+      const groupData: MergedReportData[] = await fetchUserAssessmentData(
+        [userId],
+        variant,
+      );
 
       if (!groupData || groupData.length === 0) {
         jobStore.set(jobId, {
@@ -494,15 +552,17 @@ export const reportQueueService = {
         .replace(/_+/g, '_')
         .replace(/^_|_$/g, '');
 
-      // Naming convention: <full_name>_<report_number>[_short].pdf
-      const fileName = `${formattedName}_${formattedReportNo}${short ? '_short' : ''}.pdf`;
+      // Naming convention: <full_name>_<report_number>[_short|_level1].pdf
+      const variantSuffix =
+        variant === 'short' ? '_short' : variant === 'level1' ? '_level1' : '';
+      const fileName = `${formattedName}_${formattedReportNo}${variantSuffix}.pdf`;
       const filePath = path.join(jobDir, fileName);
 
       logger.info(
-        `[JOB:${jobId}] Generating ${fileName}${short ? ' (SHORT)' : ''}...`,
+        `[JOB:${jobId}] Generating ${fileName} (${variant.toUpperCase()})...`,
       );
 
-      const password = await generateReportForUser(user, filePath, short);
+      const password = await generateReportForUser(user, filePath, variant);
 
       // Complete
       logger.info(`[JOB:${jobId}] PDF Created.`);

@@ -11,10 +11,12 @@ import {
   CxoData,
 } from '../types/types';
 import { SCHOOL_LEVEL_ID, SCHOOL_STREAM_ID } from '../reports/BaseConstants';
+import { ReportVariant } from './reportFactory';
 
 export async function fetchGroupAssessmentData(
   groupId: string,
   programId?: string | number,
+  variant: ReportVariant = 'full',
 ): Promise<MergedReportData[]> {
   const client = await getPool().connect();
 
@@ -76,7 +78,7 @@ export async function fetchGroupAssessmentData(
       `Sessions fetched for group ${groupId}: ${sessionsResult.rows.length} rows`,
     );
 
-    return await processSessionRows(client, sessionsResult.rows);
+    return await processSessionRows(client, sessionsResult.rows, variant);
   } catch (error) {
     logger.error('Error fetching group assessment data:', error);
     throw error;
@@ -87,6 +89,7 @@ export async function fetchGroupAssessmentData(
 
 export async function fetchUserAssessmentData(
   userIds: string[],
+  variant: ReportVariant = 'full',
 ): Promise<MergedReportData[]> {
   const client = await getPool().connect();
 
@@ -171,7 +174,7 @@ export async function fetchUserAssessmentData(
       `Sessions fetched for users: ${sessionsResult.rows.length} rows`,
     );
 
-    return await processSessionRows(client, sessionsResult.rows);
+    return await processSessionRows(client, sessionsResult.rows, variant);
   } catch (error) {
     logger.error('Error fetching user assessment data:', error);
     throw error;
@@ -183,8 +186,10 @@ export async function fetchUserAssessmentData(
 async function processSessionRows(
   client: any,
   sessionRows: any[],
+  variant: ReportVariant = 'full',
 ): Promise<MergedReportData[]> {
   const validUsersData: MergedReportData[] = [];
+  const level1Only = variant === 'level1';
 
   for (const session of sessionRows) {
     const programId = Number(session.program_id); // Ensure number
@@ -193,20 +198,19 @@ async function processSessionRows(
     // We need COMPLETED attempts
     const attemptsQuery = `
             SELECT status, metadata
-            FROM assessment_attempts 
-            WHERE assessment_session_id = $1 
+            FROM assessment_attempts
+            WHERE assessment_session_id = $1
             AND status = 'COMPLETED'
             `;
     const attemptsResult = await client.query(attemptsQuery, [
       session.session_id,
     ]);
-    // logSqlOutput(`Attempts for Session ${session.session_id}`, attemptsResult.rows);
 
-    if (attemptsResult.rows.length < 2) {
+    if (!level1Only && attemptsResult.rows.length < 2) {
       logger.warn(
         `User ${session.user_id} (Session ${session.session_id}) has fewer than 2 completed attempts. Skipping.`,
       );
-      continue; // We need both parts
+      continue; // Full/short reports need both DISC + Agile
     }
 
     // Merge Metadata
@@ -222,9 +226,16 @@ async function processSessionRows(
       }
     }
 
-    if (!discData || !agileData) {
+    if (!discData) {
       logger.warn(
-        `User ${session.user_id} missing either DISC or Agile data. Skipping.`,
+        `User ${session.user_id} missing DISC data. Skipping.`,
+      );
+      continue;
+    }
+
+    if (!level1Only && !agileData) {
+      logger.warn(
+        `User ${session.user_id} missing Agile data. Skipping.`,
       );
       continue;
     }
@@ -250,14 +261,16 @@ async function processSessionRows(
       { ANSWER_TYPE: 'C', COUNT: discData.disc_scores.C || 0 },
     ];
 
-    // Agile Scores mapping
-    const transformedAgile: AgileScore = {
-      focus: agileData.agile_scores.Focus || 0,
-      courage: agileData.agile_scores.Courage || 0,
-      respect: agileData.agile_scores.Respect || 0,
-      openness: agileData.agile_scores.Openness || 0,
-      commitment: agileData.agile_scores.Commitment || 0,
-    };
+    // Agile Scores mapping (null when level1-only variant — not required for that report)
+    const transformedAgile: AgileScore = agileData
+      ? {
+          focus: agileData.agile_scores.Focus || 0,
+          courage: agileData.agile_scores.Courage || 0,
+          respect: agileData.agile_scores.Respect || 0,
+          openness: agileData.agile_scores.Openness || 0,
+          commitment: agileData.agile_scores.Commitment || 0,
+        }
+      : { focus: 0, courage: 0, respect: 0, openness: 0, commitment: 0 };
 
     const reportTitleMap: Record<number, string> = {
       1: 'School Personalized Report',

@@ -41,9 +41,11 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [departmentStats, setDepartmentStats] = useState<any[]>([]);
     const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
     const [downloadLoading, setDownloadLoading] = useState(false);
-    // For MBA departments, the admin can choose between the special MBA report
-    // (default) and the standard DISC-style placement handbook.
-    const [reportType, setReportType] = useState<'mba' | 'standard'>('mba');
+    // Admin report-type chooser. Defaults to the dept-appropriate handbook
+    // (MBA → "mba", everything else → "standard"). "level1" is the new
+    // Level 1 Placement Report (group-level specialization fit) and is
+    // available for every department.
+    const [reportType, setReportType] = useState<'mba' | 'standard' | 'level1'>('mba');
 
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState('');
@@ -79,11 +81,16 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
         try {
             const stats = await assessmentService.getGroupDepartmentStats(sessionId);
             setDepartmentStats(stats.departments || []);
-            // If single department, select it automatically
+            // If single department, select it automatically and default the
+            // report type to whichever handbook best matches that department.
             if (stats.departments?.length > 0) {
-                setSelectedDepartment(stats.departments[0].id);
+                const first = stats.departments[0];
+                setSelectedDepartment(first.id);
+                const firstIsMBA = (first?.name || '').toUpperCase().includes('MBA');
+                setReportType(firstIsMBA ? 'mba' : 'standard');
+            } else {
+                setReportType('standard');
             }
-            setReportType('mba'); // default; only matters for MBA depts
             setShowDownloadModal(true);
         } catch (error) {
             console.error("Failed to fetch department stats", error);
@@ -102,11 +109,9 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             setGenerating(true);
             setProgress('Initializing...');
 
-            // 1. Start Job
-            const selectedDeptForType = departmentStats.find((d: any) => d.id === selectedDepartment);
-            const isMBAForType = (selectedDeptForType?.name || '').toUpperCase().includes('MBA');
-            const reportTypeParam = isMBAForType ? `&reportType=${reportType}` : '';
-            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true${reportTypeParam}`));
+            // 1. Start Job — always send reportType so the backend knows which
+            // report variant to generate (standard, mba, or level1).
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true&reportType=${reportType}`));
             const startData = await startRes.json();
 
             if (!startData.success || !startData.jobId) {
@@ -173,11 +178,8 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
         try {
             setSendingReportEmail(true);
 
-            // 1. Start Generation
-            const selectedDeptForType = departmentStats.find((d: any) => d.id === selectedDepartment);
-            const isMBAForType = (selectedDeptForType?.name || '').toUpperCase().includes('MBA');
-            const reportTypeParam = isMBAForType ? `&reportType=${reportType}` : '';
-            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true${reportTypeParam}`));
+            // 1. Start Generation — always send reportType.
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true&reportType=${reportType}`));
             const startData = await startRes.json();
 
             if (!startData.success || !startData.jobId) {
@@ -733,7 +735,13 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                         return (
                                         <div
                                             key={dept.id}
-                                            onClick={() => setSelectedDepartment(dept.id)}
+                                            onClick={() => {
+                                                setSelectedDepartment(dept.id);
+                                                // If the current report type isn't compatible with
+                                                // the newly-selected department, snap to a sensible
+                                                // default ("mba" only valid for MBA depts).
+                                                if (reportType === 'mba' && !isMBA) setReportType('standard');
+                                            }}
                                             className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-4 group
                                                 ${selectedDepartment === dept.id
                                                     ? 'border-brand-green bg-brand-green/10 ring-1 ring-brand-green'
@@ -778,27 +786,38 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                 </div>
                             )}
 
-                            {/* Report Type Chooser (MBA only) */}
+                            {/* Report Type Chooser — always available. The
+                                "Special MBA Report" tile only shows for MBA
+                                departments; the Standard and Level 1 reports
+                                are available for every department. */}
                             {(() => {
                                 const sel = departmentStats.find((d: any) => d.id === selectedDepartment);
                                 const isMBASel = (sel?.name || '').toUpperCase().includes('MBA');
-                                if (!isMBASel) return null;
-                                const options: { value: 'mba' | 'standard'; title: string; desc: string }[] = [
+                                if (!sel) return null;
+                                const allOptions: { value: 'mba' | 'standard' | 'level1'; title: string; desc: string; mbaOnly?: boolean }[] = [
                                     {
                                         value: 'mba',
                                         title: 'Special MBA Report',
                                         desc: 'Specialization-fit handbook (Finance, HR, BA, Ops, Marketing).',
+                                        mbaOnly: true,
                                     },
                                     {
                                         value: 'standard',
                                         title: 'Standard Placement Report',
                                         desc: 'The regular DISC-style placement handbook.',
                                     },
+                                    {
+                                        value: 'level1',
+                                        title: 'Level 1 Placement Report',
+                                        desc: 'Group specialization & trait mapping driven by Level 1 DISC scores.',
+                                    },
                                 ];
+                                const options = allOptions.filter((o) => (o.mbaOnly ? isMBASel : true));
+                                const cols = options.length >= 3 ? 'grid-cols-3' : 'grid-cols-2';
                                 return (
                                     <div className="mb-6">
                                         <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5 block">Report Type</label>
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className={`grid ${cols} gap-2`}>
                                             {options.map((opt) => {
                                                 const active = reportType === opt.value;
                                                 return (
@@ -815,6 +834,9 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                                                 <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                                                     <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
                                                                 </svg>
+                                                            )}
+                                                            {opt.value === 'level1' && (
+                                                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-brand-green/20 text-brand-green text-[9px] font-bold">L1</span>
                                                             )}
                                                             <p className={`text-sm font-semibold ${active ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
                                                                 {opt.title}

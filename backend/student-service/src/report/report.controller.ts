@@ -25,7 +25,21 @@ import { CollegeReport } from './reports/college/collegeReport';
 import { EmployeeReport } from './reports/employee/employeeReport';
 import { CxoReport } from './reports/cxo/cxoReport';
 import { fetchUserAssessmentData } from './helpers/groupReportHelper';
-import { buildReportJSON } from './helpers/reportFactory';
+import { buildReportJSON, ReportVariant } from './helpers/reportFactory';
+
+/**
+ * Resolves the report variant from request query params.
+ * Prefers the explicit `reportType` param; falls back to the legacy
+ * `short=true` flag for backward compatibility.
+ */
+function resolveReportVariant(
+  reportType?: string,
+  shortMode?: string,
+): ReportVariant {
+  if (reportType === 'short' || reportType === 'level1' || reportType === 'full')
+    return reportType;
+  return shortMode === 'true' ? 'short' : 'full';
+}
 
 @Controller('report')
 export class ReportController {
@@ -48,8 +62,10 @@ export class ReportController {
       return;
     }
 
-    const reportTypeOverride: 'standard' | 'mba' | undefined =
-      reportType === 'standard' || reportType === 'mba'
+    const reportTypeOverride: 'standard' | 'mba' | 'level1' | undefined =
+      reportType === 'standard' ||
+      reportType === 'mba' ||
+      reportType === 'level1'
         ? reportType
         : undefined;
 
@@ -80,18 +96,21 @@ export class ReportController {
     @Param('group_id') groupId: string,
     @Query('json') json: string,
     @Query('programId') programId: string,
+    @Query('reportType') reportType: string,
     @Res() res: Response,
   ): void {
+    const variant = resolveReportVariant(reportType);
     logger.info(
-      `[API] Start Group Report: Group ${groupId}${
+      `[API] Start Group Report (${variant.toUpperCase()}): Group ${groupId}${
         programId ? ` Program ${programId}` : ''
       }`,
     );
 
-    const jobId = `group_${groupId}_${Date.now()}`;
+    const variantPrefix = variant === 'full' ? '' : `${variant}_`;
+    const jobId = `group_${variantPrefix}${groupId}_${Date.now()}`;
 
     this.reportQueue
-      .processGroupReports(groupId, jobId, programId)
+      .processGroupReports(groupId, jobId, programId, variant)
       .catch((err) => logger.error('Background Job Error', err));
 
     if (json === 'true') {
@@ -108,7 +127,8 @@ export class ReportController {
   // 3. User Reports Route (ZIP)
   @Post('generate/users')
   generateUserReport(
-    @Body() body: { user_ids: string[] },
+    @Body() body: { user_ids: string[]; reportType?: string },
+    @Query('reportType') reportTypeQuery: string,
     @Res() res: Response,
   ): void {
     const { user_ids } = body;
@@ -120,12 +140,15 @@ export class ReportController {
       return;
     }
 
-    logger.info(`[API] Start User Report: ${user_ids.length} users`);
+    const variant = resolveReportVariant(reportTypeQuery || body.reportType);
+    logger.info(
+      `[API] Start User Report (${variant.toUpperCase()}): ${user_ids.length} users`,
+    );
 
-    const jobId = `users_${Date.now()}`;
+    const jobId = `users_${variant === 'full' ? '' : `${variant}_`}${Date.now()}`;
 
     this.reportQueue
-      .processUserReports(user_ids, jobId)
+      .processUserReports(user_ids, jobId, variant)
       .catch((err) => logger.error('Background Job Error', err));
 
     res.json({
@@ -140,6 +163,7 @@ export class ReportController {
     @Param('student_id') userId: string,
     @Query('api') apiMode: string,
     @Query('short') shortMode: string,
+    @Query('reportType') reportType: string,
     @Res() res: Response,
   ): Promise<void> {
     if (!userId) {
@@ -177,15 +201,16 @@ export class ReportController {
     }
 
     // ── Standard PDF Mode ──
-    const isShort = shortMode === 'true';
+    const variant = resolveReportVariant(reportType, shortMode);
     logger.info(
-      `[API] Start Single Student Report${isShort ? ' (SHORT)' : ''}: ${userId}`,
+      `[API] Start Single Student Report (${variant.toUpperCase()}): ${userId}`,
     );
 
-    const jobId = `student_${isShort ? 'short_' : ''}${userId}_${Date.now()}`;
+    const variantPrefix = variant === 'full' ? '' : `${variant}_`;
+    const jobId = `student_${variantPrefix}${userId}_${Date.now()}`;
 
     this.reportQueue
-      .processSingleUserReport(userId, jobId, isShort)
+      .processSingleUserReport(userId, jobId, variant)
       .catch((err) => logger.error('Background Job Error', err));
 
     res.json({

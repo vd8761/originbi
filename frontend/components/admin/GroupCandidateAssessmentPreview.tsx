@@ -188,6 +188,8 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const programId = session?.programId ? Number(session.programId) : null;
     const programCode = (session?.program as any)?.code || (session?.groupAssessment?.program as any)?.code || null;
     const isShortReportAvailable = programCode === 'SCHOOL_STUDENT' || programCode === 'COLLEGE_STUDENT' || programId === 1 || programId === 2;
+    // Level 1 Behavioural (DISC-only) short report — College only.
+    const isLevel1ReportAvailable = programCode === 'COLLEGE_STUDENT' || programId === 2;
 
     // Close download dropdown on outside click
     useEffect(() => {
@@ -203,7 +205,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     }, [showDownloadDropdown]);
 
     // Shared download handler
-    const handleDownloadReport = async (short: boolean = false) => {
+    const handleDownloadReport = async (variant: 'full' | 'short' | 'level1' = 'full') => {
         if (isDownloadingRef.current) return;
         if (!session?.userId) {
             alert("User ID not found for this session.");
@@ -214,9 +216,9 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             setDownloading(true);
             setShowDownloadDropdown(false);
             setDownloadProgress('Initializing...');
-            
-            const studentId = session.userId; 
-            const startData = await assessmentService.generateStudentReport(studentId, short || undefined);
+
+            const studentId = session.userId;
+            const startData = await assessmentService.generateStudentReport(studentId, variant === 'full' ? undefined : variant);
             
             if (!startData.success || !startData.jobId) {
                 throw new Error("Failed to start report generation");
@@ -404,15 +406,21 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                 <div className="flex items-center gap-2">
                     {/* Download Report Button */}
                     {downloading ? (
-                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
                             <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress}</span>
-                         </div>
+                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress || 'Generating...'}</span>
+                        </div>
                     ) : isShortReportAvailable ? (
                         <div className="relative" ref={downloadDropdownRef}>
                             <button
-                                onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
+                                onClick={() => status === 'COMPLETED' && setShowDownloadDropdown(!showDownloadDropdown)}
+                                disabled={status !== 'COMPLETED'}
+                                title={status !== 'COMPLETED' ? 'Exam must be completed to download report' : ''}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                    status === 'COMPLETED'
+                                    ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
+                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                }`}
                             >
                                 <DownloadIcon className="w-3 h-3" />
                                 Download Report
@@ -421,7 +429,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             {showDownloadDropdown && (
                                 <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                                     <button
-                                        onClick={() => handleDownloadReport(false)}
+                                        onClick={() => handleDownloadReport('full')}
                                         className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
                                     >
                                         <DownloadIcon className="w-3 h-3 text-brand-green" />
@@ -429,19 +437,37 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                     </button>
                                     <div className="border-t border-gray-100 dark:border-white/5" />
                                     <button
-                                        onClick={() => handleDownloadReport(true)}
+                                        onClick={() => handleDownloadReport('short')}
                                         className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
                                     >
                                         <DownloadIcon className="w-3 h-3 text-blue-500" />
                                         Short Report
                                     </button>
+                                    {isLevel1ReportAvailable && (
+                                        <>
+                                            <div className="border-t border-gray-100 dark:border-white/5" />
+                                            <button
+                                                onClick={() => handleDownloadReport('level1')}
+                                                className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                            >
+                                                <DownloadIcon className="w-3 h-3 text-purple-500" />
+                                                Level 1 Report
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
                     ) : (
                         <button
-                            onClick={() => handleDownloadReport(false)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-medium transition-colors"
+                            onClick={() => handleDownloadReport('full')}
+                            disabled={status !== 'COMPLETED'}
+                            title={status !== 'COMPLETED' ? 'Exam must be completed to download report' : ''}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                status === 'COMPLETED'
+                                ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
+                                : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                            }`}
                         >
                             <DownloadIcon className="w-3 h-3" />
                             Download Report

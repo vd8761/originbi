@@ -7,6 +7,7 @@ import { EmployeeReport } from '../reports/employee/employeeReport';
 import { CxoReport } from '../reports/cxo/cxoReport';
 import { CollegeShortReport } from '../reports/college/collegeShortReport';
 import { CollegeMBAShortReport } from '../reports/college/collegeMBAShort';
+import { CollegeLevel1Report } from '../reports/college/collegeLevel1Report';
 import { EmployeeShortReport } from '../reports/employee/employeeShortReport';
 import {
   CollegeData,
@@ -29,6 +30,15 @@ export const ProgramType = {
   EMPLOYEE: 3,
   CXO: 4,
 } as const;
+
+/**
+ * Report variant selector.
+ * - `full`   : the complete multi-section report (default).
+ * - `short`  : the program-specific short report (SSLC, College, MBA, ...).
+ * - `level1` : the Level 1 Behavioural (DISC-only) short report. Currently
+ *              implemented for the College program only.
+ */
+export type ReportVariant = 'full' | 'short' | 'level1';
 
 /**
  * Generates a cryptographically random password of the given length
@@ -91,10 +101,11 @@ async function getReportPasswordSettings(): Promise<{
 export async function generateReportForUser(
   user: MergedReportData,
   filePath: string,
-  short: boolean = false,
+  variant: ReportVariant = 'full',
 ): Promise<string> {
+  const short = variant === 'short';
   logger.info(
-    `[ReportFactory] Generating Type ${user.program_type}${short ? ' (SHORT)' : ''} for ${user.full_name}`,
+    `[ReportFactory] Generating Type ${user.program_type} (${variant.toUpperCase()}) for ${user.full_name}`,
   );
 
   // 1. Fetch password settings from DB
@@ -160,6 +171,14 @@ export async function generateReportForUser(
     `[ReportFactory] Building PDF for program_type ${user.program_type}`,
   );
 
+  // The Level 1 (DISC-only) short report is currently only implemented for
+  // the College program. Guard early with a clear message for other programs.
+  if (variant === 'level1' && user.program_type !== ProgramType.COLLEGE) {
+    throw new Error(
+      `Level 1 report is not yet available for program_type ${user.program_type}. It is currently supported for College students only.`,
+    );
+  }
+
   switch (user.program_type) {
     case ProgramType.SCHOOL: {
       const schoolUser = user as unknown as SchoolData;
@@ -189,7 +208,11 @@ export async function generateReportForUser(
     }
     case ProgramType.COLLEGE: {
       const collegeData = user as unknown as CollegeData;
-      if (short) {
+      if (variant === 'level1') {
+        await new CollegeLevel1Report(collegeData, pdfOptions).generate(
+          filePath,
+        );
+      } else if (short) {
         const isMBA =
           collegeData.dept_code?.toUpperCase().includes('MBA') ||
           collegeData.group_name?.toUpperCase().includes('MBA') ||

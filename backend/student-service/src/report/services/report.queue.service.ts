@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { reportQueueService, JobState } from './reportQueueService';
+import { ReportVariant } from '../helpers/reportFactory';
 
 /**
  * NestJS-injectable wrapper around the report queue singleton.
@@ -15,7 +16,7 @@ export class ReportQueueService {
     groupId: number,
     deptDegreeId: number,
     jobId: string,
-    reportTypeOverride?: 'standard' | 'mba',
+    reportTypeOverride?: 'standard' | 'mba' | 'level1',
   ): Promise<void> {
     return reportQueueService.processPlacementReport(
       groupId,
@@ -29,19 +30,29 @@ export class ReportQueueService {
     groupId: string,
     jobId: string,
     programId?: string,
+    variant: ReportVariant = 'full',
   ): Promise<void> {
-    return reportQueueService.processGroupReports(groupId, jobId, programId);
+    return reportQueueService.processGroupReports(
+      groupId,
+      jobId,
+      programId,
+      variant,
+    );
   }
 
-  processUserReports(userIds: string[], jobId: string): Promise<void> {
-    return reportQueueService.processUserReports(userIds, jobId);
+  processUserReports(
+    userIds: string[],
+    jobId: string,
+    variant: ReportVariant = 'full',
+  ): Promise<void> {
+    return reportQueueService.processUserReports(userIds, jobId, variant);
   }
 
   processSingleUserReport(
     userId: string,
     jobId: string,
-    short: boolean = false,
+    variant: ReportVariant = 'full',
   ): Promise<void> {
-    return reportQueueService.processSingleUserReport(userId, jobId, short);
+    return reportQueueService.processSingleUserReport(userId, jobId, variant);
   }
 }
