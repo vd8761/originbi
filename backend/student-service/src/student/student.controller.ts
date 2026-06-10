@@ -1,7 +1,6 @@
 import {
   Controller,
   Post,
-  Get,
   Param,
   Res,
   Body,
@@ -154,12 +153,12 @@ export class StudentController {
   }
 
   @Post('metaphor-report')
-  async getMetaphorReport(@Body() body: { email: string }) {
+  async getMetaphorReport(@Body() body: { email: string }): Promise<any> {
     return this.studentService.getMetaphorReport(body.email);
   }
 
   @Post('iat-report')
-  async getIatReport(@Body() body: { email: string }) {
+  async getIatReport(@Body() body: { email: string }): Promise<any> {
     return this.studentService.getIatReport(body.email);
   }
 

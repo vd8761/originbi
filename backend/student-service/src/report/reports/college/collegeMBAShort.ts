@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgileScore, CollegeData } from '../../types/types';
-import { BaseReport, StyledRow } from '../BaseReport';
+import { BaseReport, StyledRow, TableOptions } from '../BaseReport';
 import { logger } from '../../helpers/logger';
 import {
   BEHAVIORAL_ORIENTATION,
@@ -648,7 +648,7 @@ export class CollegeMBAShortReport extends BaseReport {
       rowAlign: ['center', 'left', 'left', 'center', 'left'],
       verticalAlign: 'middle',
       headerVerticalAlign: 'middle',
-    } as any);
+    } as TableOptions);
 
     return this.doc.y;
   }

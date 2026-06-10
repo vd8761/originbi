@@ -497,11 +497,19 @@ export class StudentService {
       }
     }
 
-    const showReportSetting = await this.settingsService.getValue<boolean>('report', 'show_report_preview_after_exam');
-    const showReportPreviewAfterExam = showReportSetting !== null ? showReportSetting : true;
+    const showReportSetting = await this.settingsService.getValue<boolean>(
+      'report',
+      'show_report_preview_after_exam',
+    );
+    const showReportPreviewAfterExam =
+      showReportSetting !== null ? showReportSetting : true;
 
-    const showIatMetaphorSetting = await this.settingsService.getValue<boolean>('report', 'show_iat_metaphor_to_student');
-    const showIatMetaphorToStudent = showIatMetaphorSetting !== null ? showIatMetaphorSetting : false;
+    const showIatMetaphorSetting = await this.settingsService.getValue<boolean>(
+      'report',
+      'show_iat_metaphor_to_student',
+    );
+    const showIatMetaphorToStudent =
+      showIatMetaphorSetting !== null ? showIatMetaphorSetting : false;
 
     return {
       ...user,
@@ -1184,7 +1192,7 @@ export class StudentService {
       });
       const buffers: Buffer[] = [];
 
-      doc.on('data', (buffer) => buffers.push(buffer));
+      doc.on('data', (buffer: Buffer) => buffers.push(buffer));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', reject);
 
@@ -1215,7 +1223,7 @@ export class StudentService {
         .text(reportRows[0].model ? `Model: ${reportRows[0].model}` : '')
         .text(
           reportRows[0].generatedAt
-            ? `Generated: ${new Date(reportRows[0].generatedAt).toLocaleString('en-GB')}`
+            ? `Generated: ${new Date(reportRows[0].generatedAt as string | number | Date).toLocaleString('en-GB')}`
             : '',
         );
       doc.moveDown(1);
@@ -1817,7 +1825,8 @@ export class StudentService {
           mobileNumber: dto.mobile_number,
           countryCode: dto.country_code ?? '+91',
           gender: dto.gender,
-          hasChangedPassword: dto.registration_source === 'ADMIN' ? false : true,
+          hasChangedPassword:
+            dto.registration_source === 'ADMIN' ? false : true,
           cognitoSub: cognitoSub,
           ...(dto.metadata || {}),
         },
@@ -2652,7 +2661,14 @@ export class StudentService {
       : 'Welcome to OriginBI - Your Assessment is Ready!';
 
     const emailHtml = isTechAssessment
-      ? getTechWelcomeEmailTemplate(name, to, pass, frontendUrl, assets, isTemporary)
+      ? getTechWelcomeEmailTemplate(
+          name,
+          to,
+          pass,
+          frontendUrl,
+          assets,
+          isTemporary,
+        )
       : getStudentWelcomeEmailTemplate(
           name,
           to,
