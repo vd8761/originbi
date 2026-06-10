@@ -59,6 +59,27 @@ const formatRetryEta = (value?: string | null) => {
     return `${hours} hr`;
 };
 
+const cleanMarkdownForStudent = (markdown: string): string => {
+    let clean = markdown;
+
+    // 1. Remove the top main title or change it
+    clean = clean.replace(/#\s+DISC\s+Behaviour\s+Analysis\s+Report/gi, '# Metaphor Analysis Report');
+
+    // 2. Remove the DISC Scores section (up to the next heading)
+    clean = clean.replace(/##\s+DISC\s+Scores[\s\S]*?(?=##)/gi, '');
+
+    // 3. Remove the Final DISC Pattern section (up to the next heading)
+    clean = clean.replace(/##\s+Final\s+DISC\s+Pattern[\s\S]*?(?=##)/gi, '');
+
+    // 4. Remove the DISC Pattern item in Behavioural Dimensions
+    clean = clean.replace(/\*\*DISC\s+Pattern\*\*[\s\S]*?(?=\n\s*\n|\n\s*\*\*|\n\s*##)/gi, '');
+
+    // Clean up multiple consecutive newlines
+    clean = clean.replace(/\n{3,}/g, '\n\n');
+
+    return clean.trim();
+};
+
 const answerStatusBadge = (answer: MetaphorAnswer) => {
     if (answer.status === 'NOT_ANSWERED') {
         return { label: 'Not submitted', className: 'bg-gray-500/10 text-gray-500 border-gray-400/30' };
@@ -373,38 +394,40 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
                     </div>
 
                     <div className="border-t border-gray-200 dark:border-white/10 pt-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                            <div>
-                                <h3 className="text-sm font-semibold text-[#150089] dark:text-white">Claude Markdown Report</h3>
-                                {report?.generatedAt && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Generated {formatDate(report.generatedAt || undefined)}</p>
-                                )}
+                        {!isStudent && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-[#150089] dark:text-white">Claude Markdown Report</h3>
+                                    {report?.generatedAt && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Generated {formatDate(report.generatedAt || undefined)}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {report?.markdown && (
+                                        <button
+                                            onClick={handleDownloadPdf}
+                                            disabled={downloadingPdf}
+                                            className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
+                                        >
+                                            {downloadingPdf ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <DownloadIcon className="w-3 h-3" />}
+                                            Download PDF
+                                        </button>
+                                    )}
+                                    {exhausted && (
+                                        <button
+                                            onClick={onRetry}
+                                            disabled={retrying}
+                                            className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
+                                        >
+                                            {retrying ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <ClockIcon className="w-3 h-3" />}
+                                            Retry Report
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {report?.markdown && (
-                                    <button
-                                        onClick={handleDownloadPdf}
-                                        disabled={downloadingPdf}
-                                        className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
-                                    >
-                                        {downloadingPdf ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <DownloadIcon className="w-3 h-3" />}
-                                        Download PDF
-                                    </button>
-                                )}
-                                {exhausted && !isStudent && (
-                                    <button
-                                        onClick={onRetry}
-                                        disabled={retrying}
-                                        className="inline-flex items-center gap-2 px-3 py-2 bg-brand-green/10 hover:bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold transition-colors disabled:opacity-60"
-                                    >
-                                        {retrying ? <LoadingIcon className="w-3 h-3 animate-spin" /> : <ClockIcon className="w-3 h-3" />}
-                                        Retry Report
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                        )}
                         {report?.markdown ? (
-                            <MarkdownPreview markdown={report.markdown} />
+                            <MarkdownPreview markdown={isStudent ? cleanMarkdownForStudent(report.markdown) : report.markdown} />
                         ) : (
                             <div className="rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-black/10 p-6">
                                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
