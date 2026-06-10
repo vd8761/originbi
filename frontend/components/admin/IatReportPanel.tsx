@@ -34,6 +34,30 @@ function collectStrongWords(modules: IatReportStatus['modules']): string[] {
 const SECTION_RE = /^section\s+\d/i;
 const RESET_RE = /90[\s-]*day|reset/i;
 
+const renderInlineMarkdown = (text: string) => {
+  const parts = text.split(/(\*\*[^*]+?\*\*|__[^_]+?__|`[^`]+?`|\*[^*]+?\*)/g).filter(Boolean);
+  return parts.map((part, index) => {
+    if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
+      return (
+        <strong key={index} className="font-semibold text-gray-900 dark:text-white">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return (
+        <code key={index} className="px-1 py-0.5 rounded bg-gray-200 dark:bg-white/10 font-mono text-[0.92em]">
+          {part.slice(1, -1)}
+        </code>
+      );
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return <em key={index}>{part.slice(1, -1)}</em>;
+    }
+    return <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+};
+
 /**
  * Renders the letter as flowing prose with SKILL.md highlight treatment:
  * - paragraphs referencing a strong bias's slowest word -> red left-border block
@@ -57,7 +81,7 @@ function ReportLetter({ text, strongWords }: { text: string; strongWords: string
               key={index}
               className="pt-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-green"
             >
-              {para}
+              {renderInlineMarkdown(para)}
             </p>
           );
         }
@@ -72,7 +96,7 @@ function ReportLetter({ text, strongWords }: { text: string; strongWords: string
               key={index}
               className="whitespace-pre-wrap border-l-4 border-red-400 bg-red-50 py-2 pl-4 dark:border-red-500/60 dark:bg-red-500/10"
             >
-              {para}
+              {renderInlineMarkdown(para)}
             </p>
           );
         }
@@ -84,7 +108,7 @@ function ReportLetter({ text, strongWords }: { text: string; strongWords: string
                 isLast ? 'text-base font-medium leading-8' : ''
               }`}
             >
-              {para}
+              {renderInlineMarkdown(para)}
             </p>
           );
         }
@@ -93,7 +117,7 @@ function ReportLetter({ text, strongWords }: { text: string; strongWords: string
             key={index}
             className={`whitespace-pre-wrap ${isLast ? 'pt-2 text-base font-medium leading-8' : ''}`}
           >
-            {para}
+            {renderInlineMarkdown(para)}
           </p>
         );
       })}

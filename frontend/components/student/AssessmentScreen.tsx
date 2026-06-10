@@ -1136,6 +1136,16 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     [assessments],
   );
 
+  const hasIatCompleted = useMemo(() => {
+    return assessments.some((a) => isIatGenAssessment(a) && a.status === 'completed');
+  }, [assessments]);
+
+  const hasMetaphorCompleted = useMemo(() => {
+    return assessments.some(
+      (a) => (a.id === '3' || /metaphor/i.test(a.title || '')) && a.status === 'completed'
+    );
+  }, [assessments]);
+
   useEffect(() => {
     if (loading) {
       return;
@@ -1145,7 +1155,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     // count — so enabling Level 3/4 keeps the student in the assessment until done.
     const reportReady =
       assessments.length > 0 && completedAssessmentCount >= assessments.length;
-    setForceReportPageMode(reportReady && showReportPreviewAfterExam);
+    setForceReportPageMode(
+      reportReady &&
+        (showReportPreviewAfterExam ||
+          (showIatMetaphorToStudent && (hasIatCompleted || hasMetaphorCompleted)))
+    );
 
     if (typeof window !== 'undefined') {
       if (reportReady) {
@@ -1157,7 +1171,14 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
         localStorage.removeItem(REPORT_READY_STORAGE_KEY);
       }
     }
-  }, [completedAssessmentCount, loading]);
+  }, [
+    completedAssessmentCount,
+    loading,
+    showReportPreviewAfterExam,
+    showIatMetaphorToStudent,
+    hasIatCompleted,
+    hasMetaphorCompleted,
+  ]);
 
   const { totalQuestions, totalCompleted } = useMemo(() => {
     return assessments.reduce(
@@ -1173,17 +1194,34 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
 
   const isReportPageMode =
     ((assessments.length > 0 && completedAssessmentCount >= assessments.length) ||
-    forceReportPageMode) && showReportPreviewAfterExam;
+    forceReportPageMode) &&
+    (showReportPreviewAfterExam ||
+      (showIatMetaphorToStudent && (hasIatCompleted || hasMetaphorCompleted)));
 
-  const hasIatCompleted = useMemo(() => {
-    return assessments.some((a) => isIatGenAssessment(a) && a.status === 'completed');
-  }, [assessments]);
+  // Redirect to IAT or Metaphor report tab if main report is disabled
+  useEffect(() => {
+    if (!loading && isReportPageMode) {
+      if (!showReportPreviewAfterExam && activeReportTab === 'main') {
+        if (hasIatCompleted) {
+          setActiveReportTab('iat');
+          if (!iatData) void fetchIatReport(true);
+        } else if (hasMetaphorCompleted) {
+          setActiveReportTab('metaphor');
+          if (!metaphorData) void fetchMetaphorReport(true);
+        }
+      }
+    }
+  }, [
+    loading,
+    isReportPageMode,
+    showReportPreviewAfterExam,
+    hasIatCompleted,
+    hasMetaphorCompleted,
+    activeReportTab,
+    iatData,
+    metaphorData,
+  ]);
 
-  const hasMetaphorCompleted = useMemo(() => {
-    return assessments.some(
-      (a) => (a.id === '3' || /metaphor/i.test(a.title || '')) && a.status === 'completed'
-    );
-  }, [assessments]);
   const loadPdfIntoViewer = async (
     absoluteDownloadUrl: string,
     authContext: SessionAuthContext,
@@ -1508,8 +1546,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   // Auto-trigger generation ONLY when:
   // - In report mode, data loaded, studentId ready
   // - No PDF in state, not loading, not restoring from cache, not locked
+  // - Show report preview after exam is enabled
   useEffect(() => {
-    if (!isReportPageMode || loading || !studentId) return;
+    if (!isReportPageMode || loading || !studentId || !showReportPreviewAfterExam) return;
     if (reportPdfBytes || isPdfPreviewLoading || isRestoringFromCache) return;
     if (reportGenerationLockRef.current) return;
 
@@ -1521,6 +1560,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     reportPdfBytes,
     isPdfPreviewLoading,
     isRestoringFromCache,
+    showReportPreviewAfterExam,
   ]);
 
   const handleCloseReportPreview = () => {
@@ -1792,16 +1832,18 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           {/* Tab Navigation */}
           {showIatMetaphorToStudent && (hasIatCompleted || hasMetaphorCompleted) && (
             <div className="flex border-b border-[#EEF4F1] dark:border-white/[0.12] pb-0 gap-8 overflow-x-auto w-full scrollbar-hide no-scrollbar">
-              <button
-                onClick={() => setActiveReportTab('main')}
-                className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap cursor-pointer ${
-                  activeReportTab === 'main'
-                    ? 'text-brand-green border-b-2 border-brand-green font-bold'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                Personality Journey Report
-              </button>
+              {showReportPreviewAfterExam && (
+                <button
+                  onClick={() => setActiveReportTab('main')}
+                  className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap cursor-pointer ${
+                    activeReportTab === 'main'
+                      ? 'text-brand-green border-b-2 border-brand-green font-bold'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  Personality Journey Report
+                </button>
+              )}
               {hasIatCompleted && (
                 <button
                   onClick={() => {
