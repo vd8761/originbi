@@ -371,12 +371,23 @@ export const assessmentService = {
         return res.json();
     },
 
+    /**
+     * Starts generation of a student report.
+     * @param studentId  the student/user id
+     * @param reportType `'short'` for the program short report, `'level1'` for
+     *                   the Level 1 Behavioural (DISC-only) report. Omit for the
+     *                   full report. A boolean `true` is accepted for backward
+     *                   compatibility and maps to `'short'`.
+     */
     async generateStudentReport(
         studentId: string,
-        short?: boolean,
+        reportType?: boolean | 'short' | 'level1',
     ): Promise<{ success: boolean; jobId: string; statusUrl: string }> {
+        const variant =
+            reportType === true ? 'short' : reportType || undefined;
+        const query = variant ? `&reportType=${variant}` : '';
         const res = await fetch(
-            buildReportApiUrl(`/generate/student/${studentId}?json=true${short ? '&short=true' : ''}`),
+            buildReportApiUrl(`/generate/student/${studentId}?json=true${query}`),
             {
                 method: "GET",
                 headers: {

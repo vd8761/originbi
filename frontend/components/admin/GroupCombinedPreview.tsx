@@ -29,7 +29,11 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
 
     const [generating, setGenerating] = useState(false);
     const [progress, setProgress] = useState("");
+    const [showReportModal, setShowReportModal] = useState(false);
     const isDownloadingRef = useRef(false);
+
+    // Level 1 Behavioural (DISC-only) report is currently College only.
+    const isLevel1Available = Number(programId) === 2;
 
     useEffect(() => {
         let active = true;
@@ -64,16 +68,20 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
         return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>;
     };
 
-    const handleGenerateCombinedReport = async () => {
+    const handleGenerateCombinedReport = async (
+        variant: "full" | "short" | "level1" = "full",
+    ) => {
         if (!data?.group?.id || isDownloadingRef.current) return;
         try {
             isDownloadingRef.current = true;
+            setShowReportModal(false);
             setGenerating(true);
             setProgress("Initializing...");
 
+            const variantQuery = variant === "full" ? "" : `&reportType=${variant}`;
             const startRes = await fetch(
                 buildReportApiUrl(
-                    `/generate/group/${data.group.id}?programId=${programId}&json=true`,
+                    `/generate/group/${data.group.id}?programId=${programId}${variantQuery}&json=true`,
                 ),
             );
             const startData = await startRes.json();
@@ -146,7 +154,7 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
                     </p>
                 </div>
                 <button
-                    onClick={handleGenerateCombinedReport}
+                    onClick={() => setShowReportModal(true)}
                     disabled={generating || data.totalCandidates === 0}
                     className={`inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all ${
                         generating || data.totalCandidates === 0
@@ -157,6 +165,68 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
                     {generating ? (progress || "Generating...") : "Generate Combined Report"}
                 </button>
             </div>
+
+            {/* Bulk report-type selection popup */}
+            {showReportModal && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    onClick={() => setShowReportModal(false)}
+                >
+                    <div
+                        className="w-full max-w-md bg-white dark:bg-[#19211C] rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden animate-fade-in"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-5 py-4 border-b border-gray-100 dark:border-white/10">
+                            <h3 className="text-sm font-bold text-[#150089] dark:text-white">Generate Combined Report</h3>
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                Which bulk report should be generated for this group?
+                            </p>
+                        </div>
+                        <div className="p-3 space-y-2">
+                            <button
+                                onClick={() => handleGenerateCombinedReport("full")}
+                                className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 hover:border-brand-green hover:bg-brand-green/5 transition-colors flex items-center gap-3"
+                            >
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-green/10 text-xs font-bold text-brand-green">1</span>
+                                <span>
+                                    <span className="block text-xs font-semibold text-gray-800 dark:text-gray-100">Full Report</span>
+                                    <span className="block text-[11px] text-gray-500 dark:text-gray-400">Complete detailed report</span>
+                                </span>
+                            </button>
+                            <button
+                                onClick={() => handleGenerateCombinedReport("short")}
+                                className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 hover:border-brand-green hover:bg-brand-green/5 transition-colors flex items-center gap-3"
+                            >
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-xs font-bold text-blue-500">2</span>
+                                <span>
+                                    <span className="block text-xs font-semibold text-gray-800 dark:text-gray-100">Short Report</span>
+                                    <span className="block text-[11px] text-gray-500 dark:text-gray-400">Program summary report</span>
+                                </span>
+                            </button>
+                            {isLevel1Available && (
+                                <button
+                                    onClick={() => handleGenerateCombinedReport("level1")}
+                                    className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 hover:border-brand-green hover:bg-brand-green/5 transition-colors flex items-center gap-3"
+                                >
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-green/10 text-xs font-bold text-brand-green">3</span>
+                                    <span>
+                                        <span className="block text-xs font-semibold text-gray-800 dark:text-gray-100">Level 1 Report</span>
+                                        <span className="block text-[11px] text-gray-500 dark:text-gray-400">Level 1 Behavioural (DISC) snapshot</span>
+                                    </span>
+                                </button>
+                            )}
+                        </div>
+                        <div className="px-3 pb-3">
+                            <button
+                                onClick={() => setShowReportModal(false)}
+                                className="w-full px-4 py-2 rounded-xl text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Assessment windows */}
             <div className="px-2 mb-6">

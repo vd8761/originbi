@@ -59,6 +59,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const isDownloadingRef = useRef(false);
     const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
     const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+    const [showShortReportModal, setShowShortReportModal] = useState(false);
     const downloadDropdownRef = useRef<HTMLDivElement>(null);
 
     // Send Email State
@@ -188,6 +189,8 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const programId = session?.programId ? Number(session.programId) : null;
     const programCode = (session?.program as any)?.code || (session?.groupAssessment?.program as any)?.code || null;
     const isShortReportAvailable = programCode === 'SCHOOL_STUDENT' || programCode === 'COLLEGE_STUDENT' || programId === 1 || programId === 2;
+    // Level 1 Behavioural (DISC-only) short report - currently College only.
+    const isLevel1ReportAvailable = programCode === 'COLLEGE_STUDENT' || programId === 2;
 
     // Close download dropdown on outside click
     useEffect(() => {
@@ -202,8 +205,8 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showDownloadDropdown]);
 
-    // Shared download handler
-    const handleDownloadReport = async (short: boolean = false) => {
+    // Shared download handler. variant: 'full' | 'short' | 'level1'
+    const handleDownloadReport = async (variant: 'full' | 'short' | 'level1' = 'full') => {
         if (isDownloadingRef.current) return;
         if (!session?.userId) {
             alert("User ID not found for this session.");
@@ -213,10 +216,11 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
             isDownloadingRef.current = true;
             setDownloading(true);
             setShowDownloadDropdown(false);
+            setShowShortReportModal(false);
             setDownloadProgress('Initializing...');
-            
-            const studentId = session.userId; 
-            const startData = await assessmentService.generateStudentReport(studentId, short || undefined);
+
+            const studentId = session.userId;
+            const startData = await assessmentService.generateStudentReport(studentId, variant === 'full' ? undefined : variant);
             
             if (!startData.success || !startData.jobId) {
                 throw new Error("Failed to start report generation");
@@ -434,7 +438,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             {showDownloadDropdown && (
                                 <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                                     <button
-                                        onClick={() => handleDownloadReport(false)}
+                                        onClick={() => handleDownloadReport('full')}
                                         className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
                                     >
                                         <DownloadIcon className="w-3 h-3 text-brand-green" />
@@ -442,21 +446,33 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                                     </button>
                                     <div className="border-t border-gray-100 dark:border-white/5" />
                                     <button
-                                        onClick={() => handleDownloadReport(true)}
+                                        onClick={() => handleDownloadReport('short')}
                                         className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
                                     >
                                         <DownloadIcon className="w-3 h-3 text-blue-500" />
                                         Short Report
                                     </button>
+                                    {isLevel1ReportAvailable && (
+                                        <>
+                                            <div className="border-t border-gray-100 dark:border-white/5" />
+                                            <button
+                                                onClick={() => handleDownloadReport('level1')}
+                                                className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                            >
+                                                <DownloadIcon className="w-3 h-3 text-purple-500" />
+                                                Level 1 Report
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
                     ) : (
                         <>
                         <button
-                            onClick={() => handleDownloadReport(false)}
+                            onClick={() => handleDownloadReport('full')}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                status === 'COMPLETED' 
+                                status === 'COMPLETED'
                                 ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer' 
                                 : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
                             }`}
@@ -546,6 +562,58 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             Download Short Report
                         </button>
                         </>
+                    )}
+
+                    {/* Short Report selection popup - lists the short reports available for this user */}
+                    {showShortReportModal && (
+                        <div
+                            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                            onClick={() => setShowShortReportModal(false)}
+                        >
+                            <div
+                                className="w-full max-w-md bg-white dark:bg-[#19211C] rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden animate-fade-in"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="px-5 py-4 border-b border-gray-100 dark:border-white/10">
+                                    <h3 className="text-sm font-bold text-[#150089] dark:text-white">Download Short Report</h3>
+                                    <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                        Select an available short report{session?.registration?.fullName ? ` for ${session.registration.fullName}` : ''}.
+                                    </p>
+                                </div>
+                                <div className="p-3 space-y-2">
+                                    <button
+                                        onClick={() => handleDownloadReport('short')}
+                                        className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 hover:border-brand-green hover:bg-brand-green/5 transition-colors flex items-center gap-3"
+                                    >
+                                        <DownloadIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                                        <span>
+                                            <span className="block text-xs font-semibold text-gray-800 dark:text-gray-100">Short Report</span>
+                                            <span className="block text-[11px] text-gray-500 dark:text-gray-400">Program summary report</span>
+                                        </span>
+                                    </button>
+                                    {isLevel1ReportAvailable && (
+                                        <button
+                                            onClick={() => handleDownloadReport('level1')}
+                                            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 hover:border-brand-green hover:bg-brand-green/5 transition-colors flex items-center gap-3"
+                                        >
+                                            <DownloadIcon className="w-4 h-4 text-brand-green shrink-0" />
+                                            <span>
+                                                <span className="block text-xs font-semibold text-gray-800 dark:text-gray-100">Short Report (Level 1 Only)</span>
+                                                <span className="block text-[11px] text-gray-500 dark:text-gray-400">Level 1 Behavioural (DISC) snapshot</span>
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="px-3 pb-3">
+                                    <button
+                                        onClick={() => setShowShortReportModal(false)}
+                                        className="w-full px-4 py-2 rounded-xl text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {/* Send Email Split Button */}

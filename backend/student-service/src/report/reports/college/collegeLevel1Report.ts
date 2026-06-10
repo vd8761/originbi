@@ -1,0 +1,1174 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+import * as fs from 'fs';
+import * as path from 'path';
+import { CollegeData } from '../../types/types';
+import { BaseReport } from '../BaseReport';
+import { blendedTraits } from './collegeConstants';
+import {
+  SPEC_MAP,
+  SpecEntry,
+  ELECTIVES,
+  calculateDiscProfile,
+} from './specializationConstants';
+import { logger } from '../../helpers/logger';
+import * as zlib from 'zlib';
+
+const WATERMARK_BG = 'public/assets/images/Watermark_Background.jpg';
+
+/** Full-form names for the four behavioural dimensions (no letter codes). */
+const DIMENSION_NAMES: Record<string, string> = {
+  D: 'Dominance',
+  I: 'Influence',
+  S: 'Steadiness',
+  C: 'Conscientiousness',
+};
+
+/** One-line descriptor shown under each dimension bar. */
+const DIMENSION_BLURBS: Record<string, string> = {
+  D: 'Drive, decisiveness and a focus on results.',
+  I: 'Communication, persuasion and energy.',
+  S: 'Consistency, patience and collaboration.',
+  C: 'Precision, structure and analysis.',
+};
+
+/**
+ * CollegeLevel1Report
+ * -------------------
+ * A short, two-page "Level 1 Only" report that summarises a student's
+ * Level 1 Behavioural (DISC) result without requiring ACI data.
+ *
+ * Page 1 - Hero: superhero image as the full card background, trait-combination
+ *          title, description, DISC score bars, and defining behaviours.
+ * Page 2 - Direction: specialization fit (canonical order), top future roles,
+ *          strengths & watch-outs, and disclaimer.
+ */
+export class CollegeLevel1Report extends BaseReport {
+  private data: CollegeData;
+
+  private readonly CONTENT_X = this.MARGIN_STD;
+  private readonly CONTENT_W = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+
+  private readonly C_CARD_BG = '#F4F3FB';
+  private readonly C_CARD_BORDER = '#E0DEF2';
+  private readonly C_MUTED = '#5D5D70';
+  private readonly C_RULE = '#DCDCE4';
+  private readonly C_INK = '#1B1B27';
+  private readonly C_ACCENT_GREEN = '#0E7C42';
+
+  private readonly SNAPSHOT_LABEL = 'Behavioural Snapshot';
+
+  // DISC dimension accent colours
+  private readonly DISC_COLORS = {
+    D: '#E53E3E',
+    I: '#D97706',
+    S: '#38A169',
+    C: '#3182CE',
+  };
+
+  constructor(data: CollegeData, options?: PDFKit.PDFDocumentOptions) {
+    super(options);
+    this.data = data;
+  }
+
+  public async generate(outputPath: string): Promise<void> {
+    logger.info('[College LEVEL 1 REPORT] Starting two-page PDF...');
+
+    const stream = fs.createWriteStream(outputPath);
+    this.doc.pipe(stream);
+
+    const streamFinished = new Promise<void>((resolve, reject) => {
+      stream.on('finish', resolve);
+      stream.on('error', reject);
+    });
+
+    this._useStdMargins = false;
+    this._currentBackground = null;
+
+    const [t1, t2] = this.getTopTwoTraits(
+      this.data.most_answered_answer_type,
+      this.data,
+    );
+    const combo = (t1 + t2) as string;
+    const block = blendedTraits[combo] || blendedTraits.DI;
+
+    // ── PAGE 1 ──
+    this.drawPageFrame();
+    let y = this.drawHeader(20);
+    const heroPath = this.resolveTraitImagePath(block.name);
+    const panelColor = this.getHeroPanelColor(heroPath);
+    y = this.drawHeroCard(y + 14, combo, block, panelColor, heroPath);
+    y = this.drawDiscBars(y + 22);
+    this.drawDefiningBehaviours(y + 22, block);
+    this.drawFooterStrip(1);
+
+    // ── PAGE 2 ──
+    const specCode = calculateDiscProfile({
+      D: this.data.score_D,
+      I: this.data.score_I,
+      S: this.data.score_S,
+      C: this.data.score_C,
+    });
+    const spec = SPEC_MAP[specCode] || SPEC_MAP[combo] || SPEC_MAP.DI;
+
+    this.doc.addPage();
+    this.drawPageFrame();
+    y = this.drawHeader(20);
+    y = this.drawSpecializationFit(y + 12, spec);
+    y = this.drawFutureRoles(y + 12, spec);
+    y = this.drawStrengthsAndWatchOuts(y + 12, block);
+    y = this.drawNextSteps(y + 12, spec);
+    this.drawDisclaimer(y + 12);
+    this.drawFooterStrip(2);
+
+    this.doc.end();
+    await streamFinished;
+    logger.info(
+      `[College LEVEL 1 REPORT] PDF generated at: ${outputPath}`,
+    );
+  }
+
+  // ============================================================
+  // PAGE FRAME
+  // ============================================================
+  private drawPageFrame(): void {
+    if (fs.existsSync(WATERMARK_BG)) {
+      this.doc.image(WATERMARK_BG, 0, 0, {
+        width: this.PAGE_WIDTH,
+        height: this.PAGE_HEIGHT,
+      });
+    } else {
+      this.doc.rect(0, 0, this.PAGE_WIDTH, this.PAGE_HEIGHT).fill('#FFFFFF');
+    }
+    this.doc.rect(0, 0, this.PAGE_WIDTH, 6).fill(this.COLOR_DEEP_BLUE);
+    this.doc
+      .rect(0, this.PAGE_HEIGHT - 6, this.PAGE_WIDTH, 6)
+      .fill(this.COLOR_DEEP_BLUE);
+  }
+
+  // ============================================================
+  // HEADER  (mirrors CollegeMBAShortReport)
+  // ============================================================
+  private drawHeader(y: number): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+
+    const logoH = 22;
+    const logoW = 78;
+    const titleFontSize = 16;
+    const nameSize = 15;
+    const dateSize = 8.5;
+    const metaGap = 4;
+
+    const metaX = x + w * 0.62;
+    const metaW = w * 0.38;
+    const metaH = nameSize + metaGap + dateSize;
+
+    const titleLeft = x + logoW + 12;
+    const titleAvailW = metaX - titleLeft - 16;
+    const titleText = 'Behavioural Snapshot';
+
+    this.doc.font(this.FONT_SORA_BOLD).fontSize(titleFontSize);
+    const titleH = this.doc.heightOfString(titleText, { width: titleAvailW });
+
+    const contentH = Math.max(logoH, titleH, metaH);
+    const bandH = contentH + 4;
+    const midY = y + bandH / 2;
+
+    // Logo
+    const logoPath = this.resolveLogoPath();
+    if (logoPath) {
+      this.doc.image(logoPath, x, midY - logoH / 2, { height: logoH });
+    }
+
+    // Title
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(titleFontSize)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(titleText, titleLeft, midY - titleH / 2, {
+        width: titleAvailW,
+        lineGap: 0,
+      });
+
+    // Name
+    const metaTop = midY - metaH / 2;
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(nameSize)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(this.data.full_name || '-', metaX, metaTop, {
+        width: metaW,
+        align: 'right',
+        lineBreak: false,
+        ellipsis: true,
+      });
+
+    const dateStr = this.data.exam_start
+      ? new Date(this.data.exam_start).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })
+      : '';
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(dateSize)
+      .fillColor(this.C_MUTED)
+      .text(
+        `${this.data.email_id || ''}   •   ${dateStr}`,
+        metaX,
+        metaTop + nameSize + metaGap,
+        { width: metaW, align: 'right', lineBreak: false },
+      );
+
+    // Rule
+    const ruleY = y + bandH + 4;
+    this.doc
+      .lineWidth(0.6)
+      .strokeColor(this.C_RULE)
+      .moveTo(x, ruleY)
+      .lineTo(x + w, ruleY)
+      .stroke();
+
+    return ruleY;
+  }
+
+  // ============================================================
+  // FOOTER  (mirrors CollegeMBAShortReport)
+  // ============================================================
+  private drawFooterStrip(pageNum: number): void {
+    const y = this.PAGE_HEIGHT - 32;
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+
+    this.doc
+      .lineWidth(0.5)
+      .strokeColor(this.C_RULE)
+      .moveTo(x, y)
+      .lineTo(x + w, y)
+      .stroke();
+
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(9)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(this.SNAPSHOT_LABEL, x, y + 8, { lineBreak: false });
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(8)
+      .fillColor('#444')
+      .text(`Page ${pageNum} of 2`, x, y + 9, {
+        width: w,
+        align: 'center',
+        lineBreak: false,
+      });
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(8)
+      .fillColor('#444')
+      .text(`#${this.data.exam_ref_no || ''}`, x, y + 9, {
+        width: w,
+        align: 'right',
+        lineBreak: false,
+      });
+  }
+
+  // ============================================================
+  // PAGE 1 — HERO CARD
+  // Superhero image IS the card — it fills the entire card as the
+  // background. A dark gradient overlay on the left side makes
+  // the text readable.
+  // ============================================================
+  private drawHeroCard(
+    y: number,
+    combo: string,
+    block: (typeof blendedTraits)[string],
+    panelColor: string,
+    heroPath: string | null,
+  ): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+    const h = 232;
+    const r = 12; // corner radius
+
+    // ── 1. Hero image as the full card background ──
+    this.doc.save();
+    this.doc.roundedRect(x, y, w, h, r).clip();
+
+    // Base fill uses a colour sampled & darkened from THIS hero image, so the
+    // text panel harmonises with the artwork's own background (which varies
+    // per superhero) rather than clashing with a fixed brand colour.
+    this.doc.rect(x, y, w, h).fill(panelColor);
+
+    if (heroPath) {
+      // The character is fitted to the card height and anchored to the right
+      // edge so the full figure stays visible; the image bleeds to the card
+      // edges with no inner frame — the image IS the card.
+      this.doc.image(heroPath, x, y, {
+        fit: [w, h],
+        align: 'right',
+        valign: 'bottom',
+      });
+    }
+
+    // ── 2. Smooth panel→transparent gradient overlay (left to right) ──
+    // Thin vertical strips with decreasing opacity, in the sampled panel
+    // colour, so the left text column is legible and the artwork emerges on
+    // the right with no visible band/seam.
+    const STRIPS = 48;
+    const stripW = w / STRIPS;
+    const solidUntil = 0.34; // fully covered up to 34% of the width
+    const clearAfter = 0.84; // fully clear past 84% of the width
+    for (let i = 0; i < STRIPS; i++) {
+      const xfrac = (i + 0.5) / STRIPS;
+      let opacity: number;
+      if (xfrac <= solidUntil) {
+        opacity = 0.94;
+      } else if (xfrac >= clearAfter) {
+        opacity = 0;
+      } else {
+        opacity = 0.94 * ((clearAfter - xfrac) / (clearAfter - solidUntil));
+      }
+      if (opacity <= 0) continue;
+      this.doc.fillOpacity(opacity);
+      // +0.6 width overlap avoids hairline seams between strips
+      this.doc.rect(x + i * stripW, y, stripW + 0.6, h).fill(panelColor);
+    }
+    this.doc.fillOpacity(1);
+
+    // ── 3. Decorative concentric rings (subtle, right side) ──
+    const ringCx = x + w - 100;
+    const ringCy = y + h / 2;
+    this.doc.strokeOpacity(0.07).strokeColor('#FFFFFF').lineWidth(1);
+    [150, 108, 66].forEach((rr) => {
+      this.doc.circle(ringCx, ringCy, rr).stroke();
+    });
+    this.doc.strokeOpacity(1);
+
+    this.doc.restore();
+
+    // ── 4. Text overlay (neutral white/light so it works on any panel hue) ──
+    const tx = x + 26;
+    const tw = w * 0.52;
+
+    this.doc.save();
+    this.doc.fillOpacity(0.72);
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(8.5)
+      .fillColor('#FFFFFF')
+      .text('YOUR BEHAVIOURAL ARCHETYPE', tx, y + 26, {
+        characterSpacing: 0.5,
+        lineBreak: false,
+      });
+    this.doc.restore();
+    this.doc.fillOpacity(1);
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(30)
+      .fillColor('#FFFFFF')
+      .text(block.name, tx, y + 40, { width: tw, lineGap: 0 });
+
+    let cy = this.doc.y + 8;
+
+    // Top-two-traits pill — full dimension names, no letter codes.
+    const t1 = DIMENSION_NAMES[combo.charAt(0)] || '';
+    const t2 = DIMENSION_NAMES[combo.charAt(1)] || '';
+    const pillLabel =
+      t1 && t2 ? `Top Two Traits:  ${t1} & ${t2}` : 'Top Behavioural Traits';
+    this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(8.5);
+    const pillW = this.doc.widthOfString(pillLabel) + 24;
+    this.doc.save();
+    this.doc.fillOpacity(0.2);
+    this.doc.roundedRect(tx, cy, pillW, 22, 11).fill('#FFFFFF');
+    this.doc.restore();
+    this.doc.fillOpacity(1);
+    this.doc
+      .fillColor('#FFFFFF')
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(8.5)
+      .text(pillLabel, tx + 12, cy + 7, { lineBreak: false });
+
+    cy += 34;
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(10)
+      .fillColor('#F2F2F7')
+      .text(this.stripHtml(block.description), tx, cy, {
+        width: tw,
+        height: h - (cy - y) - 20,
+        lineGap: 2.2,
+        ellipsis: true,
+      });
+
+    return y + h;
+  }
+
+  /**
+   * Samples the hero image and returns a darkened version of its dominant
+   * colour, used as the card's text-panel background so the panel matches
+   * each superhero's own artwork. Falls back to the brand deep-blue.
+   *
+   * Uses a small pure-JS PNG decoder (Node's built-in zlib) so there is no
+   * native dependency — important for portability across Node versions.
+   */
+  private getHeroPanelColor(heroPath: string | null): string {
+    const FALLBACK = '#0D0055';
+    if (!heroPath || !fs.existsSync(heroPath)) return FALLBACK;
+    try {
+      const avg = this.averagePngColor(heroPath);
+      if (!avg) return FALLBACK;
+      // Darken toward a deep, text-legible tone while keeping the hue.
+      const f = 0.34;
+      const dr = Math.min(64, Math.round(avg.r * f));
+      const dg = Math.min(64, Math.round(avg.g * f));
+      const db = Math.min(74, Math.round(avg.b * f));
+      const hx = (v: number) => v.toString(16).padStart(2, '0');
+      return `#${hx(dr)}${hx(dg)}${hx(db)}`;
+    } catch (e) {
+      logger.warn(
+        `[College LEVEL 1 REPORT] hero colour sample failed: ${
+          (e as Error).message
+        }`,
+      );
+      return FALLBACK;
+    }
+  }
+
+  /**
+   * Decodes an 8-bit PNG (colour types 0/2/4/6, non-interlaced) and returns
+   * the average RGB of its left half, skipping near-transparent pixels.
+   * Returns null for unsupported formats so the caller can fall back.
+   */
+  private averagePngColor(
+    filePath: string,
+  ): { r: number; g: number; b: number } | null {
+    const buf = fs.readFileSync(filePath);
+    // PNG signature: 89 50 4E 47 ...
+    if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) return null;
+
+    let pos = 8;
+    let width = 0;
+    let height = 0;
+    let bitDepth = 0;
+    let colorType = 0;
+    let interlace = 0;
+    const idat: Buffer[] = [];
+
+    while (pos + 8 <= buf.length) {
+      const len = buf.readUInt32BE(pos);
+      const type = buf.toString('ascii', pos + 4, pos + 8);
+      const dataStart = pos + 8;
+      const dataEnd = dataStart + len;
+      if (dataEnd > buf.length) break;
+      if (type === 'IHDR') {
+        width = buf.readUInt32BE(dataStart);
+        height = buf.readUInt32BE(dataStart + 4);
+        bitDepth = buf[dataStart + 8];
+        colorType = buf[dataStart + 9];
+        interlace = buf[dataStart + 12];
+      } else if (type === 'IDAT') {
+        idat.push(buf.subarray(dataStart, dataEnd));
+      } else if (type === 'IEND') {
+        break;
+      }
+      pos = dataEnd + 4; // skip 4-byte CRC
+    }
+
+    if (bitDepth !== 8 || interlace !== 0) return null;
+    let channels: number;
+    if (colorType === 2) channels = 3; // RGB
+    else if (colorType === 6) channels = 4; // RGBA
+    else if (colorType === 0) channels = 1; // grayscale
+    else if (colorType === 4) channels = 2; // grayscale + alpha
+    else return null; // palette (3) unsupported
+    if (!width || !height || idat.length === 0) return null;
+
+    const raw = zlib.inflateSync(Buffer.concat(idat));
+    const bpp = channels;
+    const stride = width * bpp;
+    if (raw.length < (stride + 1) * height) return null;
+
+    const recon = Buffer.alloc(stride * height);
+    const paeth = (a: number, b: number, c: number): number => {
+      const p = a + b - c;
+      const pa = Math.abs(p - a);
+      const pb = Math.abs(p - b);
+      const pc = Math.abs(p - c);
+      if (pa <= pb && pa <= pc) return a;
+      if (pb <= pc) return b;
+      return c;
+    };
+
+    let inPos = 0;
+    for (let row = 0; row < height; row++) {
+      const filter = raw[inPos++];
+      const rowStart = row * stride;
+      const prevStart = (row - 1) * stride;
+      for (let i = 0; i < stride; i++) {
+        const filt = raw[inPos++];
+        const a = i >= bpp ? recon[rowStart + i - bpp] : 0;
+        const b = row > 0 ? recon[prevStart + i] : 0;
+        const c = row > 0 && i >= bpp ? recon[prevStart + i - bpp] : 0;
+        let val: number;
+        switch (filter) {
+          case 0:
+            val = filt;
+            break;
+          case 1:
+            val = filt + a;
+            break;
+          case 2:
+            val = filt + b;
+            break;
+          case 3:
+            val = filt + ((a + b) >> 1);
+            break;
+          case 4:
+            val = filt + paeth(a, b, c);
+            break;
+          default:
+            return null;
+        }
+        recon[rowStart + i] = val & 0xff;
+      }
+    }
+
+    // Average the left ~half — that is where the text panel sits, so the
+    // panel colour blends into the artwork it overlaps.
+    const cols = Math.max(1, Math.floor(width * 0.5));
+    let r = 0;
+    let g = 0;
+    let bSum = 0;
+    let n = 0;
+    for (let row = 0; row < height; row++) {
+      const rowStart = row * stride;
+      for (let px = 0; px < cols; px++) {
+        const off = rowStart + px * bpp;
+        let pr: number;
+        let pg: number;
+        let pb: number;
+        let pa = 255;
+        if (channels >= 3) {
+          pr = recon[off];
+          pg = recon[off + 1];
+          pb = recon[off + 2];
+          if (channels === 4) pa = recon[off + 3];
+        } else {
+          pr = pg = pb = recon[off];
+          if (channels === 2) pa = recon[off + 1];
+        }
+        if (pa < 200) continue; // skip near-transparent pixels
+        r += pr;
+        g += pg;
+        bSum += pb;
+        n++;
+      }
+    }
+    if (n === 0) return null;
+    return { r: r / n, g: g / n, b: bSum / n };
+  }
+
+  // ============================================================
+  // PAGE 1 — DISC SCORE BARS  (new section)
+  // ============================================================
+  private drawDiscBars(y: number): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Your Behavioural Profile', x, y, { lineBreak: false });
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(this.C_MUTED)
+      .text(
+        'Your strength across the four behavioural dimensions, shown as percentages.',
+        x,
+        y + 18,
+        { lineBreak: false },
+      );
+
+    const dims: ('D' | 'I' | 'S' | 'C')[] = ['D', 'I', 'S', 'C'];
+
+    const scores = {
+      D: this.data.score_D || 0,
+      I: this.data.score_I || 0,
+      S: this.data.score_S || 0,
+      C: this.data.score_C || 0,
+    };
+
+    const colGap = 18;
+    const colW = (w - colGap) / 2;
+    const cardH = 62;
+    const rowGap = 12;
+    const valueW = 48;
+    const startY = y + 42;
+
+    dims.forEach((key, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const bx = x + col * (colW + colGap);
+      const by = startY + row * (cardH + rowGap);
+      // Scores are already on a 0-100 scale — present directly as a percentage.
+      const pct = Math.max(0, Math.min(100, Math.round(scores[key])));
+      const fillRatio = pct / 100;
+      const color = this.DISC_COLORS[key];
+
+      // Card background
+      this.doc
+        .roundedRect(bx, by, colW, cardH, 9)
+        .fillAndStroke(this.C_CARD_BG, this.C_CARD_BORDER);
+
+      const pad = 14;
+      const innerX = bx + pad;
+      const innerW = colW - pad * 2;
+
+      // Dimension name (full form — no letter code)
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(11)
+        .fillColor(this.C_INK)
+        .text(DIMENSION_NAMES[key], innerX, by + 11, {
+          width: innerW - valueW,
+          lineBreak: false,
+          ellipsis: true,
+        });
+
+      // Percentage value (right aligned)
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(14)
+        .fillColor(color)
+        .text(`${pct}%`, innerX + innerW - valueW, by + 9, {
+          width: valueW,
+          align: 'right',
+          lineBreak: false,
+        });
+
+      // Bar track + fill
+      const barY = by + 30;
+      const barH = 8;
+      this.doc.roundedRect(innerX, barY, innerW, barH, barH / 2).fill('#E6E8F2');
+      if (fillRatio > 0) {
+        this.doc
+          .roundedRect(innerX, barY, Math.max(8, innerW * fillRatio), barH, barH / 2)
+          .fill(color);
+      }
+
+      // Descriptor
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(8)
+        .fillColor(this.C_MUTED)
+        .text(DIMENSION_BLURBS[key], innerX, barY + 13, {
+          width: innerW,
+          lineBreak: false,
+          ellipsis: true,
+        });
+    });
+
+    return startY + Math.ceil(dims.length / 2) * (cardH + rowGap) - rowGap;
+  }
+
+  // ============================================================
+  // PAGE 1 — DEFINING BEHAVIOURS
+  // ============================================================
+  private drawDefiningBehaviours(
+    y: number,
+    block: (typeof blendedTraits)[string],
+  ): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+    const behaviours = (block.key_behaviours || []).slice(0, 6);
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('What Defines You', x, y, { lineBreak: false });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(this.C_MUTED)
+      .text(
+        'The behaviours that consistently show up in how you work and lead.',
+        x,
+        y + 18,
+        { lineBreak: false },
+      );
+
+    const colGap = 16;
+    const rowGap = 10;
+    const colW = (w - colGap) / 2;
+    const startY = y + 40;
+    let col0Y = startY;
+    let col1Y = startY;
+
+    behaviours.forEach((text, i) => {
+      const col = i % 2;
+      const cx = x + col * (colW + colGap);
+      const cy = col === 0 ? col0Y : col1Y;
+
+      this.doc.font(this.FONT_REGULAR).fontSize(9.5);
+      const textH = this.doc.heightOfString(text, {
+        width: colW - 42,
+        lineGap: 1.4,
+      });
+      const cardH = Math.max(textH + 18, 38);
+
+      this.doc
+        .roundedRect(cx, cy, colW, cardH, 8)
+        .fillAndStroke(this.C_CARD_BG, this.C_CARD_BORDER);
+
+      // Number badge
+      this.doc.circle(cx + 20, cy + cardH / 2, 11).fill(this.COLOR_DEEP_BLUE);
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(10)
+        .fillColor('#FFFFFF')
+        .text(`${i + 1}`, cx + 9, cy + cardH / 2 - 6, {
+          width: 22,
+          align: 'center',
+          lineBreak: false,
+        });
+
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(9.5)
+        .fillColor('#2A2A36')
+        .text(text, cx + 38, cy + (cardH - textH) / 2, {
+          width: colW - 50,
+          lineGap: 1.4,
+        });
+
+      if (col === 0) col0Y = cy + cardH + rowGap;
+      else col1Y = cy + cardH + rowGap;
+    });
+
+    return Math.max(col0Y, col1Y);
+  }
+
+  // ============================================================
+  // PAGE 2 — SPECIALIZATION FIT
+  // Electives shown in canonical order — NOT sorted by rank.
+  // ============================================================
+  private drawSpecializationFit(y: number, spec: SpecEntry): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Your Specialization Fit', x, y, { lineBreak: false });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(this.C_MUTED)
+      .text(
+        'How your behavioural profile maps to the five MBA electives.',
+        x,
+        y + 18,
+        { lineBreak: false },
+      );
+
+    // ── Recommended specialization banner ──
+    const bannerY = y + 34;
+    const bannerH = 56;
+    this.doc
+      .roundedRect(x, bannerY, w, bannerH, 10)
+      .fillAndStroke('#EDF8F1', '#CDE9D8');
+
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(8)
+      .fillColor(this.C_ACCENT_GREEN)
+      .text('RECOMMENDED SPECIALIZATION', x + 18, bannerY + 9, {
+        lineBreak: false,
+        characterSpacing: 0.4,
+      });
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(19)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(spec.suggestion, x + 18, bannerY + 21, {
+        width: w - 36,
+        lineBreak: false,
+        ellipsis: true,
+      });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(this.C_MUTED)
+      .text(`Behavioural profile: ${spec.trait}`, x + 18, bannerY + 42, {
+        width: w - 36,
+        lineBreak: false,
+        ellipsis: true,
+      });
+
+    // ── Elective fit — canonical order (no sorting) ──
+    let cy = bannerY + bannerH + 12;
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(9)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Elective Fit', x, cy, { lineBreak: false });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(7.5)
+      .fillColor(this.C_MUTED)
+      .text('1 = Strongest Fit  ·  5 = Weakest Fit', x, cy + 1, {
+        width: w,
+        align: 'right',
+        lineBreak: false,
+      });
+
+    cy += 16;
+
+    const rowH = 25;
+    const labelW = w * 0.34;
+    const barX = x + labelW + 10;
+    const tagW = 86;
+    const barW = w - labelW - 10 - tagW - 10;
+
+    // Iterate in the canonical ELECTIVES order — rank 1 may not be first
+    ELECTIVES.forEach((e) => {
+      const weight = (spec as unknown as Record<string, number>)[e.key];
+      const strongest = weight === 1;
+      const rowY = cy;
+
+      if (strongest) {
+        this.doc
+          .roundedRect(x - 6, rowY - 4, w + 12, rowH - 4, 6)
+          .fill('#F1FBF5');
+      }
+
+      // Accent dot + label
+      this.doc.circle(x + 6, rowY + 9, 4).fill(e.accent);
+      this.doc
+        .font(strongest ? this.FONT_SORA_BOLD : this.FONT_SORA_SEMIBOLD)
+        .fontSize(10)
+        .fillColor(strongest ? this.C_ACCENT_GREEN : '#2A2A36')
+        .text(e.label, x + 18, rowY + 4, {
+          width: labelW - 18,
+          lineBreak: false,
+          ellipsis: true,
+        });
+
+      // Strength bar (weight 1..5 → visual strength 5..1)
+      const strength = (6 - weight) / 5;
+      const barY = rowY + 6;
+      const barH = 7;
+      this.doc.roundedRect(barX, barY, barW, barH, barH / 2).fill('#EAECF4');
+      this.doc
+        .roundedRect(barX, barY, Math.max(8, barW * strength), barH, barH / 2)
+        .fill(e.accent);
+
+      // Right tag
+      const tagX = x + w - tagW;
+      if (strongest) {
+        this.doc
+          .roundedRect(tagX, rowY + 1, tagW, 16, 8)
+          .fill(this.C_ACCENT_GREEN);
+        this.doc
+          .font(this.FONT_SORA_SEMIBOLD)
+          .fontSize(7.5)
+          .fillColor('#FFFFFF')
+          .text('STRONGEST FIT', tagX, rowY + 5, {
+            width: tagW,
+            align: 'center',
+            lineBreak: false,
+          });
+      } else {
+        this.doc
+          .font(this.FONT_SORA_SEMIBOLD)
+          .fontSize(8.5)
+          .fillColor(this.C_MUTED)
+          .text(`Fit rank ${weight}`, tagX, rowY + 4, {
+            width: tagW,
+            align: 'center',
+            lineBreak: false,
+          });
+      }
+
+      cy += rowH;
+    });
+
+    return cy;
+  }
+
+  // ============================================================
+  // PAGE 2 — TOP FUTURE ROLES
+  // ============================================================
+  private drawFutureRoles(y: number, spec: SpecEntry): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+    const roles = (spec.roles || []).slice(0, 6);
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Top Future Roles', x, y, { lineBreak: false });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(this.C_MUTED)
+      .text(
+        'Career directions this behavioural profile is well-positioned for.',
+        x,
+        y + 18,
+        { lineBreak: false },
+      );
+
+    let chipX = x;
+    let chipY = y + 34;
+    const chipH = 24;
+    const chipGap = 8;
+    const maxX = x + w;
+
+    roles.forEach((role) => {
+      this.doc.font(this.FONT_SORA_SEMIBOLD).fontSize(9.5);
+      const chipW = this.doc.widthOfString(role) + 26;
+      if (chipX > x && chipX + chipW > maxX) {
+        chipX = x;
+        chipY += chipH + chipGap;
+      }
+      this.doc
+        .roundedRect(chipX, chipY, chipW, chipH, chipH / 2)
+        .fillAndStroke('#FFFFFF', this.C_CARD_BORDER);
+      this.doc
+        .fillColor('#2A2A36')
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(9.5)
+        .text(role, chipX + 13, chipY + 7, { lineBreak: false });
+      chipX += chipW + chipGap;
+    });
+
+    return chipY + chipH;
+  }
+
+  // ============================================================
+  // PAGE 2 — STRENGTHS & WATCH-OUTS  (new section)
+  // ============================================================
+  private drawStrengthsAndWatchOuts(
+    y: number,
+    block: (typeof blendedTraits)[string],
+  ): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+    const colGap = 16;
+    const colW = (w - colGap) / 2;
+
+    // Extract from trait_mapping1[0]: [name, roles, weaknesses, strengths]
+    const mapping = block.trait_mapping1?.[0] || [];
+    const strengthsRaw: string = mapping[3] || '';
+    const watchOutsRaw: string = mapping[2] || '';
+
+    const strengthsList = strengthsRaw
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    const watchOutsList = watchOutsRaw
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean)
+      .slice(0, 4);
+
+    // Section titles
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Natural Strengths', x, y, { lineBreak: false });
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Watch-outs', x + colW + colGap, y, { lineBreak: false });
+
+    const itemsY = y + 24;
+    const dotR = 3;
+    const itemGap = 8;
+    const textSize = 9.5;
+
+    const drawItems = (
+      items: string[],
+      colX: number,
+      accentColor: string,
+    ): number => {
+      let curY = itemsY;
+      items.forEach((item) => {
+        this.doc.circle(colX + dotR, curY + 6, dotR).fill(accentColor);
+        this.doc
+          .font(this.FONT_REGULAR)
+          .fontSize(textSize)
+          .fillColor(this.C_INK)
+          .text(item, colX + dotR * 2 + 8, curY, {
+            width: colW - dotR * 2 - 10,
+            lineGap: 1.2,
+          });
+        const textH = this.doc.heightOfString(item, {
+          width: colW - dotR * 2 - 10,
+          lineGap: 1.2,
+        });
+        curY += textH + itemGap;
+      });
+      return curY;
+    };
+
+    const leftEnd = drawItems(strengthsList, x, this.C_ACCENT_GREEN);
+    const rightEnd = drawItems(watchOutsList, x + colW + colGap, '#E07B2E');
+
+    return Math.max(leftEnd, rightEnd);
+  }
+
+  // ============================================================
+  // PAGE 2 — RECOMMENDED NEXT STEPS
+  // ============================================================
+  private drawNextSteps(y: number, spec: SpecEntry): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+
+    const topRole = spec.roles?.[0] || 'your target role';
+
+    const steps: string[] = [
+      `Explore the ${spec.suggestion} specialization and its core subjects in depth.`,
+      `Speak with seniors, mentors or alumni working as a ${topRole}.`,
+      'Take on one project or internship aligned to your strongest elective.',
+      'Pick one watch-out from this report and actively work on it this term.',
+    ];
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(13)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Recommended Next Steps', x, y, { lineBreak: false });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9)
+      .fillColor(this.C_MUTED)
+      .text(
+        'Practical actions to turn this behavioural snapshot into momentum.',
+        x,
+        y + 18,
+        { lineBreak: false },
+      );
+
+    const colGap = 16;
+    const rowGap = 8;
+    const colW = (w - colGap) / 2;
+    const startY = y + 32;
+    let col0Y = startY;
+    let col1Y = startY;
+
+    steps.forEach((text, i) => {
+      const col = i % 2;
+      const cx = x + col * (colW + colGap);
+      const cy = col === 0 ? col0Y : col1Y;
+
+      this.doc.font(this.FONT_REGULAR).fontSize(9.5);
+      const textH = this.doc.heightOfString(text, {
+        width: colW - 50,
+        lineGap: 1.4,
+      });
+      const ch = Math.max(textH + 16, 38);
+
+      this.doc
+        .roundedRect(cx, cy, colW, ch, 8)
+        .fillAndStroke('#EDF8F1', '#CDE9D8');
+
+      this.doc.circle(cx + 20, cy + ch / 2, 11).fill(this.C_ACCENT_GREEN);
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(10)
+        .fillColor('#FFFFFF')
+        .text(`${i + 1}`, cx + 9, cy + ch / 2 - 6, {
+          width: 22,
+          align: 'center',
+          lineBreak: false,
+        });
+
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(9.5)
+        .fillColor('#234')
+        .text(text, cx + 38, cy + (ch - textH) / 2, {
+          width: colW - 50,
+          lineGap: 1.4,
+        });
+
+      if (col === 0) col0Y = cy + ch + rowGap;
+      else col1Y = cy + ch + rowGap;
+    });
+
+    return Math.max(col0Y, col1Y);
+  }
+
+  // ============================================================
+  // PAGE 2 — DISCLAIMER
+  // ============================================================
+  private drawDisclaimer(y: number): number {
+    const x = this.CONTENT_X;
+    const w = this.CONTENT_W;
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(11)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text('Disclaimer', x, y, { lineBreak: false });
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(8.5)
+      .fillColor('#3A3A46')
+      .text(
+        'This report is a quick behavioural snapshot based on your behavioural (DISC) responses. ' +
+          'It is meant to support, not replace, deeper career guidance. Please refer to the full Origin BI report ' +
+          'for detailed trait insights, agile dimensions, and personalised recommendations.',
+        x,
+        y + 16,
+        { width: w, lineGap: 1.2 },
+      );
+
+    return y + 58;
+  }
+
+  // ============================================================
+  // UTILS
+  // ============================================================
+  private resolveTraitImagePath(name: string): string | null {
+    const file = `${name.trim().replace(/\s+/g, '_')}.png`;
+    const candidates = [
+      path.resolve(
+        process.cwd(),
+        `public/assets/images/student_traits/${file}`,
+      ),
+      path.resolve(
+        process.cwd(),
+        `../../backend/student-service/public/assets/images/student_traits/${file}`,
+      ),
+    ];
+    return candidates.find((c) => fs.existsSync(c)) ?? null;
+  }
+
+  private stripHtml(value: string): string {
+    return (value || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/p>/gi, ' ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+}
