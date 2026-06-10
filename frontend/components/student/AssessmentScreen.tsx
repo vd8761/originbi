@@ -2,6 +2,8 @@ import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import { useLanguage } from '../../contexts/LanguageContext';
+import MetaphorReportPanel from "../admin/MetaphorReportPanel";
+import IatReportPanel from "../admin/IatReportPanel";
 
 const translations = {
   ENG: {
@@ -982,6 +984,67 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   // Track if cache restore has been attempted this mount
   const cacheRestoreAttemptedRef = useRef(false);
   const [showReportPreviewAfterExam, setShowReportPreviewAfterExam] = useState(true);
+  const [showIatMetaphorToStudent, setShowIatMetaphorToStudent] = useState(false);
+  const [activeReportTab, setActiveReportTab] = useState<'main' | 'iat' | 'metaphor'>('main');
+
+  const [metaphorData, setMetaphorData] = useState<any>(null);
+  const [metaphorLoading, setMetaphorLoading] = useState(false);
+  const [iatData, setIatData] = useState<any>(null);
+  const [iatLoading, setIatLoading] = useState(false);
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true
+    });
+  };
+
+  const fetchMetaphorReport = async (showLoading = false) => {
+    const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+    if (!email) return;
+    try {
+      if (showLoading) setMetaphorLoading(true);
+      const data = await studentService.getMetaphorReport(email);
+      setMetaphorData(data);
+    } catch (err) {
+      console.error("Failed to fetch Metaphor report for student:", err);
+    } finally {
+      if (showLoading) setMetaphorLoading(false);
+    }
+  };
+
+  const fetchIatReport = async (showLoading = false) => {
+    const email = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail');
+    if (!email) return;
+    try {
+      if (showLoading) setIatLoading(true);
+      const data = await studentService.getIatReport(email);
+      setIatData(data);
+    } catch (err) {
+      console.error("Failed to fetch IAT report for student:", err);
+    } finally {
+      if (showLoading) setIatLoading(false);
+    }
+  };
+
+  // Polling for Metaphor report
+  useEffect(() => {
+    if (activeReportTab !== 'metaphor' || !metaphorData || metaphorData.report) return;
+    const interval = setInterval(() => {
+      void fetchMetaphorReport(false);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [activeReportTab, metaphorData]);
+
+  // Polling for IAT report
+  useEffect(() => {
+    if (activeReportTab !== 'iat' || !iatData || iatData.report) return;
+    const interval = setInterval(() => {
+      void fetchIatReport(false);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [activeReportTab, iatData]);
 
   // Dynamic API URL for Mobile Support
 
@@ -1007,6 +1070,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           }
           if (profileData && profileData.showReportPreviewAfterExam !== undefined) {
             setShowReportPreviewAfterExam(profileData.showReportPreviewAfterExam);
+          }
+          if (profileData && profileData.showIatMetaphorToStudent !== undefined) {
+            setShowIatMetaphorToStudent(profileData.showIatMetaphorToStudent);
           }
         } catch (err) {
           console.error("Error fetching assessment data:", err);
@@ -1108,6 +1174,16 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const isReportPageMode =
     ((assessments.length > 0 && completedAssessmentCount >= assessments.length) ||
     forceReportPageMode) && showReportPreviewAfterExam;
+
+  const hasIatCompleted = useMemo(() => {
+    return assessments.some((a) => isIatGenAssessment(a) && a.status === 'completed');
+  }, [assessments]);
+
+  const hasMetaphorCompleted = useMemo(() => {
+    return assessments.some(
+      (a) => (a.id === '3' || /metaphor/i.test(a.title || '')) && a.status === 'completed'
+    );
+  }, [assessments]);
   const loadPdfIntoViewer = async (
     absoluteDownloadUrl: string,
     authContext: SessionAuthContext,
@@ -1706,83 +1782,171 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               Your report is being generated. Once ready, it is available below and also shared to your registered mail.
             </p>
 
-            {isPdfPreviewLoading && (
+            {isPdfPreviewLoading && activeReportTab === 'main' && (
               <p className="text-brand-green text-sm lg:text-[0.95vw] font-medium text-center">
                 {pdfPreviewProgress || 'Generating report...'}
               </p>
             )}
           </div>
 
-          <div className="rounded-2xl bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none h-[68vh] min-h-[440px] flex flex-col overflow-hidden transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
-            <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex flex-wrap justify-between items-center gap-2">
-              <h3 className="font-semibold text-[#19211C] dark:text-white text-[18px]">Your Report Document</h3>
-              <div className="flex flex-wrap items-center gap-2">
+          {/* Tab Navigation */}
+          {showIatMetaphorToStudent && (hasIatCompleted || hasMetaphorCompleted) && (
+            <div className="flex border-b border-[#EEF4F1] dark:border-white/[0.12] pb-0 gap-8 overflow-x-auto w-full scrollbar-hide no-scrollbar">
+              <button
+                onClick={() => setActiveReportTab('main')}
+                className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap cursor-pointer ${
+                  activeReportTab === 'main'
+                    ? 'text-brand-green border-b-2 border-brand-green font-bold'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Personality Journey Report
+              </button>
+              {hasIatCompleted && (
                 <button
-                  onClick={() => { void openReportPreview(); }}
-                  className="px-4 py-2 rounded-full border border-[#EEF4F1] dark:border-white/10 bg-white dark:bg-white/10 text-xs lg:text-[0.833vw] font-semibold text-[#19211C] dark:text-white hover:bg-[#F7FAF8] dark:hover:bg-white/15 transition-colors disabled:opacity-55 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setActiveReportTab('iat');
+                    if (!iatData) void fetchIatReport(true);
+                  }}
+                  className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap cursor-pointer ${
+                    activeReportTab === 'iat'
+                      ? 'text-brand-green border-b-2 border-brand-green font-bold'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
                 >
-                  Open Fullpage View
+                  Implicit Bias (IAT)
                 </button>
-
+              )}
+              {hasMetaphorCompleted && (
                 <button
-                  onClick={handlePrintReportPdf}
-                  disabled={!reportIsReady}
-                  className="px-4 py-2 rounded-full border border-[#EEF4F1] dark:border-white/10 bg-white dark:bg-white/10 text-xs lg:text-[0.833vw] font-semibold text-[#19211C] dark:text-white hover:bg-[#F7FAF8] dark:hover:bg-white/15 transition-colors disabled:opacity-55 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    setActiveReportTab('metaphor');
+                    if (!metaphorData) void fetchMetaphorReport(true);
+                  }}
+                  className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap cursor-pointer ${
+                    activeReportTab === 'metaphor'
+                      ? 'text-brand-green border-b-2 border-brand-green font-bold'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  }`}
                 >
-                  Print
+                  Metaphor Analysis
                 </button>
-
-                <button
-                  onClick={handleDownloadReportPdf}
-                  disabled={!reportIsReady}
-                  className="px-4 py-2 rounded-full border border-brand-green bg-brand-green text-white text-xs lg:text-[0.833vw] font-semibold hover:bg-brand-green/90 transition-colors disabled:opacity-55 disabled:cursor-not-allowed"
-                >
-                  Download
-                </button>
-              </div>
+              )}
             </div>
-            <hr className="border-[#19211C]/6 dark:border-white/10" />
+          )}
 
-            {isPdfPreviewLoading && !reportPdfBytes && (
-              <div className="flex-1 w-full px-6 pt-4 pb-6 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[0.833vw] flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <Spinner className="w-6 h-6 text-brand-green" />
-                  <p className="text-sm font-medium text-[#19211C] dark:text-white">
-                    {pdfPreviewProgress || 'Preparing report PDF...'}
+          {/* Tab Contents */}
+          {activeReportTab === 'main' ? (
+            <div className="rounded-2xl bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] shadow-[0_2px_8px_rgba(25,33,28,0.04)] dark:shadow-none h-[68vh] min-h-[440px] flex flex-col overflow-hidden transition-colors duration-300 hover:border-[#EAF1ED] dark:hover:border-white/[0.2]">
+              <div className="px-6 pt-6 pb-4 lg:px-[1.25vw] lg:pt-[1.25vw] lg:pb-[0.833vw] flex flex-wrap justify-between items-center gap-2">
+                <h3 className="font-semibold text-[#19211C] dark:text-white text-[18px]">Your Report Document</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => { void openReportPreview(); }}
+                    className="px-4 py-2 rounded-full border border-[#EEF4F1] dark:border-white/10 bg-white dark:bg-white/10 text-xs lg:text-[0.833vw] font-semibold text-[#19211C] dark:text-white hover:bg-[#F7FAF8] dark:hover:bg-white/15 transition-colors disabled:opacity-55 disabled:cursor-not-allowed"
+                  >
+                    Open Fullpage View
+                  </button>
+
+                  <button
+                    onClick={handlePrintReportPdf}
+                    disabled={!reportIsReady}
+                    className="px-4 py-2 rounded-full border border-[#EEF4F1] dark:border-white/10 bg-white dark:bg-white/10 text-xs lg:text-[0.833vw] font-semibold text-[#19211C] dark:text-white hover:bg-[#F7FAF8] dark:hover:bg-white/15 transition-colors disabled:opacity-55 disabled:cursor-not-allowed"
+                  >
+                    Print
+                  </button>
+
+                  <button
+                    onClick={handleDownloadReportPdf}
+                    disabled={!reportIsReady}
+                    className="px-4 py-2 rounded-full border border-brand-green bg-brand-green text-white text-xs lg:text-[0.833vw] font-semibold hover:bg-brand-green/90 transition-colors disabled:opacity-55 disabled:cursor-not-allowed"
+                  >
+                    Download
+                  </button>
+                </div>
+              </div>
+              <hr className="border-[#19211C]/6 dark:border-white/10" />
+
+              {isPdfPreviewLoading && !reportPdfBytes && (
+                <div className="flex-1 w-full px-6 pt-4 pb-6 lg:px-[1.25vw] lg:pt-[0.41vw] lg:pb-[0.833vw] flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    <Spinner className="w-6 h-6 text-brand-green" />
+                    <p className="text-sm font-medium text-[#19211C] dark:text-white">
+                      {pdfPreviewProgress || 'Preparing report PDF...'}
+                    </p>
+                  </div>
+                  <div className="grid gap-3">
+                    <div className="h-7 rounded-lg bg-white/80 dark:bg-white/10 animate-pulse" />
+                    <div className="h-7 rounded-lg bg-white/80 dark:bg-white/10 animate-pulse" />
+                    <div className="h-7 rounded-lg bg-white/80 dark:bg-white/10 animate-pulse" />
+                  </div>
+                  <div className="flex-1 rounded-xl border border-dashed border-[#19211C]/6 dark:border-white/10 bg-white/60 dark:bg-white/5" />
+                </div>
+              )}
+
+              {!isPdfPreviewLoading && pdfPreviewError && (
+                <div className="flex-1 w-full flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <p className="text-sm font-semibold text-red-500 dark:text-red-400 max-w-3xl">
+                    {pdfPreviewError}
                   </p>
                 </div>
-                <div className="grid gap-3">
-                  <div className="h-7 rounded-lg bg-white/80 dark:bg-white/10 animate-pulse" />
-                  <div className="h-7 rounded-lg bg-white/80 dark:bg-white/10 animate-pulse" />
-                  <div className="h-7 rounded-lg bg-white/80 dark:bg-white/10 animate-pulse" />
+              )}
+
+              {!showReportPreview && !isPdfPreviewLoading && !pdfPreviewError && reportPdfBytes && (
+                <ResponsivePdfRenderer
+                  pdfBytes={reportPdfBytes}
+                  password={reportPdfPassword}
+                />
+              )}
+
+              {!isPdfPreviewLoading && !pdfPreviewError && !reportPdfBytes && (
+                <div className="flex-1 w-full flex flex-col items-center justify-center p-6 text-center gap-3">
+                  <p className="text-sm font-medium text-[#19211C]/60 dark:text-white/60">
+                    Report is in queue. Please wait while we prepare it.
+                  </p>
                 </div>
-                <div className="flex-1 rounded-xl border border-dashed border-[#19211C]/6 dark:border-white/10 bg-white/60 dark:bg-white/5" />
-              </div>
-            )}
-
-            {!isPdfPreviewLoading && pdfPreviewError && (
-              <div className="flex-1 w-full flex flex-col items-center justify-center gap-3 p-6 text-center">
-                <p className="text-sm font-semibold text-red-500 dark:text-red-400 max-w-3xl">
-                  {pdfPreviewError}
-                </p>
-              </div>
-            )}
-
-            {!showReportPreview && !isPdfPreviewLoading && !pdfPreviewError && reportPdfBytes && (
-              <ResponsivePdfRenderer
-                pdfBytes={reportPdfBytes}
-                password={reportPdfPassword}
-              />
-            )}
-
-            {!isPdfPreviewLoading && !pdfPreviewError && !reportPdfBytes && (
-              <div className="flex-1 w-full flex flex-col items-center justify-center p-6 text-center gap-3">
-                <p className="text-sm font-medium text-[#19211C]/60 dark:text-white/60">
-                  Report is in queue. Please wait while we prepare it.
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          ) : activeReportTab === 'iat' ? (
+            <div className="w-full">
+              {iatLoading ? (
+                <div className="flex items-center justify-center min-h-[300px] w-full bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] rounded-2xl">
+                  <Spinner className="w-8 h-8 text-brand-green animate-spin" />
+                </div>
+              ) : (
+                <IatReportPanel
+                  data={iatData}
+                  loading={iatLoading}
+                  formatDate={formatDate}
+                  isStudent={true}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="w-full">
+              {metaphorLoading ? (
+                <div className="flex items-center justify-center min-h-[300px] w-full bg-white dark:bg-white/[0.08] border border-[#EEF4F1] dark:border-white/[0.12] rounded-2xl">
+                  <Spinner className="w-8 h-8 text-brand-green animate-spin" />
+                </div>
+              ) : (
+                <MetaphorReportPanel
+                  data={metaphorData}
+                  loading={metaphorLoading}
+                  retrying={false}
+                  onRetry={() => {}}
+                  formatDate={formatDate}
+                  stats={null}
+                  displayData={{
+                    title: "Metaphor Analysis",
+                    program: userName,
+                    type: "Student"
+                  }}
+                  isStudent={true}
+                  studentEmail={activeUserEmail || undefined}
+                />
+              )}
+            </div>
+          )}
         </div>
 
         {reportPreviewModal}

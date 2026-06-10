@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { IatService } from './iat.service';
+import { IatService, IntakeDto, TrialEvent } from './iat.service';
 
 @Controller('iat')
 export class IatController {
@@ -11,14 +11,14 @@ export class IatController {
   }
 
   @Post('attempt/:attemptId/intake')
-  saveIntake(@Param('attemptId') attemptId: string, @Body() body: any) {
+  saveIntake(@Param('attemptId') attemptId: string, @Body() body: IntakeDto) {
     return this.iat.saveIntake(Number(attemptId), body || {});
   }
 
   @Post('attempt/:attemptId/trial-events')
   saveTrialEvents(
     @Param('attemptId') attemptId: string,
-    @Body('events') events: any[],
+    @Body('events') events: TrialEvent[],
   ) {
     return this.iat.saveTrialEvents(Number(attemptId), events || []);
   }

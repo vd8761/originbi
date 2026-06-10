@@ -159,6 +159,51 @@ export const studentService = {
             return null;
         }
     },
+
+    async getMetaphorReport(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/metaphor-report`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) throw new Error("Failed to fetch metaphor report");
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to fetch metaphor report", error);
+            return null;
+        }
+    },
+
+    async getIatReport(email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/iat-report`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) throw new Error("Failed to fetch IAT report");
+            return await res.json();
+        } catch (error) {
+            console.error("Failed to fetch IAT report", error);
+            return null;
+        }
+    },
+
+    async downloadMetaphorReportPdf(attemptId: string | number, email: string) {
+        try {
+            const res = await fetch(`${API_URL}/student/metaphor/${attemptId}/report/pdf`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            if (!res.ok) throw new Error("Failed to download metaphor report PDF");
+            return await res.blob();
+        } catch (error) {
+            console.error("Failed to download metaphor report PDF", error);
+            throw error;
+        }
+    },
     async createDebriefOrder(email: string) {
         try {
             const res = await fetch(`${API_URL}/student/subscription/debrief/order`, {

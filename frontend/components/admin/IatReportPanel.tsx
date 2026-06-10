@@ -8,6 +8,7 @@ interface Props {
   onRetry?: () => void;
   formatDate: (date?: string) => string;
   stats?: React.ReactNode;
+  isStudent?: boolean;
 }
 
 const patternClass: Record<string, string> = {
@@ -107,6 +108,7 @@ const IatReportPanel: React.FC<Props> = ({
   onRetry,
   formatDate,
   stats,
+  isStudent = false,
 }) => {
   if (loading) {
     return (
@@ -121,7 +123,9 @@ const IatReportPanel: React.FC<Props> = ({
       <div className="rounded-2xl border border-gray-200 bg-white p-8 dark:border-white/10 dark:bg-[#19211C]">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">IATGen</h3>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          This candidate did not receive IATGen for Level 2.
+          {isStudent
+            ? "Your implicit bias report is not available yet."
+            : "This candidate did not receive IATGen for Level 2."}
         </p>
       </div>
     );
@@ -129,7 +133,7 @@ const IatReportPanel: React.FC<Props> = ({
 
   const jobStatus = data.job?.status || data.report?.status || 'PENDING';
   const ready = data.report?.status === 'DONE' && data.report?.reportText;
-  const canRetry = Boolean(onRetry && data.attempt && !ready && jobStatus !== 'PROCESSING');
+  const canRetry = Boolean(onRetry && data.attempt && !ready && jobStatus !== 'PROCESSING' && !isStudent);
 
   return (
     <div className="space-y-6">
@@ -142,7 +146,8 @@ const IatReportPanel: React.FC<Props> = ({
               Corporate India Bias Profile
             </h3>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Modules completed: {data.completed}/{data.total} - Report status: {jobStatus}
+              Modules completed: {data.completed}/{data.total}
+              {!isStudent && ` - Report status: ${jobStatus}`}
             </p>
           </div>
           <div className="flex flex-col items-start gap-2 md:items-end">
@@ -164,7 +169,7 @@ const IatReportPanel: React.FC<Props> = ({
           </div>
         </div>
 
-        {data.job?.lastError && !ready && (
+        {data.job?.lastError && !ready && !isStudent && (
           <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
             {data.job.lastError}
           </div>
@@ -210,7 +215,9 @@ const IatReportPanel: React.FC<Props> = ({
           />
         ) : (
           <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-            The candidate can continue normally. The admin-only Claude report will appear here when the queued job completes.
+            {isStudent
+              ? "Your implicit bias report is being prepared. It will appear here when the job completes."
+              : "The candidate can continue normally. The admin-only Claude report will appear here when the queued job completes."}
           </p>
         )}
       </div>

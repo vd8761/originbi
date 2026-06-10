@@ -19,7 +19,7 @@ import { Registration } from '../entities/registration.entity';
 import { IAT_ASSESSMENT_KIND, IAT_REPORT_QUEUE } from './iat.constants';
 import { IatEligibilityService } from './iat-eligibility.service';
 
-interface TrialEvent {
+export interface TrialEvent {
   trialId: number;
   keyPressed: string;
   responseTimeMs: number;
@@ -28,7 +28,7 @@ interface TrialEvent {
   answeredAt?: string;
 }
 
-interface IntakeDto {
+export interface IntakeDto {
   studentName?: string;
   age?: number;
   gender?: string;
@@ -606,9 +606,25 @@ export class IatService {
     // IAT block sizing. Each count is a multiple of its pool size so the E/I
     // split stays balanced.
     // Part 1 — attribute practice (incompatible-half arrangement): attr B / attr A
-    addStimuli(1, 'PRACTICE_ATTRIBUTE', [attrB], [attrA], this.title(attrB), this.title(attrA), 20);
+    addStimuli(
+      1,
+      'PRACTICE_ATTRIBUTE',
+      [attrB],
+      [attrA],
+      this.title(attrB),
+      this.title(attrA),
+      20,
+    );
     // Part 2 — target practice: target A / target B
-    addStimuli(2, 'PRACTICE_TARGET', [targetA], [targetB], this.title(targetA), this.title(targetB), 20);
+    addStimuli(
+      2,
+      'PRACTICE_TARGET',
+      [targetA],
+      [targetB],
+      this.title(targetA),
+      this.title(targetB),
+      20,
+    );
     // Part 3 — combined practice (incompatible pairing): A+attrB / B+attrA
     addStimuli(
       3,
@@ -630,7 +646,15 @@ export class IatService {
       40,
     );
     // Part 5 — attribute practice (compatible-half arrangement): attr A / attr B
-    addStimuli(5, 'PRACTICE_ATTRIBUTE', [attrA], [attrB], this.title(attrA), this.title(attrB), 30);
+    addStimuli(
+      5,
+      'PRACTICE_ATTRIBUTE',
+      [attrA],
+      [attrB],
+      this.title(attrA),
+      this.title(attrB),
+      30,
+    );
     // Part 6 — combined practice (compatible pairing): A+attrA / B+attrB
     addStimuli(
       6,
