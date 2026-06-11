@@ -39,7 +39,7 @@ const REPORT_PDF_POLL_INTERVAL_MS = 1200;
 const REPORT_PDF_POLL_MAX_ATTEMPTS = 240;
 const PDF_RENDER_MAX_WIDTH = 1080;
 const PDF_RENDER_PIXEL_RATIO_CAP = 1.35;
-const REPORT_PREVIEW_CACHE_VERSION = 'v3';
+const REPORT_PREVIEW_CACHE_VERSION = 'v5';
 const REPORT_PREVIEW_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 const REPORT_READY_STORAGE_KEY = 'studentReportReady';
 
@@ -976,6 +976,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false);
   const [pdfPreviewProgress, setPdfPreviewProgress] = useState('');
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  // "Blocked" message (e.g. required assessment not completed) — shown WITHOUT
+  // a retry button, since retrying won't help until the data exists.
+  const [pdfPreviewBlockedMessage, setPdfPreviewBlockedMessage] = useState<string | null>(null);
   // Whether we're currently restoring from cache (blocks generation trigger)
   const [isRestoringFromCache, setIsRestoringFromCache] = useState(false);
   const [forceReportPageMode, setForceReportPageMode] = useState(false);
@@ -983,6 +986,10 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const reportGenerationLockRef = useRef(false);
   // Track if cache restore has been attempted this mount
   const cacheRestoreAttemptedRef = useRef(false);
+  // Track if the preview has been auto-generated this mount. Prevents the
+  // auto-trigger from retrying after a failure/blocked result — the user must
+  // click "Retry" explicitly (which bypasses this guard via forceRefresh).
+  const previewAutoAttemptedRef = useRef(false);
   const [showReportPreviewAfterExam, setShowReportPreviewAfterExam] = useState(true);
   const [showIatMetaphorToStudent, setShowIatMetaphorToStudent] = useState(false);
   const [activeReportTab, setActiveReportTab] = useState<'main' | 'iat' | 'metaphor'>('main');
@@ -1403,6 +1410,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     const authContext = getSessionAuthContext();
 
     setPdfPreviewError(null);
+    setPdfPreviewBlockedMessage(null);
     setPdfPreviewProgress('Initializing report preview...');
 
     if (!authContext.token || !authContext.userEmail) {
@@ -1444,7 +1452,11 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
     setReportPdfPassword(null);
 
     try {
-      const startResponse = await fetch(buildReportApiUrl(`/generate/student/${studentId}`), {
+      // Student-side preview: the backend resolves which report to show
+      // (Level 1 "Behavioural Snapshot" for MBA, the program Short report
+      // otherwise) and may block generation when the required assessment is
+      // missing.
+      const startResponse = await fetch(buildReportApiUrl(`/generate/student/${studentId}?reportType=auto`), {
         method: 'GET',
         headers: buildSecureRequestHeaders(authContext, {
           Accept: 'application/json',
@@ -1460,7 +1472,21 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       const startData = await startResponse.json() as {
         success?: boolean;
         jobId?: string;
+        blocked?: boolean;
+        message?: string;
       };
+
+      // Blocked (e.g. required ACI assessment not completed): stop with the
+      // admin-configured message and NO retry button — retrying won't help.
+      if (startData?.blocked) {
+        setPdfPreviewBlockedMessage(
+          startData.message || 'Please contact your administrator to receive your report.',
+        );
+        setIsPdfPreviewLoading(false);
+        setPdfPreviewProgress('');
+        reportGenerationLockRef.current = false;
+        return;
+      }
 
       if (!startData?.success || !startData?.jobId) {
         throw new Error('Unable to start report generation.');
@@ -1540,6 +1566,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   };
 
   const openReportPreview = async (forceRefresh = false) => {
+    // A manual retry clears the one-shot guard so the user can re-attempt.
+    if (forceRefresh) previewAutoAttemptedRef.current = false;
     await ensureReportPreviewData({ forceRefresh, openModal: true });
   };
 
@@ -1547,11 +1575,14 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   // - In report mode, data loaded, studentId ready
   // - No PDF in state, not loading, not restoring from cache, not locked
   // - Show report preview after exam is enabled
+  // - It hasn't already been auto-attempted (so a failure/blocked result does
+  //   NOT auto-retry — the user must click Retry).
   useEffect(() => {
     if (!isReportPageMode || loading || !studentId || !showReportPreviewAfterExam) return;
     if (reportPdfBytes || isPdfPreviewLoading || isRestoringFromCache) return;
-    if (reportGenerationLockRef.current) return;
+    if (reportGenerationLockRef.current || previewAutoAttemptedRef.current) return;
 
+    previewAutoAttemptedRef.current = true;
     void ensureReportPreviewData({ forceRefresh: false, openModal: false });
   }, [
     isReportPageMode,
@@ -1743,7 +1774,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               </div>
             )}
 
-            {!isPdfPreviewLoading && pdfPreviewError && (
+            {!isPdfPreviewLoading && !pdfPreviewBlockedMessage && pdfPreviewError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
                 <p className="text-sm font-semibold text-red-500 dark:text-red-400">
                   {pdfPreviewError}
@@ -1757,14 +1788,22 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
               </div>
             )}
 
-            {!isPdfPreviewLoading && !pdfPreviewError && reportPdfBytes && (
+            {!isPdfPreviewLoading && pdfPreviewBlockedMessage && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center">
+                <p className="text-sm font-medium text-brand-text-light-secondary dark:text-brand-text-secondary">
+                  {pdfPreviewBlockedMessage}
+                </p>
+              </div>
+            )}
+
+            {!isPdfPreviewLoading && !pdfPreviewError && !pdfPreviewBlockedMessage && reportPdfBytes && (
               <ResponsivePdfRenderer
                 pdfBytes={reportPdfBytes}
                 password={reportPdfPassword}
               />
             )}
 
-            {!isPdfPreviewLoading && !pdfPreviewError && !reportPdfBytes && (
+            {!isPdfPreviewLoading && !pdfPreviewError && !pdfPreviewBlockedMessage && !reportPdfBytes && (
               <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
                 <p className="text-sm font-medium text-brand-text-light-secondary dark:text-brand-text-secondary">
                   Report preview is being prepared.
@@ -1926,22 +1965,36 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
                 </div>
               )}
 
-              {!isPdfPreviewLoading && pdfPreviewError && (
+              {!isPdfPreviewLoading && !pdfPreviewBlockedMessage && pdfPreviewError && (
                 <div className="flex-1 w-full flex flex-col items-center justify-center gap-3 p-6 text-center">
                   <p className="text-sm font-semibold text-red-500 dark:text-red-400 max-w-3xl">
                     {pdfPreviewError}
                   </p>
+                  <button
+                    onClick={() => { void openReportPreview(true); }}
+                    className="px-4 py-2 rounded-lg bg-brand-green text-white text-sm font-semibold hover:bg-brand-green/90 transition-colors"
+                  >
+                    Retry Preview
+                  </button>
                 </div>
               )}
 
-              {!showReportPreview && !isPdfPreviewLoading && !pdfPreviewError && reportPdfBytes && (
+              {!isPdfPreviewLoading && pdfPreviewBlockedMessage && (
+                <div className="flex-1 w-full flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <p className="text-sm font-medium text-[#19211C]/70 dark:text-white/70 max-w-3xl">
+                    {pdfPreviewBlockedMessage}
+                  </p>
+                </div>
+              )}
+
+              {!showReportPreview && !isPdfPreviewLoading && !pdfPreviewError && !pdfPreviewBlockedMessage && reportPdfBytes && (
                 <ResponsivePdfRenderer
                   pdfBytes={reportPdfBytes}
                   password={reportPdfPassword}
                 />
               )}
 
-              {!isPdfPreviewLoading && !pdfPreviewError && !reportPdfBytes && (
+              {!isPdfPreviewLoading && !pdfPreviewError && !pdfPreviewBlockedMessage && !reportPdfBytes && (
                 <div className="flex-1 w-full flex flex-col items-center justify-center p-6 text-center gap-3">
                   <p className="text-sm font-medium text-[#19211C]/60 dark:text-white/60">
                     Report is in queue. Please wait while we prepare it.
