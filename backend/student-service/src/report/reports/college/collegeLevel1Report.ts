@@ -1,15 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import * as fs from 'fs';
 import * as path from 'path';
-import { CollegeData } from '../../types/types';
+import { CollegeData, COLORS } from '../../types/types';
 import { BaseReport } from '../BaseReport';
 import { blendedTraits } from './collegeConstants';
-import {
-  SPEC_MAP,
-  SpecEntry,
-  ELECTIVES,
-  calculateDiscProfile,
-} from './specializationConstants';
+import { SPEC_MAP, SpecEntry, ELECTIVES } from './specializationConstants';
 import { logger } from '../../helpers/logger';
 import * as zlib from 'zlib';
 
@@ -21,14 +15,6 @@ const DIMENSION_NAMES: Record<string, string> = {
   I: 'Influence',
   S: 'Steadiness',
   C: 'Conscientiousness',
-};
-
-/** One-line descriptor shown under each dimension bar. */
-const DIMENSION_BLURBS: Record<string, string> = {
-  D: 'Drive, decisiveness and a focus on results.',
-  I: 'Communication, persuasion and energy.',
-  S: 'Consistency, patience and collaboration.',
-  C: 'Precision, structure and analysis.',
 };
 
 /**
@@ -88,7 +74,7 @@ export class CollegeLevel1Report extends BaseReport {
       this.data.most_answered_answer_type,
       this.data,
     );
-    const combo = (t1 + t2) as string;
+    const combo = t1 + t2;
     const block = blendedTraits[combo] || blendedTraits.DI;
 
     // ── PAGE 1 ──
@@ -102,13 +88,10 @@ export class CollegeLevel1Report extends BaseReport {
     this.drawFooterStrip(1);
 
     // ── PAGE 2 ──
-    const specCode = calculateDiscProfile({
-      D: this.data.score_D,
-      I: this.data.score_I,
-      S: this.data.score_S,
-      C: this.data.score_C,
-    });
-    const spec = SPEC_MAP[specCode] || SPEC_MAP[combo] || SPEC_MAP.DI;
+    // Resolve the specialization (and its future roles) from the SAME top-two
+    // profile used for the page-1 archetype, so the recommendation and roles
+    // always match the behavioural archetype the student is shown.
+    const spec = SPEC_MAP[combo] || SPEC_MAP.DI;
 
     this.doc.addPage();
     this.drawPageFrame();
@@ -122,9 +105,7 @@ export class CollegeLevel1Report extends BaseReport {
 
     this.doc.end();
     await streamFinished;
-    logger.info(
-      `[College LEVEL 1 REPORT] PDF generated at: ${outputPath}`,
-    );
+    logger.info(`[College LEVEL 1 REPORT] PDF generated at: ${outputPath}`);
   }
 
   // ============================================================
@@ -314,39 +295,15 @@ export class CollegeLevel1Report extends BaseReport {
       });
     }
 
-    // ── 2. Smooth panel→transparent gradient overlay (left to right) ──
-    // Thin vertical strips with decreasing opacity, in the sampled panel
-    // colour, so the left text column is legible and the artwork emerges on
-    // the right with no visible band/seam.
-    const STRIPS = 48;
-    const stripW = w / STRIPS;
-    const solidUntil = 0.34; // fully covered up to 34% of the width
-    const clearAfter = 0.84; // fully clear past 84% of the width
-    for (let i = 0; i < STRIPS; i++) {
-      const xfrac = (i + 0.5) / STRIPS;
-      let opacity: number;
-      if (xfrac <= solidUntil) {
-        opacity = 0.94;
-      } else if (xfrac >= clearAfter) {
-        opacity = 0;
-      } else {
-        opacity = 0.94 * ((clearAfter - xfrac) / (clearAfter - solidUntil));
-      }
-      if (opacity <= 0) continue;
-      this.doc.fillOpacity(opacity);
-      // +0.6 width overlap avoids hairline seams between strips
-      this.doc.rect(x + i * stripW, y, stripW + 0.6, h).fill(panelColor);
-    }
-    this.doc.fillOpacity(1);
-
-    // ── 3. Decorative concentric rings (subtle, right side) ──
-    const ringCx = x + w - 100;
-    const ringCy = y + h / 2;
-    this.doc.strokeOpacity(0.07).strokeColor('#FFFFFF').lineWidth(1);
-    [150, 108, 66].forEach((rr) => {
-      this.doc.circle(ringCx, ringCy, rr).stroke();
-    });
-    this.doc.strokeOpacity(1);
+    // ── 2. Smooth panel→transparent fade overlay (left to right) ──
+    // A single linear gradient in the sampled panel colour, so the left text
+    // column is fully legible and the artwork emerges cleanly on the right
+    // with no banding or visible seams.
+    const grad = this.doc.linearGradient(x, y, x + w, y);
+    grad.stop(0, panelColor, 1); // image fully faded out (0%) at the left edge
+    grad.stop(0.34, panelColor, 1); // fully covered up to 34% of the width
+    grad.stop(0.84, panelColor, 0); // fully clear past 84% of the width
+    this.doc.rect(x, y, w, h).fill(grad);
 
     this.doc.restore();
 
@@ -482,10 +439,14 @@ export class CollegeLevel1Report extends BaseReport {
 
     if (bitDepth !== 8 || interlace !== 0) return null;
     let channels: number;
-    if (colorType === 2) channels = 3; // RGB
-    else if (colorType === 6) channels = 4; // RGBA
-    else if (colorType === 0) channels = 1; // grayscale
-    else if (colorType === 4) channels = 2; // grayscale + alpha
+    if (colorType === 2)
+      channels = 3; // RGB
+    else if (colorType === 6)
+      channels = 4; // RGBA
+    else if (colorType === 0)
+      channels = 1; // grayscale
+    else if (colorType === 4)
+      channels = 2; // grayscale + alpha
     else return null; // palette (3) unsupported
     if (!width || !height || idat.length === 0) return null;
 
@@ -607,77 +568,51 @@ export class CollegeLevel1Report extends BaseReport {
       C: this.data.score_C || 0,
     };
 
-    const colGap = 18;
-    const colW = (w - colGap) / 2;
-    const cardH = 62;
-    const rowGap = 12;
-    const valueW = 48;
-    const startY = y + 42;
+    // ── 3D bar graph (same "Nature style" chart used in the full report) ──
+    // Scores are already on a 0-100 scale — present directly as a percentage.
+    const chartData = dims.map((key) => ({
+      label: '', // category names are drawn manually below (full words)
+      value: Math.max(0, Math.min(100, Math.round(scores[key]))),
+      color: COLORS[key],
+    }));
 
+    const cfg = {
+      barWidth: 46,
+      barGap: 38,
+      maxBarHeight: 120,
+      slantDepth: 12,
+      sideViewWidth: 22,
+      labelFontSize: 10,
+      categoryFontSize: 10,
+      percentageLabelOffset: -22,
+      categoryLabelOffset: 0,
+    };
+
+    const totalW = dims.length * cfg.barWidth + (dims.length - 1) * cfg.barGap;
+    const startX = x + (w - totalW + cfg.slantDepth) / 2;
+    const startY = y + 46;
+
+    // Bars + percentage labels (helper draws empty category labels).
+    this.draw3DBarChart(chartData, startX, startY, cfg);
+
+    // Full-form dimension names centred under each bar.
+    const labelY = startY + cfg.maxBarHeight + 16;
     dims.forEach((key, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const bx = x + col * (colW + colGap);
-      const by = startY + row * (cardH + rowGap);
-      // Scores are already on a 0-100 scale — present directly as a percentage.
-      const pct = Math.max(0, Math.min(100, Math.round(scores[key])));
-      const fillRatio = pct / 100;
-      const color = this.DISC_COLORS[key];
-
-      // Card background
-      this.doc
-        .roundedRect(bx, by, colW, cardH, 9)
-        .fillAndStroke(this.C_CARD_BG, this.C_CARD_BORDER);
-
-      const pad = 14;
-      const innerX = bx + pad;
-      const innerW = colW - pad * 2;
-
-      // Dimension name (full form — no letter code)
+      const barCenter =
+        startX + i * (cfg.barWidth + cfg.barGap) + cfg.barWidth / 2;
+      const boxW = cfg.barWidth + cfg.barGap;
       this.doc
         .font(this.FONT_SORA_SEMIBOLD)
-        .fontSize(11)
-        .fillColor(this.C_INK)
-        .text(DIMENSION_NAMES[key], innerX, by + 11, {
-          width: innerW - valueW,
+        .fontSize(8.5)
+        .fillColor(this.DISC_COLORS[key])
+        .text(DIMENSION_NAMES[key], barCenter - boxW / 2, labelY, {
+          width: boxW,
+          align: 'center',
           lineBreak: false,
-          ellipsis: true,
-        });
-
-      // Percentage value (right aligned)
-      this.doc
-        .font(this.FONT_SORA_BOLD)
-        .fontSize(14)
-        .fillColor(color)
-        .text(`${pct}%`, innerX + innerW - valueW, by + 9, {
-          width: valueW,
-          align: 'right',
-          lineBreak: false,
-        });
-
-      // Bar track + fill
-      const barY = by + 30;
-      const barH = 8;
-      this.doc.roundedRect(innerX, barY, innerW, barH, barH / 2).fill('#E6E8F2');
-      if (fillRatio > 0) {
-        this.doc
-          .roundedRect(innerX, barY, Math.max(8, innerW * fillRatio), barH, barH / 2)
-          .fill(color);
-      }
-
-      // Descriptor
-      this.doc
-        .font(this.FONT_REGULAR)
-        .fontSize(8)
-        .fillColor(this.C_MUTED)
-        .text(DIMENSION_BLURBS[key], innerX, barY + 13, {
-          width: innerW,
-          lineBreak: false,
-          ellipsis: true,
         });
     });
 
-    return startY + Math.ceil(dims.length / 2) * (cardH + rowGap) - rowGap;
+    return labelY + 14;
   }
 
   // ============================================================
@@ -783,8 +718,11 @@ export class CollegeLevel1Report extends BaseReport {
       );
 
     // ── Recommended specialization banner ──
+    // Shows the top-two strongest electives as a podium: a big "1" beside the
+    // strongest elective and a smaller, bottom-aligned "2" beside the runner-up,
+    // so the second reads as shorter in height than the first.
     const bannerY = y + 34;
-    const bannerH = 56;
+    const bannerH = 86;
     this.doc
       .roundedRect(x, bannerY, w, bannerH, 10)
       .fillAndStroke('#EDF8F1', '#CDE9D8');
@@ -793,28 +731,61 @@ export class CollegeLevel1Report extends BaseReport {
       .font(this.FONT_SORA_SEMIBOLD)
       .fontSize(8)
       .fillColor(this.C_ACCENT_GREEN)
-      .text('RECOMMENDED SPECIALIZATION', x + 18, bannerY + 9, {
+      .text('RECOMMENDED SPECIALIZATION', x + 18, bannerY + 10, {
         lineBreak: false,
         characterSpacing: 0.4,
       });
-    this.doc
-      .font(this.FONT_SORA_BOLD)
-      .fontSize(19)
-      .fillColor(this.COLOR_DEEP_BLUE)
-      .text(spec.suggestion, x + 18, bannerY + 21, {
-        width: w - 36,
-        lineBreak: false,
-        ellipsis: true,
-      });
-    this.doc
-      .font(this.FONT_REGULAR)
-      .fontSize(9)
-      .fillColor(this.C_MUTED)
-      .text(`Behavioural profile: ${spec.trait}`, x + 18, bannerY + 42, {
-        width: w - 36,
-        lineBreak: false,
-        ellipsis: true,
-      });
+
+    // Rank electives by fit weight (1 = strongest) and take the top two.
+    const ranked = [...ELECTIVES]
+      .map((e) => ({
+        e,
+        weight: (spec as unknown as Record<string, number>)[e.key],
+      }))
+      .sort((a, b) => a.weight - b.weight)
+      .slice(0, 2);
+
+    const podBaseY = bannerY + bannerH - 14; // shared baseline for both numerals
+    const podColW = (w - 36) / 2;
+    const NUM_SIZES = [42, 27]; // 1st larger, 2nd smaller
+    const captions = ['STRONGEST FIT', 'SECOND-STRONGEST FIT'];
+
+    ranked.forEach(({ e }, i) => {
+      const colX = x + 18 + i * podColW;
+      const numSize = NUM_SIZES[i];
+
+      // Big numeral, bottom-aligned to the shared baseline.
+      this.doc.font(this.FONT_SORA_BOLD).fontSize(numSize).fillColor(e.accent);
+      const numStr = String(i + 1);
+      const numW = this.doc.widthOfString(numStr);
+      this.doc.text(numStr, colX, podBaseY - numSize, { lineBreak: false });
+
+      // Caption + elective label, stacked beside the numeral. The label shares
+      // the numeral's baseline (both placed at podBaseY − fontSize) so it is
+      // bottom-aligned with the big number rather than floating above it.
+      const labelSize = i === 0 ? 16 : 10.5;
+      const textX = colX + numW + 12;
+      const textW = podColW - (numW + 12) - 8;
+      this.doc
+        .font(this.FONT_SORA_SEMIBOLD)
+        .fontSize(7)
+        .fillColor(this.C_MUTED)
+        .text(captions[i], textX, podBaseY - labelSize - 13, {
+          width: textW,
+          characterSpacing: 0.3,
+          lineBreak: false,
+          ellipsis: true,
+        });
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(labelSize)
+        .fillColor(this.COLOR_DEEP_BLUE)
+        .text(e.label, textX, podBaseY - labelSize, {
+          width: textW,
+          lineBreak: false,
+          ellipsis: true,
+        });
+    });
 
     // ── Elective fit — canonical order (no sorting) ──
     let cy = bannerY + bannerH + 12;
@@ -913,7 +884,9 @@ export class CollegeLevel1Report extends BaseReport {
   private drawFutureRoles(y: number, spec: SpecEntry): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
-    const roles = (spec.roles || []).slice(0, 6);
+    // Show every future role from the specialization mapping (the document
+    // lists ten per profile) — they flow as wrapping chips.
+    const roles = spec.roles || [];
 
     this.doc
       .font(this.FONT_SORA_BOLD)
@@ -970,8 +943,10 @@ export class CollegeLevel1Report extends BaseReport {
     const colGap = 16;
     const colW = (w - colGap) / 2;
 
-    // Extract from trait_mapping1[0]: [name, roles, weaknesses, strengths]
-    const mapping = block.trait_mapping1?.[0] || [];
+    // Extract from trait_mapping2[0]: [name, roles, watch-outs, strengths].
+    // trait_mapping2 carries the business/elective-aligned wording (whereas
+    // trait_mapping1 held off-domain leftovers such as "Coding efficiency…").
+    const mapping = block.trait_mapping2?.[0] || [];
     const strengthsRaw: string = mapping[3] || '';
     const watchOutsRaw: string = mapping[2] || '';
 

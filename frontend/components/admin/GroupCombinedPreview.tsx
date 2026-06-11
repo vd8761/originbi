@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { assessmentService } from "../../lib/services/assessment.service";
 import { buildReportApiUrl } from "../../lib/utils/reportUrl";
 
@@ -167,7 +168,11 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
             </div>
 
             {/* Bulk report-type selection popup */}
-            {showReportModal && (
+            {/* Rendered via a portal to document.body so `position: fixed`
+                centres on the viewport — an ancestor's CSS transform
+                (animate-fade-in) would otherwise become the containing block
+                and push the modal off-screen, forcing the user to scroll. */}
+            {showReportModal && typeof document !== "undefined" && createPortal(
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
                     onClick={() => setShowReportModal(false)}
@@ -225,7 +230,8 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
 
             {/* Assessment windows */}

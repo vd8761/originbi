@@ -26,6 +26,11 @@ import { EmployeeReport } from './reports/employee/employeeReport';
 import { CxoReport } from './reports/cxo/cxoReport';
 import { fetchUserAssessmentData } from './helpers/groupReportHelper';
 import { buildReportJSON, ReportVariant } from './helpers/reportFactory';
+import { resolveStudentPreviewVariant } from './helpers/previewVariantResolver';
+import { SettingsService } from '../settings/settings.service';
+
+const DEFAULT_BLOCKED_MESSAGE =
+  'Please contact your administrator to receive your report.';
 
 /**
  * Resolves the report variant from request query params.
@@ -36,14 +41,21 @@ function resolveReportVariant(
   reportType?: string,
   shortMode?: string,
 ): ReportVariant {
-  if (reportType === 'short' || reportType === 'level1' || reportType === 'full')
+  if (
+    reportType === 'short' ||
+    reportType === 'level1' ||
+    reportType === 'full'
+  )
     return reportType;
   return shortMode === 'true' ? 'short' : 'full';
 }
 
 @Controller('report')
 export class ReportController {
-  constructor(private readonly reportQueue: ReportQueueService) {}
+  constructor(
+    private readonly reportQueue: ReportQueueService,
+    private readonly settings: SettingsService,
+  ) {}
 
   // 1. Placement Handbook Route (PDF)
   @Get('generate/placement/:group_id/:department_degree_id')
@@ -200,8 +212,48 @@ export class ReportController {
       return;
     }
 
+    // ── Auto Mode (student preview) ──
+    // The student-side preview asks for `reportType=auto`. We resolve the
+    // correct variant server-side from admin settings + MBA/ACI completion,
+    // and block (no job) when the required assessment data is missing.
+    let variant: ReportVariant;
+    if (reportType === 'auto') {
+      const mbaVariant =
+        ((await this.settings.getValue<string>(
+          'report',
+          'student_preview_variant_mba',
+        )) as ReportVariant) || 'level1';
+      const nonMbaVariant =
+        ((await this.settings.getValue<string>(
+          'report',
+          'student_preview_variant_non_mba',
+        )) as ReportVariant) || 'short';
+      const blockedMessage =
+        (await this.settings.getValue<string>(
+          'report',
+          'student_preview_blocked_message',
+        )) || DEFAULT_BLOCKED_MESSAGE;
+
+      const resolution = await resolveStudentPreviewVariant(userId, {
+        mbaVariant,
+        nonMbaVariant,
+        blockedMessage,
+      });
+
+      if (resolution.blocked) {
+        res.json({
+          success: false,
+          blocked: true,
+          message: resolution.message,
+        });
+        return;
+      }
+      variant = resolution.variant;
+    } else {
+      variant = resolveReportVariant(reportType, shortMode);
+    }
+
     // ── Standard PDF Mode ──
-    const variant = resolveReportVariant(reportType, shortMode);
     logger.info(
       `[API] Start Single Student Report (${variant.toUpperCase()}): ${userId}`,
     );
