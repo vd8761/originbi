@@ -79,7 +79,9 @@ export class LevelEligibilityService {
         'levels',
         key,
       );
-      return Array.isArray(cfg?.rules) ? (cfg as { rules: ScopeRule[] }).rules : [];
+      return Array.isArray(cfg?.rules)
+        ? (cfg as { rules: ScopeRule[] }).rules
+        : [];
     } catch {
       return [];
     }
@@ -93,7 +95,11 @@ export class LevelEligibilityService {
     const degreeIds = this.normalizeIds(rule.departmentDegreeIds);
     const departmentIds = this.normalizeIds(rule.departmentIds);
     const boards = (rule.studentBoards || [])
-      .map((board) => String(board || '').trim().toLowerCase())
+      .map((board) =>
+        String(board || '')
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean);
 
     if (
@@ -116,7 +122,11 @@ export class LevelEligibilityService {
       departmentIds.includes(String(scope.departmentId || ''));
     const boardMatch =
       boards.length > 0 &&
-      boards.includes(String(scope.studentBoard || '').trim().toLowerCase());
+      boards.includes(
+        String(scope.studentBoard || '')
+          .trim()
+          .toLowerCase(),
+      );
 
     return programMatch || degreeMatch || departmentMatch || boardMatch;
   }

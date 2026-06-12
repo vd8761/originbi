@@ -123,10 +123,10 @@ export class StudentService {
 
     let departmentId: number | string | null = null;
     if (registration.departmentDegreeId) {
-      const rows = (await this.levelRepo.manager.query(
+      const rows = await this.levelRepo.manager.query(
         `SELECT department_id FROM department_degrees WHERE id = $1 LIMIT 1`,
         [registration.departmentDegreeId],
-      )) as Array<{ department_id: number | string | null }>;
+      );
       departmentId = rows?.[0]?.department_id ?? null;
     }
 

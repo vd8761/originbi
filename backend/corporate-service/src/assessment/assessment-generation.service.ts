@@ -145,7 +145,9 @@ export class AssessmentGenerationService {
     });
     const isEmployee =
       program?.code === 'EMPLOYEE' ||
-      String(program?.name || '').trim().toUpperCase() === 'EMPLOYEE';
+      String(program?.name || '')
+        .trim()
+        .toUpperCase() === 'EMPLOYEE';
     if (!isEmployee) return null;
 
     const registration = await manager.findOne(Registration, {
