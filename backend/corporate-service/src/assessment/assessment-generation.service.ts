@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager } from 'typeorm';
+import { Repository, EntityManager, SelectQueryBuilder } from 'typeorm';
 import {
   AssessmentLevel,
   AssessmentQuestion,
@@ -166,7 +166,10 @@ export class AssessmentGenerationService {
       if (cfg && cfg.mode) {
         return {
           mode: cfg.mode,
-          count: Number(cfg.count) > 0 ? Number(cfg.count) : DEFAULT_GENERATION_CONFIG.count,
+          count:
+            Number(cfg.count) > 0
+              ? Number(cfg.count)
+              : DEFAULT_GENERATION_CONFIG.count,
         };
       }
     } catch (err) {
@@ -192,7 +195,9 @@ export class AssessmentGenerationService {
     const boardLevel = await this.resolveEmployeeLevel(manager, attempt);
     const config = await this.getGenerationConfig(manager, attempt.programId);
 
-    const applyBaseFilters = (qb: ReturnType<EntityManager['createQueryBuilder']>) => {
+    const applyBaseFilters = (
+      qb: SelectQueryBuilder<AssessmentQuestion>,
+    ): SelectQueryBuilder<AssessmentQuestion> => {
       qb.where('q.program_id = :programId', { programId: attempt.programId })
         .andWhere('q.assessment_level_id = :levelId', {
           levelId: attempt.assessmentLevelId,
@@ -241,9 +246,10 @@ export class AssessmentGenerationService {
     ).andWhere('q.set_number = :setNumber', { setNumber: selectedSet });
 
     // random_set_ordered keeps authored order; random_set_shuffled randomizes.
-    const rows = await (config.mode === 'random_set_ordered'
-      ? qb.orderBy('q.external_code', 'ASC').addOrderBy('q.id', 'ASC')
-      : qb.orderBy('RANDOM()')
+    const rows = await (
+      config.mode === 'random_set_ordered'
+        ? qb.orderBy('q.external_code', 'ASC').addOrderBy('q.id', 'ASC')
+        : qb.orderBy('RANDOM()')
     )
       .limit(config.count)
       .getMany();
