@@ -26,6 +26,8 @@ import { AssessmentGenerationService } from './assessment-generation.service';
 import { MetaphorGenerationService } from './metaphor-generation.service';
 import { AssessmentService } from './assessment.service';
 import { AssessmentController } from './assessment.controller';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -51,12 +53,14 @@ import { AssessmentController } from './assessment.controller';
       MetaphorQuestion,
       MetaphorAnswer,
     ]),
+    SettingsModule,
   ],
   controllers: [AssessmentController],
   providers: [
     AssessmentGenerationService,
     MetaphorGenerationService,
     AssessmentService,
+    LevelEligibilityService,
   ],
   exports: [
     TypeOrmModule,

@@ -561,6 +561,7 @@ const MyEmployeesContent: React.FC = () => {
                     setSelectedEmployee(null);
                 }}
                 corporateEmail={corporateEmail}
+                corporateUserId={userId}
             />
         );
     }

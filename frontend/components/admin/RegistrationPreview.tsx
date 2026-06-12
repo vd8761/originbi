@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Registration } from '../../lib/types';
 import { AssessmentSession, assessmentService } from '../../lib/services/assessment.service';
 import AssessmentSessionsTable from './AssessmentSessionsTable';
+import AssignIndividualExamModal from './AssignIndividualExamModal';
 import AssessmentResultPreview from './AssessmentResultPreview';
 import { ArrowLeftWithoutLineIcon, PlusIcon, ChevronDownIcon, ArrowRightWithoutLineIcon, FilterFunnelIcon } from '../icons';
 import ExcelExportButton from '../ui/ExcelExportButton';
@@ -45,6 +46,9 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
     const [statusLabel, setStatusLabel] = useState<string>("All"); // UI Label
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+    const [isAssignExamOpen, setIsAssignExamOpen] = useState(false);
+
+    const registrationId = (registration as any).registrationId || registration.id;
 
     const fetchSessions = useCallback(async () => {
         // Handle mismatched property names
@@ -194,6 +198,22 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
                 onClose={() => setIsDateModalOpen(false)}
                 onApply={handleDateModalApply}
                 initialRange={{ start: startDate, end: endDate, label: dateRangeLabel }}
+            />
+            <AssignIndividualExamModal
+                isOpen={isAssignExamOpen}
+                fullName={registration.full_name}
+                loadPreview={() =>
+                    assessmentService.getIndividualExamPreview(registrationId)
+                }
+                assignExam={(examStart, examEnd) =>
+                    assessmentService.assignIndividualExam({
+                        registrationId,
+                        examStart,
+                        examEnd,
+                    })
+                }
+                onClose={() => setIsAssignExamOpen(false)}
+                onSuccess={() => fetchSessions()}
             />
             {/* Header */}
             <div>
@@ -414,7 +434,10 @@ const RegistrationPreview: React.FC<RegistrationPreviewProps> = ({ registration,
 
                         <ExcelExportButton onClick={handleExport} />
 
-                        <button className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer">
+                        <button
+                            onClick={() => setIsAssignExamOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer"
+                        >
                             <span>Assign New exam</span>
                             <PlusIcon className="w-4 h-4 text-white" />
                         </button>
