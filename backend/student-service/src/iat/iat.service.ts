@@ -461,6 +461,7 @@ export class IatService {
     // programs/departments/degrees/boards can receive different modules.
     const modules = await this.eligibility.filterModulesForRegistration(
       attempt.registrationId,
+      attempt.programId,
       activeModules,
     );
     if (!modules.length)

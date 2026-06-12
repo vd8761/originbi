@@ -101,6 +101,7 @@ export class IatEligibilityService {
    */
   async filterModulesForRegistration<T extends { id: number | string }>(
     registrationId: number | null | undefined,
+    programId: number | string | null | undefined,
     modules: T[],
   ): Promise<T[]> {
     const rulesConfig = await this.readSetting<{ rules?: IatRule[] }>(
@@ -136,8 +137,7 @@ export class IatEligibilityService {
     // Collect the matched modules IN THE ORDER the admin configured them in the
     // set (the set's moduleIds order = the order the exam plays them).
     const id = Number(registrationId);
-    const matchedOrder: string[] = [];
-    const matchedSeen = new Set<string>();
+    let row: RegistrationEligibilityRow | null = null;
     if (Number.isFinite(id) && id > 0) {
       const rows = (await this.settingRepo.manager.query(
         `SELECT r.id,
@@ -151,19 +151,32 @@ export class IatEligibilityService {
          LIMIT 1`,
         [id],
       )) as unknown as RegistrationEligibilityRow[];
-      const row = rows?.[0];
-      if (row) {
-        for (const rule of rules) {
-          if (rule.moduleSetId === undefined || rule.moduleSetId === null) {
-            continue;
-          }
-          if (this.matchesRule(rule, row)) {
-            for (const mid of setMembers.get(String(rule.moduleSetId)) || []) {
-              if (!matchedSeen.has(mid)) {
-                matchedSeen.add(mid);
-                matchedOrder.push(mid);
-              }
-            }
+      row = rows?.[0] ?? null;
+    }
+
+    // registrations.program_id is NULL for corporate registrations (they set
+    // the program only on the session/attempt). Prefer the attempt's programId
+    // so program-scoped rules still match; dept/degree/board come from the
+    // registration row.
+    const scope: RegistrationEligibilityRow = {
+      id: row?.id ?? id,
+      programId: programId ?? row?.programId ?? null,
+      departmentDegreeId: row?.departmentDegreeId ?? null,
+      departmentId: row?.departmentId ?? null,
+      studentBoard: row?.studentBoard ?? null,
+    };
+
+    const matchedOrder: string[] = [];
+    const matchedSeen = new Set<string>();
+    for (const rule of rules) {
+      if (rule.moduleSetId === undefined || rule.moduleSetId === null) {
+        continue;
+      }
+      if (this.matchesRule(rule, scope)) {
+        for (const mid of setMembers.get(String(rule.moduleSetId)) || []) {
+          if (!matchedSeen.has(mid)) {
+            matchedSeen.add(mid);
+            matchedOrder.push(mid);
           }
         }
       }
@@ -180,6 +193,21 @@ export class IatEligibilityService {
     for (const m of modules) {
       if (!assignedIds.has(String(m.id))) result.push(m);
     }
+
+    this.logger.log(
+      `[IatModules] reg=${registrationId} scope=${JSON.stringify(
+        scope,
+      )} activeModuleIds=[${modules
+        .map((m) => m.id)
+        .join(',')}] | sets=${JSON.stringify(
+        sets.map((s) => ({ id: s.id, moduleIds: s.moduleIds })),
+      )} | ruleSetIds=[${rules
+        .map((r) => r.moduleSetId)
+        .join(',')}] | assigned=[${[...assignedIds].join(
+        ',',
+      )}] | matched=[${matchedOrder.join(',')}] | kept=${result.length}`,
+    );
+
     return result;
   }
 
