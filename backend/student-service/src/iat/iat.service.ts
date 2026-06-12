@@ -450,12 +450,23 @@ export class IatService {
     });
     if (existingCount > 0) return;
 
-    const modules = await this.moduleRepo.find({
+    const activeModules = await this.moduleRepo.find({
       where: { isActive: true, isDeleted: false },
       order: { moduleOrder: 'ASC' },
     });
-    if (!modules.length)
+    if (!activeModules.length)
       throw new BadRequestException('No active IAT modules configured.');
+
+    // Apply per-scope module routing (iat.module_scope_rules): different
+    // programs/departments/degrees/boards can receive different modules.
+    const modules = await this.eligibility.filterModulesForRegistration(
+      attempt.registrationId,
+      activeModules,
+    );
+    if (!modules.length)
+      throw new BadRequestException(
+        'No IAT modules are assigned to this candidate. Check the IAT module routing rules.',
+      );
 
     const stimuli = await this.stimulusRepo.find({
       where: { isActive: true, isDeleted: false },
@@ -488,7 +499,13 @@ export class IatService {
         });
       if (alreadyCreated > 0) return;
 
+      // Play order = the order returned by filterModulesForRegistration (set
+      // selection order first, then global modules). Assign moduleOrder by
+      // position so the routing/set order — not the iat_modules.module_order
+      // column — drives the sequence shown to the candidate.
+      let order = 0;
       for (const module of modules) {
+        order += 1;
         const attemptModule = await manager
           .getRepository(IatAttemptModule)
           .save({
@@ -499,9 +516,9 @@ export class IatService {
             programId: attempt.programId,
             assessmentLevelId: attempt.assessmentLevelId,
             moduleId: Number(module.id),
-            moduleOrder: module.moduleOrder,
-            status: module.moduleOrder === 1 ? 'IN_PROGRESS' : 'NOT_STARTED',
-            startedAt: module.moduleOrder === 1 ? new Date() : null,
+            moduleOrder: order,
+            status: order === 1 ? 'IN_PROGRESS' : 'NOT_STARTED',
+            startedAt: order === 1 ? new Date() : null,
           });
         const trials = this.buildTrialsForModule(
           attempt,

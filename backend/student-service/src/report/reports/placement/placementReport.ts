@@ -356,7 +356,9 @@ export class PlacementReport extends BaseReport {
     // When none have, skip both tables (otherwise every student collapses into
     // the lowest band and the summary is misleading).
     const cohortHasAci = this.data.trait_distribution.some((group) =>
-      group.students_data.some((student) => (student.agile_score?.total ?? 0) > 0),
+      group.students_data.some(
+        (student) => (student.agile_score?.total ?? 0) > 0,
+      ),
     );
     if (!cohortHasAci) {
       logger.info(

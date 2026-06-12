@@ -188,7 +188,8 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         currentYear: formData.current_year,
         currentRole: formData.current_role,
         roleDescription: formData.role_description,
-        employeeLevel: formData.employee_level,
+        // Only the Employee program uses the difficulty level.
+        employeeLevel: isEmployeeProgram ? formData.employee_level : undefined,
       };
 
       await corporateRegistrationService.registerCandidate(payload, userIdStr);

@@ -123,10 +123,10 @@ export class StudentService {
 
     let departmentId: number | string | null = null;
     if (registration.departmentDegreeId) {
-      const rows = (await this.levelRepo.manager.query(
+      const rows = await this.levelRepo.manager.query(
         `SELECT department_id FROM department_degrees WHERE id = $1 LIMIT 1`,
         [registration.departmentDegreeId],
-      )) as Array<{ department_id: number | string | null }>;
+      );
       departmentId = rows?.[0]?.department_id ?? null;
     }
 
@@ -653,6 +653,28 @@ export class StudentService {
       where: { assessmentSessionId: session.id },
       relations: ['assessmentLevel'],
     });
+
+    // Retroactively honour the per-level enable toggle: hide levels that are
+    // currently disabled AND not yet started. Started/completed levels are
+    // kept so we never yank an in-progress or finished assessment. This is
+    // reversible — re-enabling the level brings the (still-existing) attempt
+    // back. Mirrors the registration-time filter for candidates who were
+    // registered while the level was enabled.
+    const toggledOffLevels =
+      await this.levelEligibility.getToggledOffLevelNumbers(
+        attempts.map((a) => a.assessmentLevel?.levelNumber),
+      );
+    if (toggledOffLevels.size > 0) {
+      attempts = attempts.filter((a) => {
+        const levelNumber = a.assessmentLevel?.levelNumber;
+        const notStarted = a.status === 'NOT_STARTED' && !a.startedAt;
+        return !(
+          levelNumber != null &&
+          toggledOffLevels.has(Number(levelNumber)) &&
+          notStarted
+        );
+      });
+    }
 
     // For Demo User, hide non-mandatory levels (cleanup visual clutter)
     if (email.toLowerCase() === 'demo@originbi.com') {

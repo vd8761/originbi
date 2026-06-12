@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
 /**
  * Level 1 Placement Report
  * ------------------------
@@ -106,7 +105,12 @@ export class Level1PlacementReport {
     { key: 'hr', label: 'HR', width: 36, align: 'center' },
     { key: 'marketing', label: 'Marketing', width: 58, align: 'center' },
     { key: 'operations', label: 'Operations', width: 60, align: 'center' },
-    { key: 'analytics', label: 'Business Analytics', width: 60, align: 'center' },
+    {
+      key: 'analytics',
+      label: 'Business Analytics',
+      width: 60,
+      align: 'center',
+    },
   ];
 
   constructor(cohort: Level1CohortResult) {
@@ -238,7 +242,9 @@ export class Level1PlacementReport {
       .font(F_SORA_BOLD)
       .fontSize(22)
       .fillColor(DEEP_BLUE)
-      .text('Elective-Wise Placement Fit Summary', margin, y, { width: usableW });
+      .text('Elective-Wise Placement Fit Summary', margin, y, {
+        width: usableW,
+      });
     y = this.doc.y + 2;
     this.doc
       .font(F_SORA_SEMI)
@@ -278,7 +284,10 @@ export class Level1PlacementReport {
         .font(F_REG)
         .fontSize(10)
         .fillColor(MUTED)
-        .text(e.blurb, labelX, this.doc.y + 1, { width: briefW, align: 'justify' });
+        .text(e.blurb, labelX, this.doc.y + 1, {
+          width: briefW,
+          align: 'justify',
+        });
       y = this.doc.y + 12;
     }
 
@@ -287,7 +296,8 @@ export class Level1PlacementReport {
       let n = 0;
       for (const row of this.rows) {
         const spec = SPEC_MAP[row.code];
-        if (spec && (spec as unknown as Record<string, unknown>)[e.key] === 1) n++;
+        if (spec && (spec as unknown as Record<string, unknown>)[e.key] === 1)
+          n++;
       }
       return n;
     });
@@ -409,7 +419,9 @@ export class Level1PlacementReport {
         return (spec?.roles ?? []).slice(0, ROLES_TO_SHOW).join('  ·  ');
       default:
         return spec
-          ? String((spec as unknown as Record<string, number | string>)[col.key])
+          ? String(
+              (spec as unknown as Record<string, number | string>)[col.key],
+            )
           : '—';
     }
   }
@@ -541,7 +553,9 @@ export class Level1PlacementReport {
           this.doc.font(F_SEMI).fontSize(8);
           const nameH = this.doc.heightOfString(name, { width: col.width - 8 });
           this.doc.font(F_REG).fontSize(6.5);
-          const mobH = this.doc.heightOfString(mobile, { width: col.width - 8 });
+          const mobH = this.doc.heightOfString(mobile, {
+            width: col.width - 8,
+          });
           const ty = y + Math.max(4, (rowH - (nameH + mobH + 2)) / 2);
           this.doc
             .font(F_SEMI)
