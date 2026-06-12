@@ -9,6 +9,7 @@ import {
   AssessmentAttempt,
   OriginbiSetting,
   Registration,
+  Program,
 } from '@originbi/shared-entities';
 
 /**
@@ -135,6 +136,18 @@ export class AssessmentGenerationService {
     attempt: AssessmentAttempt,
   ): Promise<string | null> {
     if (!attempt.registrationId) return null;
+
+    // Only the Employee program uses the board column for difficulty level.
+    // Other programs (College/CXO/...) must ignore employeeLevel even if it was
+    // sent on the registration, otherwise the board filter finds no questions.
+    const program = await manager.findOne(Program, {
+      where: { id: attempt.programId },
+    });
+    const isEmployee =
+      program?.code === 'EMPLOYEE' ||
+      String(program?.name || '').trim().toUpperCase() === 'EMPLOYEE';
+    if (!isEmployee) return null;
+
     const registration = await manager.findOne(Registration, {
       where: { id: attempt.registrationId },
     });

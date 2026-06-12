@@ -48,6 +48,14 @@ interface IatRule {
     departmentDegreeIds?: string[];
     departmentIds?: string[];
     studentBoards?: string[];
+    moduleSetId?: string;
+}
+
+// A named, reusable collection of IAT modules (iat.module_sets).
+interface IatModuleSet {
+    id: string;
+    name?: string;
+    moduleIds?: string[];
 }
 
 interface IatRuleConfig {
@@ -62,6 +70,7 @@ export default function SettingsManagement() {
     const [programOptions, setProgramOptions] = useState<SelectOption[]>([]);
     const [departmentOptions, setDepartmentOptions] = useState<SelectOption[]>([]);
     const [departmentDegreeOptions, setDepartmentDegreeOptions] = useState<SelectOption[]>([]);
+    const [iatModuleOptions, setIatModuleOptions] = useState<SelectOption[]>([]);
     const [iatOptionsLoading, setIatOptionsLoading] = useState(false);
     
     // Track modifications to only save what changed
@@ -90,15 +99,23 @@ export default function SettingsManagement() {
     const fetchIatReferenceOptions = async () => {
         try {
             setIatOptionsLoading(true);
-            const [programsRes, departmentsRes, departmentDegreesRes] = await Promise.all([
+            const [programsRes, departmentsRes, departmentDegreesRes, iatModulesRes] = await Promise.all([
                 api.get('/admin/programs?is_active=true'),
                 api.get('/admin/departments?is_active=true'),
                 api.get('/admin/departments/degrees'),
+                api.get('/admin/assessments/iat/modules').catch(() => ({ data: [] })),
             ]);
             const normalizeList = (body: any) => Array.isArray(body) ? body : (body?.data || []);
             const programs = normalizeList(programsRes.data);
             const departments = normalizeList(departmentsRes.data);
             const departmentDegrees = normalizeList(departmentDegreesRes.data);
+            const iatModules = normalizeList(iatModulesRes.data);
+
+            setIatModuleOptions(iatModules.map((m: any) => ({
+                value: String(m.id),
+                label: m.name || m.code || `Module ${m.id}`,
+                description: m.code,
+            })));
 
             setProgramOptions(programs.map((program: any) => ({
                 value: String(program.id),
@@ -312,19 +329,30 @@ export default function SettingsManagement() {
     const renderInput = (item: SettingItem) => {
         if (item.valueType === 'boolean') {
             return (
-                <button
-                    disabled={item.isReadonly}
-                    onClick={() => handleValueChange(item.category, item.key, !item.value)}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 ${
-                        item.value ? 'bg-brand-green' : 'bg-gray-200 dark:bg-gray-700'
-                    } ${item.isReadonly ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
+                <div className="flex items-center gap-3">
                     <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                            item.value ? 'translate-x-5' : 'translate-x-0'
+                        className={`text-xs font-semibold uppercase tracking-wide ${
+                            item.value
+                                ? 'text-brand-green'
+                                : 'text-gray-400 dark:text-gray-500'
                         }`}
-                    />
-                </button>
+                    >
+                        {item.value ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <button
+                        disabled={item.isReadonly}
+                        onClick={() => handleValueChange(item.category, item.key, !item.value)}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 ${
+                            item.value ? 'bg-brand-green' : 'bg-gray-200 dark:bg-gray-700'
+                        } ${item.isReadonly ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                item.value ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                        />
+                    </button>
+                </div>
             );
         }
 
@@ -485,22 +513,65 @@ export default function SettingsManagement() {
                 );
             }
 
+            // IAT Module Sets: named, reusable collections of IAT modules.
+            if (item.category === 'iat' && item.key === 'module_sets') {
+                return (
+                    <ModuleSetsEditor
+                        value={Array.isArray(item.value) ? item.value : []}
+                        isReadonly={item.isReadonly}
+                        moduleOptions={iatModuleOptions}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
             // Per-level scope rules (category 'levels', key like
             // 'level3_scope_rules'). Reuses the same program/department/board
-            // rule editor as the legacy IAT routing.
+            // rule editor. For Level 3 (IAT) each rule also picks the IAT
+            // Module Set that scope receives — routing lives here, not in a
+            // separate setting.
             if (item.category === 'levels' && item.key.endsWith('_scope_rules')) {
                 const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
                 const eyebrow = item.label.replace(/\s*\(scope\)\s*$/i, '') || 'Level';
+                const isLevel3 = item.key === 'level3_scope_rules';
+                // If this level's enable toggle is OFF, the rules won't take effect.
+                const levelNumMatch = item.key.match(/^level(\d+)_scope_rules$/);
+                const enabledItem = levelNumMatch
+                    ? settingsGrouped['levels']?.find((s) => s.key === `level${levelNumMatch[1]}_enabled`)
+                    : undefined;
+                const levelDisabled = enabledItem ? enabledItem.value === false : false;
+                const disabledWarning = levelDisabled
+                    ? `This level is turned off — these rules won't take effect until you enable "${enabledItem!.label || `Level ${levelNumMatch![1]}`}".`
+                    : undefined;
+                let moduleSetOptions: SelectOption[] | undefined;
+                if (isLevel3) {
+                    const definedSets: IatModuleSet[] = Array.isArray(
+                        settingsGrouped['iat']?.find((s) => s.key === 'module_sets')?.value,
+                    )
+                        ? settingsGrouped['iat'].find((s) => s.key === 'module_sets')!.value
+                        : [];
+                    moduleSetOptions = definedSets
+                        .filter((s) => s && s.id)
+                        .map((s) => ({
+                            value: String(s.id),
+                            label: s.name || `Set ${s.id}`,
+                            description: `${(s.moduleIds || []).length} module(s)`,
+                        }));
+                }
                 return (
                     <ScopeRulesEditor
                         value={value}
                         isReadonly={item.isReadonly}
                         eyebrow={eyebrow}
                         heading="Who receives this level"
-                        helpText="Empty selections match everyone. A registration matches when the program matches and at least one selected department, department-degree, or board condition matches. Leave all empty to apply this level to every registration."
+                        helpText={isLevel3
+                            ? "Empty selections match everyone. For each rule, optionally pick an IAT Module Set — candidates matching that rule receive that set's modules (in the set's order). Modules in no routed set are given to everyone. Define sets first in 'IAT Module Sets'."
+                            : "A registration matches when ANY selected condition matches — program, department, department-degree, or board (OR, not AND). Leave all fields empty to apply this level to everyone."}
                         programOptions={programOptions}
                         departmentOptions={departmentOptions}
                         departmentDegreeOptions={departmentDegreeOptions}
+                        moduleSetOptions={moduleSetOptions}
+                        disabledWarning={disabledWarning}
                         loading={iatOptionsLoading}
                         onChange={(next) => handleValueChange(item.category, item.key, next)}
                     />
@@ -955,7 +1026,9 @@ function SettingsSelect({
             bottom: opensUp ? window.innerHeight - rect.top + gap : undefined,
             width: rect.width,
             maxHeight: usableHeight,
-            zIndex: 9999,
+            // Above the rule/module-set modals (z-[10000]/[10020]) so the menu
+            // is visible when rendered inside one of them.
+            zIndex: 10050,
         });
     };
 
@@ -1600,31 +1673,38 @@ function ScopeRulesEditor({
     programOptions,
     departmentOptions,
     departmentDegreeOptions,
+    moduleSetOptions,
     loading,
     onChange,
     eyebrow = 'IAT Gen',
     heading = 'Level 2 replacement routing',
-    helpText = 'Empty selections match all values in that field. A student matches when the program matches and at least one selected department, department-degree, or board condition matches.',
+    helpText = 'A student matches when ANY selected condition matches — program, department, department-degree, or board (OR, not AND). Leave all fields empty to match everyone.',
+    disabledWarning,
 }: {
     value: IatRuleConfig;
     isReadonly: boolean;
     programOptions: SelectOption[];
     departmentOptions: SelectOption[];
     departmentDegreeOptions: SelectOption[];
+    moduleSetOptions?: SelectOption[];
     loading: boolean;
     onChange: (next: IatRuleConfig) => void;
     eyebrow?: string;
     heading?: string;
     helpText?: string;
+    // When set, this level's enable toggle is OFF — the rules won't take effect.
+    disabledWarning?: string;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const rules = Array.isArray(value?.rules) ? value.rules : [];
+    const showSets = Array.isArray(moduleSetOptions);
 
     const normalizeRule = (rule: IatRule): IatRule => ({
         programIds: (rule.programIds || []).map(String),
         departmentDegreeIds: (rule.departmentDegreeIds || []).map(String),
         departmentIds: (rule.departmentIds || []).map(String),
         studentBoards: (rule.studentBoards || []).map(String),
+        ...(showSets ? { moduleSetId: rule.moduleSetId ? String(rule.moduleSetId) : '' } : {}),
     });
 
     const updateRule = (index: number, patch: Partial<IatRule>) => {
@@ -1638,7 +1718,7 @@ function ScopeRulesEditor({
         onChange({
             rules: [
                 ...rules.map(normalizeRule),
-                { programIds: [], departmentDegreeIds: [], departmentIds: [], studentBoards: [] },
+                { programIds: [], departmentDegreeIds: [], departmentIds: [], studentBoards: [], ...(showSets ? { moduleSetId: '' } : {}) },
             ],
         });
     };
@@ -1660,6 +1740,12 @@ function ScopeRulesEditor({
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
                             {helpText}
                         </p>
+                        {disabledWarning && (
+                            <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                                <span aria-hidden>⚠</span>
+                                <span>{disabledWarning}</span>
+                            </div>
+                        )}
                         {loading && (
                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading program and department options...</p>
                         )}
@@ -1738,6 +1824,18 @@ function ScopeRulesEditor({
                                                 disabled={isReadonly}
                                                 onChange={(next) => updateRule(index, { studentBoards: next })}
                                             />
+                                            {showSets && (
+                                                <div className="space-y-2">
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Module Set</p>
+                                                    <SettingsSelect
+                                                        value={rule.moduleSetId || ''}
+                                                        disabled={isReadonly}
+                                                        placeholder="Select a module set"
+                                                        options={[{ value: '', label: 'None' }, ...(moduleSetOptions || [])]}
+                                                        onChange={(next) => updateRule(index, { moduleSetId: next })}
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -1773,7 +1871,280 @@ function ScopeRulesEditor({
             <p className="text-xs text-gray-500 dark:text-gray-400">
                 {rules.length === 0 ? 'No rules configured' : `${rules.length} rule${rules.length === 1 ? '' : 's'} configured`}
             </p>
+            {disabledWarning && (
+                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">⚠ {disabledWarning}</p>
+            )}
             {isOpen ? ReactDOM.createPortal(editor, document.body) : null}
+        </div>
+    );
+}
+
+// Editor for iat.module_sets — named, reusable collections of IAT modules.
+// A module belongs to AT MOST ONE set: modules already used by another set are
+// hidden from this set's picker. Module selection happens in a modal.
+function ModuleSetsEditor({
+    value,
+    isReadonly,
+    moduleOptions,
+    onChange,
+}: {
+    value: IatModuleSet[];
+    isReadonly: boolean;
+    moduleOptions: SelectOption[];
+    onChange: (next: IatModuleSet[]) => void;
+}) {
+    const sets: IatModuleSet[] = Array.isArray(value) ? value : [];
+    const [isOpen, setIsOpen] = useState(false);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [search, setSearch] = useState('');
+
+    const newId = () => {
+        try {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+        } catch { /* ignore */ }
+        return `set_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+    };
+
+    const update = (i: number, patch: Partial<IatModuleSet>) =>
+        onChange(sets.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
+    const remove = (i: number) => onChange(sets.filter((_, idx) => idx !== i));
+    const add = () => onChange([...sets, { id: newId(), name: '', moduleIds: [] }]);
+
+    const labelFor = (id: string) =>
+        moduleOptions.find((o) => String(o.value) === String(id))?.label || `Module ${id}`;
+
+    // Module ids claimed by sets OTHER than `exceptIndex`.
+    const usedByOtherSets = (exceptIndex: number) => {
+        const used = new Set<string>();
+        sets.forEach((s, idx) => {
+            if (idx === exceptIndex) return;
+            (s.moduleIds || []).forEach((m) => used.add(String(m)));
+        });
+        return used;
+    };
+
+    const toggleModule = (setIndex: number, moduleId: string) => {
+        const current = (sets[setIndex].moduleIds || []).map(String);
+        const next = current.includes(moduleId)
+            ? current.filter((x) => x !== moduleId)
+            : [...current, moduleId];
+        update(setIndex, { moduleIds: next });
+    };
+
+    const closeModal = () => { setEditingIndex(null); setSearch(''); };
+
+    const editingSet = editingIndex != null ? sets[editingIndex] : null;
+    const selectedInEditing = new Set((editingSet?.moduleIds || []).map(String));
+    const availableForEditing = editingIndex == null
+        ? []
+        : moduleOptions
+            .filter((o) => !usedByOtherSets(editingIndex).has(String(o.value)))
+            .filter((o) => !search.trim() ||
+                o.label.toLowerCase().includes(search.trim().toLowerCase()) ||
+                (o.description || '').toLowerCase().includes(search.trim().toLowerCase()));
+
+    const modal = editingIndex != null && editingSet ? (
+        <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm" onMouseDown={closeModal}>
+            <div
+                className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#19211C]"
+                onMouseDown={(e) => e.stopPropagation()}
+            >
+                <div className="border-b border-gray-200 px-6 py-4 dark:border-white/10">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">Module Set</p>
+                    <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                        Select modules — {editingSet.name || 'Untitled set'}
+                    </h2>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {selectedInEditing.size} selected. Modules already used by another set are not shown.
+                    </p>
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Search modules…"
+                        className="mt-3 w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-2 text-sm text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                    />
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    {availableForEditing.length === 0 ? (
+                        <p className="px-2 py-8 text-center text-sm text-gray-400">
+                            {moduleOptions.length === 0 ? 'No IAT modules available.' : 'No modules match — others may be assigned to different sets.'}
+                        </p>
+                    ) : (
+                        <div className="space-y-1">
+                            {availableForEditing.map((option) => (
+                                <label
+                                    key={option.value}
+                                    className="flex cursor-pointer items-start gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-white/5"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        disabled={isReadonly}
+                                        checked={selectedInEditing.has(String(option.value))}
+                                        onChange={() => toggleModule(editingIndex, String(option.value))}
+                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-green focus:ring-brand-green disabled:opacity-40"
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-gray-800 dark:text-gray-100">{option.label}</span>
+                                        {option.description && (
+                                            <span className="block truncate text-xs text-gray-400">{option.description}</span>
+                                        )}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center justify-end gap-2 border-t border-gray-200 px-6 py-4 dark:border-white/10">
+                    <button
+                        type="button"
+                        onClick={closeModal}
+                        className="rounded-xl bg-brand-green px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    ) : null;
+
+    const setsList = (
+        <div className="space-y-4">
+            {sets.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                    No module sets yet. Add one, then assign it to scopes in "IAT Module Routing".
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {sets.map((set, i) => {
+                        const ids = (set.moduleIds || []).map(String);
+                        return (
+                            <div key={set.id || i} className="rounded-xl border border-gray-200 p-5 dark:border-white/10">
+                                <div className="mb-4 flex items-end justify-between gap-3">
+                                    <div className="flex-1 space-y-2">
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Set name</p>
+                                        <input
+                                            type="text"
+                                            disabled={isReadonly}
+                                            value={set.name || ''}
+                                            onChange={(e) => update(i, { name: e.target.value })}
+                                            placeholder="e.g. Core Bias"
+                                            className="w-full max-w-sm rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-2 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        disabled={isReadonly}
+                                        onClick={() => remove(i)}
+                                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40 dark:text-red-400 dark:hover:bg-red-500/10"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                                <div className="flex items-center justify-between gap-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                        Modules in this set ({ids.length})
+                                    </p>
+                                    <button
+                                        type="button"
+                                        disabled={isReadonly}
+                                        onClick={() => { setSearch(''); setEditingIndex(i); }}
+                                        className="rounded-lg bg-brand-green/10 px-3 py-1.5 text-xs font-medium text-brand-green transition-colors hover:bg-brand-green/20 disabled:opacity-40"
+                                    >
+                                        {ids.length === 0 ? 'Select modules' : 'Edit modules'}
+                                    </button>
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    {ids.length === 0 ? (
+                                        <span className="text-xs text-gray-400">No modules selected.</span>
+                                    ) : (
+                                        ids.map((id) => (
+                                            <span key={id} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                                                {labelFor(id)}
+                                                {!isReadonly && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleModule(i, id)}
+                                                        className="text-gray-400 hover:text-red-500"
+                                                        aria-label="Remove module"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                )}
+                                            </span>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+            <button
+                type="button"
+                disabled={isReadonly}
+                onClick={add}
+                className="rounded-xl bg-brand-green/10 px-4 py-2 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 disabled:opacity-40"
+            >
+                + Add module set
+            </button>
+        </div>
+    );
+
+    const totalModules = sets.reduce((n, s) => n + (s.moduleIds || []).length, 0);
+
+    const setsModal = isOpen ? (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm" onMouseDown={() => setIsOpen(false)}>
+            <div
+                className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#19211C]"
+                onMouseDown={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-5 dark:border-white/10">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">IAT Gen</p>
+                        <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">IAT Module Sets</h2>
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-500 dark:text-gray-400">
+                            Named, reusable collections of IAT modules. A module belongs to at most one set. Assign sets to scopes in "IAT Module Routing".
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(false)}
+                        className="rounded-xl px-4 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+                    >
+                        Close
+                    </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-6">{setsList}</div>
+                <div className="flex items-center justify-between gap-4 border-t border-gray-200 px-6 py-4 dark:border-white/10">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Close this popup, then use Save Changes to persist the setting.</p>
+                    <button
+                        type="button"
+                        onClick={() => setIsOpen(false)}
+                        className="rounded-xl bg-brand-green px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                    >
+                        Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    ) : null;
+
+    return (
+        <div className="flex flex-col items-start gap-2">
+            <button
+                type="button"
+                disabled={isReadonly}
+                onClick={() => setIsOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-green/10 px-4 py-2.5 text-sm font-medium text-brand-green transition-colors hover:bg-brand-green/20 focus:outline-none focus:ring-2 focus:ring-brand-green/40 disabled:opacity-40"
+            >
+                Configure module sets
+            </button>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                {sets.length === 0 ? 'No sets configured' : `${sets.length} set${sets.length === 1 ? '' : 's'}, ${totalModules} module${totalModules === 1 ? '' : 's'}`}
+            </p>
+            {setsModal ? ReactDOM.createPortal(setsModal, document.body) : null}
+            {modal ? ReactDOM.createPortal(modal, document.body) : null}
         </div>
     );
 }

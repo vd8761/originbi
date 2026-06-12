@@ -288,7 +288,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     }
     setIsLoading(true);
     try {
-      await registrationService.createRegistration(formData);
+      // Only the Employee program uses the difficulty level; never send it for
+      // other programs (it would otherwise be stored and filtered against).
+      await registrationService.createRegistration({
+        ...formData,
+        employee_level: isEmployeeProgram ? formData.employee_level : undefined,
+      });
       onRegister();
     } catch (err: any) {
       console.error("Registration Error:", err);

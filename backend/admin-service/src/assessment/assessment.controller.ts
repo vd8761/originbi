@@ -153,4 +153,10 @@ export class AssessmentController {
   async getLevels() {
     return this.assessmentService.getLevels();
   }
+
+  // Active IAT modules, for the per-scope module routing config UI.
+  @Get('iat/modules')
+  async listIatModules() {
+    return this.assessmentService.listIatModules();
+  }
 }

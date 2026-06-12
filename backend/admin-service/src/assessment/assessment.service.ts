@@ -1277,6 +1277,29 @@ export class AssessmentService {
     }
   }
 
+  /** Active IAT modules for the per-scope module routing config UI. */
+  async listIatModules(): Promise<
+    Array<{ id: string; code: string; name: string }>
+  > {
+    try {
+      const rows: Array<{ id: string; code: string; name: string }> =
+        await this.dataSource.query(
+          `SELECT id, code, display_name AS name
+           FROM iat_modules
+          WHERE is_active = true AND is_deleted = false
+          ORDER BY module_order ASC`,
+        );
+      return rows.map((r) => ({
+        id: String(r.id),
+        code: r.code,
+        name: r.name,
+      }));
+    } catch (error) {
+      this.logger.error('Error fetching IAT modules', error as Error);
+      return [];
+    }
+  }
+
   async findGroupDepartmentStats(groupId: number) {
     try {
       const stats = await this.sessionRepo

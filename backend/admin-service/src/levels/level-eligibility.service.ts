@@ -56,15 +56,37 @@ export class LevelEligibilityService {
     level: LevelLike,
     scope: RegistrationScope,
   ): Promise<boolean> {
-    const enabled = await this.readBool(`level${level.levelNumber}_enabled`);
+    const n = level.levelNumber;
+    const enabled = await this.readBool(`level${n}_enabled`);
     // Missing setting -> fall back to the level's mandatory flag so behaviour
     // matches the pre-feature default and nothing silently disappears.
-    if (enabled === null) return Boolean(level.isMandatory);
-    if (enabled === false) return false;
+    if (enabled === null) {
+      this.logger.log(
+        `[LevelEligibility] L${n}: no enable flag → mandatory=${Boolean(level.isMandatory)}`,
+      );
+      return Boolean(level.isMandatory);
+    }
+    if (enabled === false) {
+      this.logger.log(
+        `[LevelEligibility] L${n}: DISABLED (levels.level${n}_enabled=false)`,
+      );
+      return false;
+    }
 
-    const rules = await this.readRules(`level${level.levelNumber}_scope_rules`);
-    if (rules.length === 0) return true; // empty = everyone
-    return rules.some((rule) => this.matchesRule(rule, scope));
+    const rules = await this.readRules(`level${n}_scope_rules`);
+    if (rules.length === 0) {
+      this.logger.log(
+        `[LevelEligibility] L${n}: enabled, no scope rules → everyone`,
+      );
+      return true; // empty = everyone
+    }
+    const matched = rules.some((rule) => this.matchesRule(rule, scope));
+    this.logger.log(
+      `[LevelEligibility] L${n}: enabled, ${rules.length} rule(s), scope=${JSON.stringify(
+        scope,
+      )} → ${matched ? 'MATCH' : 'NO MATCH'} rules=${JSON.stringify(rules)}`,
+    );
+    return matched;
   }
 
   private async readBool(key: string): Promise<boolean | null> {
@@ -91,19 +113,29 @@ export class LevelEligibilityService {
     }
   }
 
+  // OR semantics: a registration matches when ANY selected dimension matches
+  // (program OR department-degree OR department OR board). Empty fields are
+  // ignored; a rule with nothing selected applies to everyone.
   private matchesRule(rule: ScopeRule, scope: RegistrationScope): boolean {
-    if (!this.idListMatches(rule.programIds, scope.programId)) return false;
-
+    const programIds = this.normalizeIds(rule.programIds);
     const degreeIds = this.normalizeIds(rule.departmentDegreeIds);
     const departmentIds = this.normalizeIds(rule.departmentIds);
     const boards = (rule.studentBoards || [])
       .map((board) => String(board || '').trim().toLowerCase())
       .filter(Boolean);
 
-    const hasSpecificScope =
-      degreeIds.length > 0 || departmentIds.length > 0 || boards.length > 0;
-    if (!hasSpecificScope) return true;
+    if (
+      programIds.length === 0 &&
+      degreeIds.length === 0 &&
+      departmentIds.length === 0 &&
+      boards.length === 0
+    ) {
+      return true; // nothing selected => everyone
+    }
 
+    const programMatch =
+      programIds.length > 0 &&
+      programIds.includes(String(scope.programId || ''));
     const degreeMatch =
       degreeIds.length > 0 &&
       degreeIds.includes(String(scope.departmentDegreeId || ''));
@@ -114,15 +146,7 @@ export class LevelEligibilityService {
       boards.length > 0 &&
       boards.includes(String(scope.studentBoard || '').trim().toLowerCase());
 
-    return degreeMatch || departmentMatch || boardMatch;
-  }
-
-  private idListMatches(
-    values: Array<number | string> | undefined,
-    actual: number | string | null | undefined,
-  ): boolean {
-    const ids = this.normalizeIds(values);
-    return ids.length === 0 || ids.includes(String(actual || ''));
+    return programMatch || degreeMatch || departmentMatch || boardMatch;
   }
 
   private normalizeIds(values: Array<number | string> | undefined): string[] {

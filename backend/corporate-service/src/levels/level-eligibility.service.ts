@@ -85,19 +85,29 @@ export class LevelEligibilityService {
     }
   }
 
+  // OR semantics: a registration matches when ANY selected dimension matches
+  // (program OR department-degree OR department OR board). Empty fields are
+  // ignored; a rule with nothing selected applies to everyone.
   private matchesRule(rule: ScopeRule, scope: RegistrationScope): boolean {
-    if (!this.idListMatches(rule.programIds, scope.programId)) return false;
-
+    const programIds = this.normalizeIds(rule.programIds);
     const degreeIds = this.normalizeIds(rule.departmentDegreeIds);
     const departmentIds = this.normalizeIds(rule.departmentIds);
     const boards = (rule.studentBoards || [])
       .map((board) => String(board || '').trim().toLowerCase())
       .filter(Boolean);
 
-    const hasSpecificScope =
-      degreeIds.length > 0 || departmentIds.length > 0 || boards.length > 0;
-    if (!hasSpecificScope) return true;
+    if (
+      programIds.length === 0 &&
+      degreeIds.length === 0 &&
+      departmentIds.length === 0 &&
+      boards.length === 0
+    ) {
+      return true; // nothing selected => everyone
+    }
 
+    const programMatch =
+      programIds.length > 0 &&
+      programIds.includes(String(scope.programId || ''));
     const degreeMatch =
       degreeIds.length > 0 &&
       degreeIds.includes(String(scope.departmentDegreeId || ''));
@@ -108,15 +118,7 @@ export class LevelEligibilityService {
       boards.length > 0 &&
       boards.includes(String(scope.studentBoard || '').trim().toLowerCase());
 
-    return degreeMatch || departmentMatch || boardMatch;
-  }
-
-  private idListMatches(
-    values: Array<number | string> | undefined,
-    actual: number | string | null | undefined,
-  ): boolean {
-    const ids = this.normalizeIds(values);
-    return ids.length === 0 || ids.includes(String(actual || ''));
+    return programMatch || degreeMatch || departmentMatch || boardMatch;
   }
 
   private normalizeIds(values: Array<number | string> | undefined): string[] {
