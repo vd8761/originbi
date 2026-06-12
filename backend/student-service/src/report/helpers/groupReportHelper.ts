@@ -231,9 +231,7 @@ async function processSessionRows(
     }
 
     if (!discData) {
-      logger.warn(
-        `User ${session.user_id} missing DISC data. Skipping.`,
-      );
+      logger.warn(`User ${session.user_id} missing DISC data. Skipping.`);
       continue;
     }
 

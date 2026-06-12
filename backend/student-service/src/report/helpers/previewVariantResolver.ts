@@ -113,7 +113,8 @@ export async function resolveStudentPreviewVariant(
     // report skips ACI sections when data is absent, so we no longer block on
     // a missing ACI unless an admin has explicitly opted back in via setting.
     const needsAci =
-      settings.requireAci === true && (variant === 'short' || variant === 'full');
+      settings.requireAci === true &&
+      (variant === 'short' || variant === 'full');
 
     // DISC is always mandatory - there is no DISC-less report.
     if (!discCompleted || (needsAci && !aciCompleted)) {

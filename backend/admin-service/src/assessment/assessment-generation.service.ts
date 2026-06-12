@@ -131,12 +131,20 @@ export class AssessmentGenerationService {
       where: { id: attempt.programId },
     });
     const isSchool = program?.code === 'SCHOOL_STUDENT';
+    const isEmployee =
+      program?.code === 'EMPLOYEE' ||
+      String(program?.name || '')
+        .trim()
+        .toUpperCase() === 'EMPLOYEE';
 
     // The `board` column sub-segments main questions: by exam board for School,
-    // and by difficulty level (Entry/Medium/Executive) for the Employee program.
-    const employeeLevel = registration?.metadata?.employeeLevel
-      ? String(registration.metadata.employeeLevel).trim()
-      : null;
+    // and by difficulty level (Entry/Medium/Executive) for the Employee program
+    // ONLY. Other programs (e.g. College) ignore employeeLevel even if it was
+    // sent on the registration.
+    const employeeLevel =
+      isEmployee && registration?.metadata?.employeeLevel
+        ? String(registration.metadata.employeeLevel).trim()
+        : null;
     const boardFilter: string | null = isSchool ? studentBoard : employeeLevel;
 
     // ---------------------------------------------------------
@@ -276,7 +284,10 @@ export class AssessmentGenerationService {
     // ---------------------------------------------------------
 
     // Admin-configured per-program main-question generation mode.
-    const genConfig = await this.getGenerationConfig(manager, attempt.programId);
+    const genConfig = await this.getGenerationConfig(
+      manager,
+      attempt.programId,
+    );
 
     // 2. Find Available Sets
     // Filter by Board (School board OR Employee difficulty level)

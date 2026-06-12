@@ -61,6 +61,36 @@ export class LevelEligibilityService {
     return rules.some((rule) => this.matchesRule(rule, scope));
   }
 
+  /**
+   * True when a level's enable toggle (`levelN_enabled`) is explicitly OFF.
+   * Used to retroactively hide a disabled level from candidates who already
+   * have a (not-yet-started) attempt for it. A missing flag is NOT treated as
+   * disabled (returns false) so nothing is hidden by accident.
+   */
+  async isLevelToggledOff(levelNumber: number): Promise<boolean> {
+    return (await this.readBool(`level${levelNumber}_enabled`)) === false;
+  }
+
+  /** Subset of `levelNumbers` whose enable toggle is explicitly OFF. */
+  async getToggledOffLevelNumbers(
+    levelNumbers: Array<number | null | undefined>,
+  ): Promise<Set<number>> {
+    const distinct = Array.from(
+      new Set(
+        levelNumbers
+          .map((n) => Number(n))
+          .filter((n) => Number.isFinite(n) && n > 0),
+      ),
+    );
+    const off = new Set<number>();
+    await Promise.all(
+      distinct.map(async (n) => {
+        if (await this.isLevelToggledOff(n)) off.add(n);
+      }),
+    );
+    return off;
+  }
+
   private async readBool(key: string): Promise<boolean | null> {
     try {
       const value = await this.settings.getValue<boolean>('levels', key);
@@ -79,25 +109,41 @@ export class LevelEligibilityService {
         'levels',
         key,
       );
-      return Array.isArray(cfg?.rules) ? (cfg as { rules: ScopeRule[] }).rules : [];
+      return Array.isArray(cfg?.rules)
+        ? (cfg as { rules: ScopeRule[] }).rules
+        : [];
     } catch {
       return [];
     }
   }
 
+  // OR semantics: a registration matches when ANY selected dimension matches
+  // (program OR department-degree OR department OR board). Empty fields are
+  // ignored; a rule with nothing selected applies to everyone.
   private matchesRule(rule: ScopeRule, scope: RegistrationScope): boolean {
-    if (!this.idListMatches(rule.programIds, scope.programId)) return false;
-
+    const programIds = this.normalizeIds(rule.programIds);
     const degreeIds = this.normalizeIds(rule.departmentDegreeIds);
     const departmentIds = this.normalizeIds(rule.departmentIds);
     const boards = (rule.studentBoards || [])
-      .map((board) => String(board || '').trim().toLowerCase())
+      .map((board) =>
+        String(board || '')
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean);
 
-    const hasSpecificScope =
-      degreeIds.length > 0 || departmentIds.length > 0 || boards.length > 0;
-    if (!hasSpecificScope) return true;
+    if (
+      programIds.length === 0 &&
+      degreeIds.length === 0 &&
+      departmentIds.length === 0 &&
+      boards.length === 0
+    ) {
+      return true; // nothing selected => everyone
+    }
 
+    const programMatch =
+      programIds.length > 0 &&
+      programIds.includes(String(scope.programId || ''));
     const degreeMatch =
       degreeIds.length > 0 &&
       degreeIds.includes(String(scope.departmentDegreeId || ''));
@@ -106,17 +152,13 @@ export class LevelEligibilityService {
       departmentIds.includes(String(scope.departmentId || ''));
     const boardMatch =
       boards.length > 0 &&
-      boards.includes(String(scope.studentBoard || '').trim().toLowerCase());
+      boards.includes(
+        String(scope.studentBoard || '')
+          .trim()
+          .toLowerCase(),
+      );
 
-    return degreeMatch || departmentMatch || boardMatch;
-  }
-
-  private idListMatches(
-    values: Array<number | string> | undefined,
-    actual: number | string | null | undefined,
-  ): boolean {
-    const ids = this.normalizeIds(values);
-    return ids.length === 0 || ids.includes(String(actual || ''));
+    return programMatch || degreeMatch || departmentMatch || boardMatch;
   }
 
   private normalizeIds(values: Array<number | string> | undefined): string[] {

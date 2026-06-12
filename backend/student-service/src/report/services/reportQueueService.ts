@@ -13,10 +13,7 @@ import {
   getMBAPlacementDetails,
   getPlacementDetails,
 } from '../helpers/sqlHelper';
-import {
-  generateReportForUser,
-  ReportVariant,
-} from '../helpers/reportFactory';
+import { generateReportForUser, ReportVariant } from '../helpers/reportFactory';
 import { PlacementReport } from '../reports/placement/placementReport';
 import { MBAPlacementReport } from '../reports/placement/mbaPlacementReport';
 import { Level1PlacementReport } from '../reports/placement/level1PlacementReport';
@@ -304,7 +301,11 @@ export const reportQueueService = {
         const safeName = user.full_name.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
         const deptStr = 'dept_code' in user ? user.dept_code : 'GENERAL';
         const variantSuffix =
-          variant === 'short' ? '_short' : variant === 'level1' ? '_level1' : '';
+          variant === 'short'
+            ? '_short'
+            : variant === 'level1'
+              ? '_level1'
+              : '';
         const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}${variantSuffix}.pdf`;
         const groupStr = 'group_name' in user ? user.group_name : 'NoGroup';
         groupName = groupStr?.replace(' ', '_');
@@ -401,8 +402,10 @@ export const reportQueueService = {
       fs.mkdirSync(jobDir, { recursive: true });
 
       logger.info(`[JOB:${jobId}] Fetching data...`);
-      const groupData: MergedReportData[] =
-        await fetchUserAssessmentData(userIds, variant);
+      const groupData: MergedReportData[] = await fetchUserAssessmentData(
+        userIds,
+        variant,
+      );
       const totalUsers = groupData.length;
 
       if (totalUsers === 0) {
@@ -427,7 +430,11 @@ export const reportQueueService = {
         const safeName = user.full_name.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
         const deptStr = 'dept_code' in user ? user.dept_code : 'GENERAL';
         const variantSuffix =
-          variant === 'short' ? '_short' : variant === 'level1' ? '_level1' : '';
+          variant === 'short'
+            ? '_short'
+            : variant === 'level1'
+              ? '_level1'
+              : '';
         const fileName = `${safeName}.${deptStr}.${user.exam_ref_no.replace(/[\/\\]/g, '-')}${variantSuffix}.pdf`;
         const filePath = path.join(jobDir, fileName);
 
