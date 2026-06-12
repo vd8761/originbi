@@ -43,6 +43,20 @@ export interface AssessmentSession {
     emailSentTo?: string | null;
 }
 
+export interface IndividualExamPreview {
+    registrationId: number;
+    userId: number;
+    program: { id: number; name: string; assessmentTitle?: string } | null;
+    levels: Array<{
+        id: number;
+        levelNumber: number;
+        name: string;
+        patternType?: string | null;
+    }>;
+    canAssign: boolean;
+    ongoingStatus: string | null;
+}
+
 export interface MetaphorReportStatus {
     attempt: { id: number; status: string; startedAt?: string; completedAt?: string } | null;
     total: number;
@@ -533,6 +547,47 @@ export const assessmentService = {
         if (!res.ok) {
             const err = await res.json().catch(() => null);
             throw new Error(err?.message || "Failed to assign group exam");
+        }
+        return res.json();
+    },
+
+    async getIndividualExamPreview(
+        registrationId: number | string,
+    ): Promise<IndividualExamPreview> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/individual-exam-preview?registrationId=${registrationId}`,
+            {
+                headers: { Authorization: token ? `Bearer ${token}` : "" },
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to load exam preview");
+        }
+        return res.json();
+    },
+
+    async assignIndividualExam(payload: {
+        registrationId: number | string;
+        examStart?: string;
+        examEnd?: string;
+    }): Promise<{ sessionId: number; levelsAssigned: number }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/assign-individual-exam`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify(payload),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to assign exam");
         }
         return res.json();
     },

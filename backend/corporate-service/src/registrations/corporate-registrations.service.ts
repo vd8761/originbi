@@ -682,6 +682,233 @@ export class CorporateRegistrationsService {
     });
   }
 
+  /** Terminal session statuses — a user with only these can receive a new exam. */
+  private static readonly TERMINAL_SESSION_STATUSES = [
+    'COMPLETED',
+    'EXPIRED',
+    'PARTIALLY_EXP',
+    'PARTIALLY_EXPIRED',
+  ];
+
+  /** Resolve the corporate account for a corporate user id (direct or fallback). */
+  private async resolveCorporateAccount(corporateUserId: number) {
+    let corporateAccount = await this.corpRepo.findOne({
+      where: { userId: corporateUserId },
+    });
+    if (!corporateAccount) {
+      const u = await this.userRepo.findOne({ where: { id: corporateUserId } });
+      if (u && u.corporateId) {
+        corporateAccount = await this.corpRepo.findOne({
+          where: { id: Number(u.corporateId) },
+        });
+      }
+    }
+    if (!corporateAccount) {
+      throw new BadRequestException('Corporate account not found');
+    }
+    return corporateAccount;
+  }
+
+  /**
+   * Resolve the program id for a registration. Corporate registrations don't
+   * always persist program_id, so fall back to the user's latest session, then
+   * to the stored programType label.
+   */
+  private async resolveProgramId(
+    manager: EntityManager,
+    registration: Registration,
+  ): Promise<number> {
+    if (registration.programId) return Number(registration.programId);
+
+    const latestSession = await manager
+      .getRepository(AssessmentSession)
+      .createQueryBuilder('s')
+      .where('s.user_id = :uid', { uid: registration.userId })
+      .andWhere('s.program_id IS NOT NULL')
+      .orderBy('s.created_at', 'DESC')
+      .getOne();
+    if (latestSession?.programId) return Number(latestSession.programId);
+
+    const programType = registration.metadata?.programType;
+    if (programType) {
+      const program = await this.findProgram(manager, programType);
+      return Number(program.id);
+    }
+    throw new BadRequestException(
+      'Could not determine the program for this employee.',
+    );
+  }
+
+  /**
+   * Preview a brand-new individual exam for one corporate employee: the program
+   * and the levels currently enabled for their scope, plus whether they have an
+   * ongoing (non-terminal) session that would block assignment.
+   */
+  async previewIndividualExam(registrationId: number, corporateUserId: number) {
+    const corporateAccount =
+      await this.resolveCorporateAccount(corporateUserId);
+
+    const manager = this.dataSource.manager;
+    const registration = await manager
+      .getRepository(Registration)
+      .findOne({ where: { id: registrationId as any } });
+    if (!registration) {
+      throw new BadRequestException(`Registration ${registrationId} not found`);
+    }
+    if (
+      Number(registration.corporateAccountId) !== Number(corporateAccount.id)
+    ) {
+      throw new BadRequestException(
+        'This employee does not belong to your account.',
+      );
+    }
+
+    const programId = await this.resolveProgramId(manager, registration);
+    const program = await manager
+      .getRepository(Program)
+      .findOne({ where: { id: programId as any } });
+
+    const levels = await this.resolveEnabledLevels(
+      manager,
+      registration,
+      programId,
+    );
+
+    const ongoingSession = await manager
+      .getRepository(AssessmentSession)
+      .createQueryBuilder('s')
+      .where('s.user_id = :uid', { uid: registration.userId })
+      .andWhere('s.status NOT IN (:...terminal)', {
+        terminal: CorporateRegistrationsService.TERMINAL_SESSION_STATUSES,
+      })
+      .getOne();
+
+    return {
+      registrationId: Number(registration.id),
+      userId: Number(registration.userId),
+      program: program
+        ? {
+            id: Number(program.id),
+            name: program.name,
+            assessmentTitle: program.assessmentTitle,
+          }
+        : null,
+      levels: levels.map((l) => ({
+        id: Number(l.id),
+        levelNumber: l.levelNumber,
+        name: l.name,
+        patternType: l.patternType,
+      })),
+      canAssign: !ongoingSession,
+      ongoingStatus: ongoingSession?.status ?? null,
+    };
+  }
+
+  /**
+   * Assign a brand-new individual exam (date window only) to one corporate
+   * employee. Reuses their program + current level settings; creates a fresh
+   * standalone session + attempts (Level-1 questions generated up-front).
+   * Blocks when the employee has an ongoing (non-terminal) session.
+   */
+  async assignIndividualExam(
+    input: { registrationId: number; examStart?: string; examEnd?: string },
+    corporateUserId: number,
+  ) {
+    const { registrationId, examStart, examEnd } = input;
+    if (!registrationId) {
+      throw new BadRequestException('registrationId is required');
+    }
+    const corporateAccount =
+      await this.resolveCorporateAccount(corporateUserId);
+
+    const validFrom = examStart ? new Date(examStart) : new Date();
+    const validTo = examEnd
+      ? new Date(examEnd)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const registration = await manager
+        .getRepository(Registration)
+        .findOne({ where: { id: registrationId as any } });
+      if (!registration) {
+        throw new BadRequestException(
+          `Registration ${registrationId} not found`,
+        );
+      }
+      if (
+        Number(registration.corporateAccountId) !== Number(corporateAccount.id)
+      ) {
+        throw new BadRequestException(
+          'This employee does not belong to your account.',
+        );
+      }
+
+      const ongoingSession = await manager
+        .getRepository(AssessmentSession)
+        .createQueryBuilder('s')
+        .where('s.user_id = :uid', { uid: registration.userId })
+        .andWhere('s.status NOT IN (:...terminal)', {
+          terminal: CorporateRegistrationsService.TERMINAL_SESSION_STATUSES,
+        })
+        .getOne();
+      if (ongoingSession) {
+        throw new BadRequestException(
+          `Employee has an ongoing assessment (Status: ${ongoingSession.status}). Cannot assign a new exam.`,
+        );
+      }
+
+      const programId = await this.resolveProgramId(manager, registration);
+
+      const session = manager.create(AssessmentSession, {
+        userId: registration.userId,
+        registrationId: registration.id,
+        programId,
+        groupId: registration.groupId ?? null,
+        groupAssessmentId: null,
+        status: 'NOT_STARTED',
+        validFrom,
+        validTo,
+        metadata: { source: 'CORPORATE_ASSIGN_INDIVIDUAL_EXAM' },
+      });
+      await manager.save(session);
+
+      const levels = await this.resolveEnabledLevels(
+        manager,
+        registration,
+        programId,
+      );
+
+      for (const level of levels) {
+        const attempt = manager.create(AssessmentAttempt, {
+          userId: registration.userId,
+          registrationId: registration.id,
+          programId,
+          assessmentSessionId: session.id,
+          assessmentLevelId: level.id,
+          status: 'NOT_STARTED',
+        });
+        await manager.save(attempt);
+
+        if (this.isBehavioralLevel(level)) {
+          await this.assessmentGenService.generateLevel1Questions(
+            attempt,
+            manager,
+          );
+        }
+      }
+
+      return {
+        sessionId: Number(session.id),
+        registrationId: Number(registration.id),
+        userId: Number(registration.userId),
+        programId,
+        levelsAssigned: levels.length,
+        validFrom,
+        validTo,
+      };
+    });
+  }
+
   private normalizeString(str: string): string {
     return str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
   }

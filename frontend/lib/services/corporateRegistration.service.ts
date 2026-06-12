@@ -351,5 +351,54 @@ export const corporateRegistrationService = {
 
         if (!res.ok) return []; // Return empty if failed or not implemented
         return res.json();
-    }
+    },
+
+    // Preview a brand-new individual exam for one employee (levels + program).
+    async getIndividualExamPreview(
+        registrationId: number | string,
+        userId: string,
+    ): Promise<any> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
+        const res = await fetch(
+            `${CORP_API}/corporate/registrations/individual-exam-preview?registrationId=${registrationId}&userId=${userId}`,
+            {
+                headers: { Authorization: token ? `Bearer ${token}` : "" },
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to load exam preview");
+        }
+        return res.json();
+    },
+
+    // Assign a brand-new individual exam (date window only) to one employee.
+    async assignIndividualExam(
+        payload: {
+            registrationId: number | string;
+            examStart?: string;
+            examEnd?: string;
+        },
+        userId: string,
+    ): Promise<any> {
+        const token = AuthService.getToken();
+        const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;
+        const res = await fetch(
+            `${CORP_API}/corporate/registrations/assign-individual-exam?userId=${userId}`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify(payload),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to assign exam");
+        }
+        return res.json();
+    },
 };
