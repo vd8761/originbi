@@ -27,6 +27,7 @@ import { AssessmentGenerationService } from '../assessment/assessment-generation
 import { getWelcomeEmailTemplate } from '../mail/templates/welcome.template';
 import { CreateCandidateDto } from './dto/create-candidate.dto';
 import { SettingsService } from '../settings/settings.service';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
 
 @Injectable()
 export class CorporateRegistrationsService {
@@ -83,7 +84,48 @@ export class CorporateRegistrationsService {
     private readonly http: HttpService,
     private readonly assessmentGenService: AssessmentGenerationService,
     private readonly settingsService: SettingsService,
+    private readonly levelEligibility: LevelEligibilityService,
   ) {}
+
+  /**
+   * Resolve the assessment levels a corporate registration should receive, in
+   * order, from the admin-configurable `levels.*` settings (enable flag +
+   * program/department/board scope). Replaces the old mandatory-only lookup.
+   */
+  private async resolveEnabledLevels(
+    manager: EntityManager,
+    registration: Registration,
+    programId: number,
+  ): Promise<AssessmentLevel[]> {
+    const levels = await manager.getRepository(AssessmentLevel).find({
+      order: { sortOrder: 'ASC' },
+    });
+
+    let departmentId: number | string | null = null;
+    if (registration.departmentDegreeId) {
+      const rows = (await manager.query(
+        `SELECT department_id FROM department_degrees WHERE id = $1 LIMIT 1`,
+        [registration.departmentDegreeId],
+      )) as Array<{ department_id: number | string | null }>;
+      departmentId = rows?.[0]?.department_id ?? null;
+    }
+
+    return this.levelEligibility.filterEnabledLevels(levels, {
+      programId,
+      departmentDegreeId: registration.departmentDegreeId,
+      departmentId,
+      studentBoard: registration.studentBoard,
+    });
+  }
+
+  /** True when a level is the Level 1 Behavioral (DISC) level. */
+  private isBehavioralLevel(level: AssessmentLevel): boolean {
+    return (
+      level.levelNumber === 1 ||
+      String(level.patternType || '').toUpperCase() === 'DISC' ||
+      level.name === 'Level 1'
+    );
+  }
 
   async registerCandidate(dto: CreateCandidateDto, corporateUserId: number) {
     const email = this.normalizeEmail(dto.email);
@@ -328,20 +370,18 @@ export class CorporateRegistrationsService {
         await manager.save(session);
 
         // F. Create Attempt (Level 1)
-        // F. Create Attempts (Mandatory Levels)
-        // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
-        const levels = await manager.getRepository(AssessmentLevel).find({
-          where: {
-            isMandatory: true,
-          },
-          order: {
-            sortOrder: 'ASC',
-          },
-        });
+        // F. Create Attempts for the levels enabled for this registration
+        // (per-level enable + program/department/board scope, resolved from
+        // the `levels.*` settings). Ordered Level 1 -> N.
+        const levels = await this.resolveEnabledLevels(
+          manager,
+          registration,
+          Number(program.id),
+        );
 
         if (levels.length === 0) {
           this.logger.warn(
-            'No mandatory levels found in AssessmentLevel table. Candidate created without assessment attempt.',
+            'No enabled levels resolved. Candidate created without assessment attempt.',
           );
         }
 
@@ -356,9 +396,9 @@ export class CorporateRegistrationsService {
           });
           await manager.save(attempt);
 
-          // G. Generate Questions for this Level (Only Level 1)
-          // We strictly generate questions ONLY for Level 1 here.
-          if (level.levelNumber === 1 || level.name === 'Level 1') {
+          // G. Generate questions ONLY for Level 1 (Behavioral). IAT (L3)
+          // builds its trials lazily; other levels generate on first start.
+          if (this.isBehavioralLevel(level)) {
             await this.assessmentGenService.generateLevel1Questions(
               attempt,
               manager,
@@ -594,11 +634,12 @@ export class CorporateRegistrationsService {
       });
       await manager.save(session);
 
-      // 5. Create Attempts
-      const levels = await manager.getRepository(AssessmentLevel).find({
-        where: { isMandatory: true },
-        order: { sortOrder: 'ASC' },
-      });
+      // 5. Create Attempts for the levels enabled for this registration.
+      const levels = await this.resolveEnabledLevels(
+        manager,
+        registration,
+        Number(program.id),
+      );
 
       for (const level of levels) {
         const attempt = manager.create(AssessmentAttempt, {
@@ -611,7 +652,7 @@ export class CorporateRegistrationsService {
         });
         await manager.save(attempt);
 
-        if (level.levelNumber === 1 || level.name === 'Level 1') {
+        if (this.isBehavioralLevel(level)) {
           await this.assessmentGenService.generateLevel1Questions(
             attempt,
             manager,

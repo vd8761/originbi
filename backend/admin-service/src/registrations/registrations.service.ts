@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In, Not } from 'typeorm';
+import { Repository, DataSource, EntityManager, In, Not } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
@@ -29,6 +29,7 @@ import { getStudentWelcomeEmailTemplate } from '../mail/templates/student-welcom
 import { SettingsService } from '../settings/settings.service';
 import { WhatsappTemplatesService } from '../whatsapp/whatsapp-templates.service';
 import { SmsService, SmsTemplate } from '../sms/sms.service';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
 
 import * as nodemailer from 'nodemailer';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
@@ -68,7 +69,57 @@ export class RegistrationsService {
     private readonly settingsService: SettingsService,
     private readonly whatsappTemplates: WhatsappTemplatesService,
     private readonly smsService: SmsService,
+    private readonly levelEligibility: LevelEligibilityService,
   ) {}
+
+  /**
+   * Resolve the assessment levels a registration should receive, in order.
+   * Replaces the old `find({ where: { isMandatory: true }})` lookups — the
+   * decision now comes from the admin-configurable `levels.*` settings via
+   * LevelEligibilityService (enable flag + program/department/board scope).
+   */
+  private async resolveEnabledLevels(
+    manager: EntityManager,
+    registration: Registration,
+    programId: number,
+  ): Promise<AssessmentLevel[]> {
+    const levels = await manager.getRepository(AssessmentLevel).find({
+      order: { sortOrder: 'ASC' },
+    });
+
+    let departmentId: number | string | null = null;
+    if (registration.departmentDegreeId) {
+      const rows = (await manager.query(
+        `SELECT department_id FROM department_degrees WHERE id = $1 LIMIT 1`,
+        [registration.departmentDegreeId],
+      )) as Array<{ department_id: number | string | null }>;
+      departmentId = rows?.[0]?.department_id ?? null;
+    }
+
+    return this.levelEligibility.filterEnabledLevels(levels, {
+      programId,
+      departmentDegreeId: registration.departmentDegreeId,
+      departmentId,
+      studentBoard: registration.studentBoard,
+    });
+  }
+
+  /** True when a level is the Metaphor level, robust to its level number. */
+  private isMetaphorLevel(level: AssessmentLevel): boolean {
+    return (
+      String(level.patternType || '').toUpperCase() === 'METAPHOR' ||
+      Boolean(level.name?.toLowerCase().includes('metaphor'))
+    );
+  }
+
+  /** True when a level is the Level 1 Behavioral (DISC) level. */
+  private isBehavioralLevel(level: AssessmentLevel): boolean {
+    return (
+      level.levelNumber === 1 ||
+      String(level.patternType || '').toUpperCase() === 'DISC' ||
+      level.name === 'Level 1'
+    );
+  }
 
   async withRetry<T>(
     operation: () => Promise<T>,
@@ -425,24 +476,22 @@ export class RegistrationsService {
         });
         await manager.save(session);
 
-        // E. Create Assessment Attempts (Mandatory Levels)
-        // Fetch all mandatory levels, ordered by sequence (Level 1 -> Level 2)
-        const levels = await manager.getRepository(AssessmentLevel).find({
-          where: {
-            isMandatory: true,
-          },
-          order: {
-            sortOrder: 'ASC',
-          },
-        });
+        // E. Create Assessment Attempts for the levels enabled for this
+        // registration (per-level enable + program/department/board scope,
+        // resolved from the `levels.*` settings). Ordered Level 1 -> N.
+        const levels = await this.resolveEnabledLevels(
+          manager,
+          registration,
+          programId,
+        );
 
         this.logger.log(
-          `Found ${levels ? levels.length : 0} mandatory levels for new registration.`,
+          `Resolved ${levels.length} enabled level(s) for new registration ${registration.id}.`,
         );
 
         if (!levels || levels.length === 0) {
           this.logger.warn(
-            'No mandatory assessment levels found. Registration will proceed without attempts.',
+            'No enabled assessment levels resolved. Registration will proceed without attempts.',
           );
         }
 
@@ -457,8 +506,11 @@ export class RegistrationsService {
           });
           await manager.save(attempt);
 
-          // F. Generate Questions for this Level (Only Level 1)
-          if (level.levelNumber === 1 || level.name === 'Level 1') {
+          // F. Generate questions for this level.
+          // Level 1 (Behavioral) is the only level whose questions are
+          // generated up-front; ACI (L2) is generated lazily on first start,
+          // IAT (L3) builds its trials lazily, Metaphor (L4) is gated below.
+          if (this.isBehavioralLevel(level)) {
             try {
               await this.assessmentGenService.generateQuestions(
                 attempt,
@@ -474,14 +526,10 @@ export class RegistrationsService {
               throw err;
             }
           }
-          // Generate Level 3 (Metaphor) — gated; skips silently if no bank.
-          // NON-FATAL: a metaphor failure must never roll back the core
-          // registration (Level 1). Toggling Level 3 can't break other levels.
-          else if (
-            level.levelNumber === 3 ||
-            level.name?.includes('Metaphor') ||
-            (level as any).patternType === 'METAPHOR'
-          ) {
+          // Metaphor — gated; skips silently if no bank. NON-FATAL: a metaphor
+          // failure must never roll back the core registration (Level 1).
+          // Matched by pattern_type so it is robust to the level number.
+          else if (this.isMetaphorLevel(level)) {
             try {
               await this.metaphorGenService.generate(attempt, manager);
             } catch (err) {
@@ -660,17 +708,19 @@ export class RegistrationsService {
       });
       await manager.save(session);
 
-      const levels = await manager.getRepository(AssessmentLevel).find({
-        where: { isMandatory: true },
-      });
+      const levels = await this.resolveEnabledLevels(
+        manager,
+        registration,
+        programId,
+      );
 
       this.logger.log(
-        `Found ${levels ? levels.length : 0} mandatory levels for existing user.`,
+        `Resolved ${levels.length} enabled level(s) for existing user registration ${registration.id}.`,
       );
 
       if (!levels || levels.length === 0) {
         this.logger.warn(
-          'No mandatory assessment levels found. Registration will proceed without attempts.',
+          'No enabled assessment levels resolved. Registration will proceed without attempts.',
         );
       }
 
@@ -685,8 +735,8 @@ export class RegistrationsService {
         });
         await manager.save(attempt);
 
-        // Strictly generate questions ONLY for Level 1.
-        if (level.levelNumber === 1 || level.name === 'Level 1') {
+        // Strictly generate questions ONLY for Level 1 (Behavioral).
+        if (this.isBehavioralLevel(level)) {
           try {
             await this.assessmentGenService.generateQuestions(attempt, manager);
           } catch (err) {
@@ -697,12 +747,8 @@ export class RegistrationsService {
             throw err;
           }
         }
-        // Generate Level 3 (Metaphor) — gated + NON-FATAL (see create()).
-        else if (
-          level.levelNumber === 3 ||
-          level.name?.includes('Metaphor') ||
-          (level as any).patternType === 'METAPHOR'
-        ) {
+        // Metaphor — gated + NON-FATAL (see create()). Matched by pattern_type.
+        else if (this.isMetaphorLevel(level)) {
           try {
             await this.metaphorGenService.generate(attempt, manager);
           } catch (err) {

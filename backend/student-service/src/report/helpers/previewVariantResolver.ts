@@ -14,6 +14,13 @@ export interface PreviewVariantSettings {
   nonMbaVariant: ReportVariant;
   /** Message shown when the variant's required assessment is incomplete. */
   blockedMessage: string;
+  /**
+   * When true, `short`/`full` variants still require ACI completion (legacy
+   * behaviour). When false (default), ACI is optional: the report generates
+   * from DISC alone and ACI-dependent sections are skipped at render time.
+   * DISC is always required regardless of this flag.
+   */
+  requireAci?: boolean;
 }
 
 export interface PreviewResolution {
@@ -101,18 +108,26 @@ export async function resolveStudentPreviewVariant(
     const variant: ReportVariant = isMba
       ? settings.mbaVariant
       : settings.nonMbaVariant;
-    const needsAci = variant === 'short' || variant === 'full';
+    // ACI is optional by default: only `level1` strictly needs DISC, and
+    // `short`/`full` previously also required ACI. With dynamic generation the
+    // report skips ACI sections when data is absent, so we no longer block on
+    // a missing ACI unless an admin has explicitly opted back in via setting.
+    const needsAci =
+      settings.requireAci === true && (variant === 'short' || variant === 'full');
 
+    // DISC is always mandatory - there is no DISC-less report.
     if (!discCompleted || (needsAci && !aciCompleted)) {
       logger.info(
         `[PreviewResolver] User ${userId} blocked (variant=${variant}, ` +
-          `isMba=${isMba}, disc=${discCompleted}, aci=${aciCompleted}).`,
+          `isMba=${isMba}, disc=${discCompleted}, aci=${aciCompleted}, ` +
+          `requireAci=${settings.requireAci === true}).`,
       );
       return { blocked: true, message: settings.blockedMessage };
     }
 
     logger.info(
-      `[PreviewResolver] User ${userId} -> variant=${variant} (isMba=${isMba}).`,
+      `[PreviewResolver] User ${userId} -> variant=${variant} ` +
+        `(isMba=${isMba}, aci=${aciCompleted}).`,
     );
     return { blocked: false, variant };
   } catch (error) {

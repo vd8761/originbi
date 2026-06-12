@@ -233,11 +233,19 @@ export class ReportController {
           'report',
           'student_preview_blocked_message',
         )) || DEFAULT_BLOCKED_MESSAGE;
+      // Opt-in flag to restore the legacy "ACI required for short/full" gate.
+      // Defaults to false: ACI is optional and reports degrade gracefully.
+      const requireAci =
+        (await this.settings.getValue<boolean>(
+          'report',
+          'student_preview_require_aci',
+        )) === true;
 
       const resolution = await resolveStudentPreviewVariant(userId, {
         mbaVariant,
         nonMbaVariant,
         blockedMessage,
+        requireAci,
       });
 
       if (resolution.blocked) {

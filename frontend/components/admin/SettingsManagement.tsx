@@ -459,9 +459,31 @@ export default function SettingsManagement() {
             if (item.category === 'iat' && item.key === 'level2_replacement_rules') {
                 const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
                 return (
-                    <IatRulesEditor
+                    <ScopeRulesEditor
                         value={value}
                         isReadonly={item.isReadonly}
+                        programOptions={programOptions}
+                        departmentOptions={departmentOptions}
+                        departmentDegreeOptions={departmentDegreeOptions}
+                        loading={iatOptionsLoading}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            // Per-level scope rules (category 'levels', key like
+            // 'level3_scope_rules'). Reuses the same program/department/board
+            // rule editor as the legacy IAT routing.
+            if (item.category === 'levels' && item.key.endsWith('_scope_rules')) {
+                const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
+                const eyebrow = item.label.replace(/\s*\(scope\)\s*$/i, '') || 'Level';
+                return (
+                    <ScopeRulesEditor
+                        value={value}
+                        isReadonly={item.isReadonly}
+                        eyebrow={eyebrow}
+                        heading="Who receives this level"
+                        helpText="Empty selections match everyone. A registration matches when the program matches and at least one selected department, department-degree, or board condition matches. Leave all empty to apply this level to every registration."
                         programOptions={programOptions}
                         departmentOptions={departmentOptions}
                         departmentDegreeOptions={departmentDegreeOptions}
@@ -1456,7 +1478,7 @@ const SCHOOL_BOARD_OPTIONS: SelectOption[] = [
     { value: 'Other', label: 'Other' },
 ];
 
-function IatRulesEditor({
+function ScopeRulesEditor({
     value,
     isReadonly,
     programOptions,
@@ -1464,6 +1486,9 @@ function IatRulesEditor({
     departmentDegreeOptions,
     loading,
     onChange,
+    eyebrow = 'IAT Gen',
+    heading = 'Level 2 replacement routing',
+    helpText = 'Empty selections match all values in that field. A student matches when the program matches and at least one selected department, department-degree, or board condition matches.',
 }: {
     value: IatRuleConfig;
     isReadonly: boolean;
@@ -1472,6 +1497,9 @@ function IatRulesEditor({
     departmentDegreeOptions: SelectOption[];
     loading: boolean;
     onChange: (next: IatRuleConfig) => void;
+    eyebrow?: string;
+    heading?: string;
+    helpText?: string;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const rules = Array.isArray(value?.rules) ? value.rules : [];
@@ -1511,10 +1539,10 @@ function IatRulesEditor({
             >
                 <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 dark:border-white/10 md:flex-row md:items-start md:justify-between">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">IAT Gen</p>
-                        <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">Level 2 replacement routing</h2>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">{eyebrow}</p>
+                        <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">{heading}</h2>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-                            Empty selections match all values in that field. A student matches when the program matches and at least one selected department, department-degree, or board condition matches.
+                            {helpText}
                         </p>
                         {loading && (
                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading program and department options...</p>
@@ -1542,7 +1570,7 @@ function IatRulesEditor({
                 <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     {rules.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
-                            No IAT Gen replacement rules configured.
+                            No scope rules configured — applies to everyone.
                         </div>
                     ) : (
                         <div className="space-y-5">

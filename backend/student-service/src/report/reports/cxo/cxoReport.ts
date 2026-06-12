@@ -205,7 +205,15 @@ export class CxoReport extends BaseReport {
     // Set the starting Y position for the first item
     let currentY = 45 * this.MM;
 
-    CXO_TOC_CONTENT.forEach((item, index) => {
+    // Drop the ACI entry from the contents when the section is skipped, so the
+    // TOC matches the rendered report (and numbering stays sequential).
+    const tocItems = this.hasAci(this.data.agile_scores)
+      ? CXO_TOC_CONTENT
+      : CXO_TOC_CONTENT.filter(
+          (item) => !item.includes('Agile Compatibility Index'),
+        );
+
+    tocItems.forEach((item, index) => {
       // 2. Check for overflow
       if (currentY > bottomLimit) {
         this.doc.addPage();
@@ -443,7 +451,16 @@ export class CxoReport extends BaseReport {
       color: this.COLOR_BLACK,
     });
 
-    this.generateACI();
+    // ACI is optional: render the Agile Compatibility Index only when the
+    // executive has completed the ACI assessment; otherwise skip it and
+    // continue with the DISC-only sections.
+    if (this.hasAci(this.data.agile_scores)) {
+      this.generateACI();
+    } else {
+      logger.info(
+        '[CxoREPORT] ACI data absent - skipping Agile Compatibility Index section.',
+      );
+    }
 
     // 7. Executive Behavioral SnapShot
     this.h1('Your Executive Behavioral Snapshot');

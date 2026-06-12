@@ -279,8 +279,20 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const allLevelsCompleted = session?.status === 'COMPLETED';
     // Simplified completion logic: if status is COMPLETED, it's done.
 
+    // Only show tabs for levels this candidate actually has an attempt for.
+    // Levels are now enabled per registration, and legacy sessions may lack a
+    // dedicated IAT attempt (IAT used to be the Level-2 variant) — rendering a
+    // tab for a level with no attempt previously duplicated the IAT report.
+    const levelHasAttempt = (lvl: any) =>
+        Boolean(session?.attempts?.find((a: any) => {
+            const aId = String(a.assessmentLevelId ?? (a.assessmentLevel ? a.assessmentLevel.id : ''));
+            const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
+            return aId === String(lvl?.id) || alId === String(lvl?.id);
+        }));
+    const visibleLevels = session?.attempts?.length ? levels.filter(levelHasAttempt) : levels;
+
     // Calculation for progress bar
-    const totalMandatoryLevels = levels.length || 4; // fallback
+    const totalMandatoryLevels = visibleLevels.length || 4; // fallback
     const currentLvl = (status === 'NOT_STARTED' || status === 'ASSIGNED') ? 0 : (session?.currentLevel || 1);
 
     // Tab Accessibility
@@ -289,7 +301,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         if (status === 'COMPLETED') return true;
 
         // Find the level corresponding to this tab index (1-based index)
-        const level = levels[index - 1];
+        const level = visibleLevels[index - 1];
         if (!level) return false;
 
         // Check if there is a COMPLETED attempt for this level
@@ -376,6 +388,65 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Generated Report Trait Code</p>
                     <p className="text-sm font-semibold text-gray-800 dark:text-white">{session?.metadata?.traitCode || '--'}</p>
                 </div>
+            </div>
+        );
+    };
+
+    // Normalize the IAT / Metaphor report+job status into a single human label.
+    const reportStatusLabel = (data?: any): string => {
+        const reportStatus = String(data?.report?.status || '').toUpperCase();
+        const jobStatus = String(data?.job?.status || '').toUpperCase();
+        if (reportStatus === 'DONE' || reportStatus === 'COMPLETED') return 'Processed';
+        if (jobStatus === 'PROCESSING' || reportStatus === 'PROCESSING') return 'Processing';
+        if (jobStatus === 'FAILED' || reportStatus === 'FAILED') return 'Failed';
+        if (jobStatus === 'PENDING' || jobStatus === 'SCHEDULED') return 'Scheduled';
+        if (data?.report) return 'Processed';
+        return jobStatus ? 'Scheduled' : '--';
+    };
+
+    // Compact stats bar for the IAT Gen & Metaphor tabs — only the timing /
+    // status fields that make sense for those reports (no Maximum Score,
+    // Sincerity, or Trait Code), plus any report-specific extras.
+    const renderReportStatsBar = (
+        attemptData?: any,
+        levelData?: any,
+        extras: { label: string; value: React.ReactNode }[] = [],
+    ) => {
+        const currentStatus = attemptData?.status || status;
+        const isOngoing = currentStatus === 'IN_PROGRESS' || currentStatus === 'ON_GOING';
+        return (
+            <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Exam Starts On</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">{formatDate(attemptData?.startedAt) || '-'}</p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{isOngoing ? 'To be completed by' : 'Ends On'}</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                        {isOngoing ? formatDate(attemptData?.expiresAt) || '-' : formatDate(attemptData?.completedAt) || '-'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Exam Duration</p>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-white">
+                        {levelData?.durationMinutes ? `${levelData.durationMinutes} Minutes` : '--'}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Exam Status</p>
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold
+                    ${currentStatus === 'COMPLETED' ? 'bg-[#00B69B] text-white' :
+                            isOngoing ? 'bg-[#F59E0B] text-black' :
+                                'bg-gray-600 text-gray-200'}`}>
+                        {String(currentStatus).replace(/_/g, ' ')}
+                    </span>
+                </div>
+                {extras.map((extra, i) => (
+                    <div key={i}>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{extra.label}</p>
+                        <p className="text-sm font-semibold text-gray-800 dark:text-white">{extra.value}</p>
+                    </div>
+                ))}
             </div>
         );
     };
@@ -959,7 +1030,12 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                 retrying={metaphorRetrying}
                 onRetry={handleRetryMetaphorReport}
                 formatDate={formatDate}
-                stats={renderStatsBar(levelAttempt, levelData)}
+                stats={renderReportStatsBar(levelAttempt, levelData, [
+                    { label: 'Generated Questions', value: metaphorData?.total ?? '--' },
+                    { label: 'Submitted Questions', value: metaphorData?.answered ?? '--' },
+                    { label: 'Missing Questions', value: metaphorData?.missing ?? '--' },
+                    { label: 'Report Status', value: reportStatusLabel(metaphorData) },
+                ])}
                 displayData={displayData}
             />
         );
@@ -973,7 +1049,9 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                 retrying={iatRetrying}
                 onRetry={handleRetryIatReport}
                 formatDate={formatDate}
-                stats={renderStatsBar(levelAttempt, levelData)}
+                stats={renderReportStatsBar(levelAttempt, levelData, [
+                    { label: 'Report Status', value: reportStatusLabel(iatData) },
+                ])}
             />
         );
     };
@@ -993,9 +1071,11 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     };
 
 
-    // Level 2 is configured as "ACI", but a candidate may instead have taken
-    // the IATGen variant. Label the tab accordingly so it doesn't read "ACI"
-    // for IATGen takers.
+    // IAT Gen is now its own dedicated level (named "IAT Gen"), so each level
+    // tab just uses the level's own name. The only special case is LEGACY data
+    // where IAT was taken as a Level-2 variant (the Level-2 attempt's own
+    // metadata is IAT_GEN and there is no dedicated IAT level) — relabel that
+    // single tab so it doesn't read "ACI" for those old takers.
     const getLevelTabLabel = (lvl: any): string => {
         const lvlNumber = Number(lvl?.levelNumber || lvl?.level_number || 0);
         if (lvlNumber !== 2) return lvl?.name;
@@ -1006,8 +1086,9 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         const kind = String(
             lvlAttempt?.metadata?.assessment_kind || lvlAttempt?.metadata?.assessmentKind || ''
         ).toUpperCase();
-        const isIatLevel2 = kind === 'IAT_GEN' || Boolean(iatData?.attempt);
-        return isIatLevel2 ? 'IATGen' : lvl?.name;
+        // Only the Level-2 attempt's OWN metadata counts here — not the global
+        // iatData, which now refers to the dedicated IAT level.
+        return kind === 'IAT_GEN' ? 'IATGen' : lvl?.name;
     };
 
     const renderOverallReport = () => {
@@ -1026,7 +1107,23 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
             (a.assessmentLevel && String(a.assessmentLevel.id) === String(aciLevel?.id))
         );
         const aciKind = String(aciAttempt?.metadata?.assessment_kind || aciAttempt?.metadata?.assessmentKind || '').toUpperCase();
-        const hasIatLevel2 = aciKind === 'IAT_GEN' || Boolean(iatData?.attempt);
+        // LEGACY only: old sessions where IAT replaced ACI at Level 2. The new
+        // dedicated IAT level is rendered as its own section below instead.
+        const hasIatLevel2 = aciKind === 'IAT_GEN';
+
+        // Dedicated IAT Gen level (the new model).
+        const iatLevel = levels.find(l =>
+            String(l.patternType || l.pattern_type || '').toUpperCase() === 'IAT_GEN' ||
+            l.name === 'IAT Gen'
+        );
+        const iatLevelAttempt = session?.attempts?.find((a: any) =>
+            String(a.assessmentLevelId) === String(iatLevel?.id) ||
+            (a.assessmentLevel && String(a.assessmentLevel.id) === String(iatLevel?.id))
+        );
+        // Require a real attempt on the dedicated IAT level — not the global
+        // iatData, which for legacy sessions resolves to the Level-2 IAT and
+        // would double-render the section.
+        const hasDedicatedIat = Boolean(iatLevel && iatLevelAttempt);
 
         return (
             <div className="flex flex-col">
@@ -1061,6 +1158,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                                     {hasIatLevel2
                                         ? renderIatReport(aciAttempt, aciLevel)
                                         : renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
+                                    {hasDedicatedIat && renderIatReport(iatLevelAttempt, iatLevel)}
                                 </>
                             );
                         })()}
@@ -1104,7 +1202,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                         {activeTab === 0 && <span className='bg-brand-green rounded-full p-[1px]'><CheckIcon className="w-2 h-2 text-black" /></span>}
                     </div>
                     {/* Level Tabs */}
-                    {levels.map((lvl, idx) => {
+                    {visibleLevels.map((lvl, idx) => {
                         const tabIndex = idx + 1;
                         const accessible = isTabAccessible(tabIndex);
                         const isActive = activeTab === tabIndex;
@@ -1129,28 +1227,8 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             </div>
                         );
                     })}
-                    {/* Survey Tab — always shown; enabled only if the candidate had survey questions */}
-                    {(() => {
-                        const surveyTabIndex = levels.length + 1;
-                        const isActive = activeTab === surveyTabIndex;
-                        return (
-                            <div
-                                onClick={() => hasSurvey && setActiveTab(surveyTabIndex)}
-                                className={`flex items-center gap-2 text-sm font-medium pb-4 transition-colors whitespace-nowrap ${isActive
-                                    ? 'text-brand-green border-b-2 border-brand-green font-bold cursor-default'
-                                    : hasSurvey
-                                        ? 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer'
-                                        : 'text-gray-400 dark:text-white/50 cursor-not-allowed'
-                                    }`}
-                                title={hasSurvey ? 'Survey responses' : 'No survey questions in this assessment'}
-                            >
-                                Survey
-                                {!isActive && !hasSurvey && (
-                                    <LockIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
-                                )}
-                            </div>
-                        );
-                    })()}
+                    {/* Survey is no longer a separate tab — its responses are
+                        shown inside the Behavioral Insight tab below. */}
                 </div>
 
                 {/* Progress Indicator */}
@@ -1175,13 +1253,10 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
             {/* Main Content Area */}
             {activeTab === 0 ? renderOverallReport() :
-                activeTab === levels.length + 1 ? (
-                    <SurveyAnswersView data={surveyData} loading={surveyLoading} />
-                ) :
                 // Level Reports
                 (() => {
                     const levelIndex = activeTab - 1;
-                    const level = levels[levelIndex];
+                    const level = visibleLevels[levelIndex];
 
                     // Find the attempt corresponding to this level generically
                     const attempt = session?.attempts?.find((a: any) => {
@@ -1195,10 +1270,15 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                     const patternType = String(level?.pattern_type || level?.patternType || attempt?.assessmentLevel?.patternType || '').toLowerCase();
                     const levelNumber = Number(level?.levelNumber || level?.level_number || attempt?.assessmentLevel?.levelNumber || 0);
                     const assessmentKind = String(attempt?.metadata?.assessment_kind || attempt?.metadata?.assessmentKind || '').toUpperCase();
-                    const isIat = levelNumber === 2 && (assessmentKind === 'IAT_GEN' || Boolean(iatData?.attempt));
-                    const isMetaphor = patternType === 'metaphor' || levelName.includes('metaphor') || levelNumber === 3;
+                    // Dedicated IAT Gen level (pattern_type IAT_GEN / "IAT Gen"),
+                    // plus the legacy case where IAT was a Level-2 variant.
+                    const isIat =
+                        patternType === 'iat_gen' ||
+                        levelName.includes('iat') ||
+                        (levelNumber === 2 && assessmentKind === 'IAT_GEN');
+                    const isMetaphor = patternType === 'metaphor' || levelName.includes('metaphor') || levelNumber === 4;
                     const isDisc = patternType === 'disc' || levelName.includes('disc') || levelName === 'behavioral insight';
-                    const isAci = patternType === 'aci' || levelName.includes('aci') || levelName.includes('agile');
+                    const isAci = (patternType === 'aci' || levelName.includes('aci') || levelName.includes('agile')) && !isIat;
 
                     if (isIat) {
                         return renderIatReport(attempt, level);
@@ -1206,7 +1286,18 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                         return renderMetaphorReport(attempt, level);
                     } else if (isDisc) {
                         const { breakdown, compatibility } = getDiscData(attempt);
-                        return renderLevelReport('DISC', breakdown, compatibility, attempt, level);
+                        return (
+                            <>
+                                {renderLevelReport('DISC', breakdown, compatibility, attempt, level)}
+                                {/* Survey responses live inside the Behavioral
+                                    Insight tab (no separate Survey tab). */}
+                                {hasSurvey && (
+                                    <div className="mt-6">
+                                        <SurveyAnswersView data={surveyData} loading={surveyLoading} />
+                                    </div>
+                                )}
+                            </>
+                        );
                     } else if (isAci) {
                         const { breakdown, compatibility } = getAciData(attempt);
                         return renderLevelReport('ACI', breakdown, compatibility, attempt, level);

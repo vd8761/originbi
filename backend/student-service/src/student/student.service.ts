@@ -48,6 +48,7 @@ import { SmsService, SmsTemplate } from '../sms/sms.service';
 import { SubscriptionService } from './subscription.service';
 import { MetaphorGenerationService } from '../metaphor/metaphor-generation.service';
 import { IatEligibilityService } from '../iat/iat-eligibility.service';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
 
 export interface AssessmentProgressItem {
   id: number;
@@ -104,7 +105,55 @@ export class StudentService {
     private readonly subscriptionService: SubscriptionService,
     private readonly metaphorGeneration: MetaphorGenerationService,
     private readonly iatEligibility: IatEligibilityService,
+    private readonly levelEligibility: LevelEligibilityService,
   ) {}
+
+  /**
+   * Resolve the assessment levels a registration should receive, in order,
+   * from the admin-configurable `levels.*` settings (enable flag +
+   * program/department/board scope). Replaces the old mandatory-only lookup.
+   */
+  private async resolveEnabledLevels(
+    registration: Registration,
+    programId: number,
+  ): Promise<AssessmentLevel[]> {
+    const levels = await this.levelRepo.find({
+      order: { sortOrder: 'ASC' },
+    });
+
+    let departmentId: number | string | null = null;
+    if (registration.departmentDegreeId) {
+      const rows = (await this.levelRepo.manager.query(
+        `SELECT department_id FROM department_degrees WHERE id = $1 LIMIT 1`,
+        [registration.departmentDegreeId],
+      )) as Array<{ department_id: number | string | null }>;
+      departmentId = rows?.[0]?.department_id ?? null;
+    }
+
+    return this.levelEligibility.filterEnabledLevels(levels, {
+      programId,
+      departmentDegreeId: registration.departmentDegreeId,
+      departmentId,
+      studentBoard: registration.studentBoard,
+    });
+  }
+
+  /** True when a level is the Metaphor level, robust to its level number. */
+  private isMetaphorLevel(level: AssessmentLevel): boolean {
+    return (
+      String(level.patternType || '').toUpperCase() === 'METAPHOR' ||
+      Boolean(level.name?.toLowerCase().includes('metaphor'))
+    );
+  }
+
+  /** True when a level is the Level 1 Behavioral (DISC) level. */
+  private isBehavioralLevel(level: AssessmentLevel): boolean {
+    return (
+      level.levelNumber === 1 ||
+      String(level.patternType || '').toUpperCase() === 'DISC' ||
+      Boolean(level.name?.includes('Level 1'))
+    );
+  }
 
   /**
    * Creates a configured nodemailer transporter backed by AWS SES v2.
@@ -633,22 +682,26 @@ export class StudentService {
           ? metadataAssessmentKind.toUpperCase()
           : '') || '';
       if (!assessmentKind) {
-        if (level?.levelNumber === 1 || level?.patternType === 'DISC') {
+        const patternType = String(level?.patternType || '').toUpperCase();
+        // Levels are now distinct: 1 = DISC, 2 = ACI, 3 = IAT Gen,
+        // 4 = Metaphor. Prefer pattern_type so the mapping survives any future
+        // renumbering; fall back to the level number for legacy rows.
+        if (level?.levelNumber === 1 || patternType === 'DISC') {
           assessmentKind = 'DISC';
         } else if (
+          patternType === 'IAT_GEN' ||
           level?.levelNumber === 3 ||
-          level?.name?.toLowerCase().includes('metaphor') ||
-          String(level?.patternType || '').toUpperCase() === 'METAPHOR'
+          Boolean(level?.name?.toUpperCase().includes('IAT'))
+        ) {
+          assessmentKind = 'IAT_GEN';
+        } else if (
+          patternType === 'METAPHOR' ||
+          level?.levelNumber === 4 ||
+          Boolean(level?.name?.toLowerCase().includes('metaphor'))
         ) {
           assessmentKind = 'METAPHOR';
-        } else if (
-          level?.levelNumber === 2 ||
-          String(level?.patternType || '').toUpperCase() === 'ACI'
-        ) {
-          assessmentKind =
-            await this.iatEligibility.getAssessmentKindForRegistration(
-              attempt.registrationId,
-            );
+        } else if (level?.levelNumber === 2 || patternType === 'ACI') {
+          assessmentKind = 'ACI';
         }
       }
 
@@ -907,7 +960,7 @@ export class StudentService {
        FROM assessment_attempts aa
        JOIN assessment_levels al ON al.id = aa.assessment_level_id
        WHERE aa.assessment_session_id = $1
-         AND (LOWER(al.name) LIKE '%metaphor%' OR LOWER(COALESCE(al.pattern_type, '')) = 'metaphor' OR al.level_number = 3)
+         AND (LOWER(al.name) LIKE '%metaphor%' OR LOWER(COALESCE(al.pattern_type, '')) = 'metaphor' OR al.level_number = 4)
        ORDER BY aa.id DESC
        LIMIT 1`,
       [session.id],
@@ -1067,9 +1120,10 @@ export class StudentService {
        FROM assessment_attempts aa
        JOIN assessment_levels al ON al.id = aa.assessment_level_id
        WHERE aa.assessment_session_id = $1
-         AND al.level_number = 2
          AND (
-           aa.metadata->>'assessment_kind' = 'IAT_GEN'
+           al.level_number = 3
+           OR UPPER(COALESCE(al.pattern_type, '')) = 'IAT_GEN'
+           OR aa.metadata->>'assessment_kind' = 'IAT_GEN'
            OR EXISTS (
              SELECT 1 FROM iat_attempt_modules iam
              WHERE iam.assessment_attempt_id = aa.id
@@ -1692,14 +1746,12 @@ export class StudentService {
       const savedSession = await this.sessionRepo.save(session);
 
       // 7. Create Attempts (Level 1 Mandated)
-      // Fetch Level 1
-      const levels = await this.levelRepo.find({
-        where: { isMandatory: true },
-        order: { levelNumber: 'ASC' },
-      });
+      // Resolve the levels enabled for this registration (enable flag +
+      // program/department/board scope), ordered Level 1 -> N.
+      const levels = await this.resolveEnabledLevels(savedReg, program.id);
 
       this.logger.log(
-        `[Register Debug] Found ${levels.length} mandatory levels`,
+        `[Register Debug] Resolved ${levels.length} enabled level(s)`,
       );
 
       for (const level of levels) {
@@ -1718,8 +1770,8 @@ export class StudentService {
         });
         const savedAttempt = await this.attemptRepo.save(attempt);
 
-        // Generate Questions for Level 1
-        if (level.levelNumber === 1 || level.name.includes('Level 1')) {
+        // Generate Questions for Level 1 (Behavioral)
+        if (this.isBehavioralLevel(level)) {
           this.logger.log(
             `[Register Debug] Generating questions for Level 1 (Attempt ID: ${savedAttempt.id})`,
           );
@@ -1730,13 +1782,10 @@ export class StudentService {
             level,
           );
         }
-        // Generate Level 3 (Metaphor) questions — gated + NON-FATAL: a metaphor
+        // Generate Metaphor questions — gated + NON-FATAL: a metaphor
         // failure must never break the core registration / Level 1.
-        else if (
-          level.levelNumber === 3 ||
-          level.name?.includes('Metaphor') ||
-          (level as any).patternType === 'METAPHOR'
-        ) {
+        // Matched by pattern_type so it is robust to the level number.
+        else if (this.isMetaphorLevel(level)) {
           try {
             await this.metaphorGeneration.generate(
               savedAttempt,

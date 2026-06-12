@@ -615,7 +615,7 @@ export class AssessmentService {
        FROM assessment_attempts aa
        JOIN assessment_levels al ON al.id = aa.assessment_level_id
        WHERE aa.assessment_session_id = $1
-         AND (LOWER(al.name) LIKE '%metaphor%' OR LOWER(COALESCE(al.pattern_type, '')) = 'metaphor' OR al.level_number = 3)
+         AND (LOWER(al.name) LIKE '%metaphor%' OR LOWER(COALESCE(al.pattern_type, '')) = 'metaphor' OR al.level_number = 4)
        ORDER BY aa.id DESC
        LIMIT 1`,
       [sessionId],
@@ -777,9 +777,10 @@ export class AssessmentService {
        FROM assessment_attempts aa
        JOIN assessment_levels al ON al.id = aa.assessment_level_id
        WHERE aa.assessment_session_id = $1
-         AND al.level_number = 2
          AND (
-           aa.metadata->>'assessment_kind' = 'IAT_GEN'
+           al.level_number = 3
+           OR UPPER(COALESCE(al.pattern_type, '')) = 'IAT_GEN'
+           OR aa.metadata->>'assessment_kind' = 'IAT_GEN'
            OR EXISTS (
              SELECT 1 FROM iat_attempt_modules iam
              WHERE iam.assessment_attempt_id = aa.id
