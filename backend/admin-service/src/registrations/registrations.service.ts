@@ -406,6 +406,7 @@ export class RegistrationsService {
             currentYear: dto.currentYear,
             currentRole,
             roleDescription,
+            employeeLevel: dto.employeeLevel,
             examStart: dto.examStart,
             examEnd: dto.examEnd,
             departmentId: dto.departmentId ?? null,

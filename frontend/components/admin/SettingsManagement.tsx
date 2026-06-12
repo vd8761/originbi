@@ -331,16 +331,17 @@ export default function SettingsManagement() {
         if (item.valueType === 'string' || item.valueType === 'number') {
             if (item.category === 'metaphor' && item.key === 'question_selection_mode') {
                 return (
-                    <select
-                        id={item.key}
-                        disabled={item.isReadonly}
-                        value={String(item.value || 'random_single_set')}
-                        onChange={(e) => handleValueChange(item.category, item.key, e.target.value)}
-                        className={`block w-full max-w-lg rounded-xl border-0 py-2.5 px-4 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm sm:leading-6 transition-all cursor-pointer ${item.isReadonly ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-black/20' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
-                    >
-                        <option value="random_single_set">Pick random N questions from a random single set</option>
-                        <option value="random_all_sets">Pick random N questions from all sets</option>
-                    </select>
+                    <div className="block w-full max-w-lg">
+                        <SettingsSelect
+                            value={String(item.value || 'random_single_set')}
+                            disabled={item.isReadonly}
+                            options={[
+                                { value: 'random_single_set', label: 'Pick random N questions from a random single set' },
+                                { value: 'random_all_sets', label: 'Pick random N questions from all sets' },
+                            ]}
+                            onChange={(next) => handleValueChange(item.category, item.key, next)}
+                        />
+                    </div>
                 );
             }
 
@@ -431,6 +432,19 @@ export default function SettingsManagement() {
                     <DistributionEditor
                         value={Array.isArray(item.value) ? item.value : []}
                         isReadonly={item.isReadonly}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            // Per-program main-question generation mode (object keyed by
+            // program id -> { mode, count }).
+            if (item.category === 'assessment' && item.key === 'question_generation_mode') {
+                return (
+                    <GenerationModeEditor
+                        value={item.value && typeof item.value === 'object' && !Array.isArray(item.value) ? item.value : {}}
+                        isReadonly={item.isReadonly}
+                        programOptions={programOptions}
                         onChange={(next) => handleValueChange(item.category, item.key, next)}
                     />
                 );
@@ -1184,6 +1198,108 @@ function DistributionEditor({
                     Total open questions per assessment: <strong className="text-gray-700 dark:text-gray-200">{total}</strong>
                 </span>
             </div>
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Per-program main-question generation mode editor.
+// Value shape: { [programId]: { mode, count } }
+// ------------------------------------------------------------------
+const GENERATION_MODES: SelectOption[] = [
+    { value: 'random_set_shuffled', label: 'Random set, shuffled questions' },
+    { value: 'random_set_ordered', label: 'Random set, ordered (first N)' },
+    { value: 'random_all_sets', label: 'Random N from all sets' },
+];
+
+interface GenerationModeConfig {
+    mode: string;
+    count: number;
+}
+
+function GenerationModeEditor({
+    value,
+    isReadonly,
+    programOptions,
+    onChange,
+}: {
+    value: Record<string, GenerationModeConfig>;
+    isReadonly: boolean;
+    programOptions: SelectOption[];
+    onChange: (next: Record<string, GenerationModeConfig>) => void;
+}) {
+    const DEFAULT: GenerationModeConfig = { mode: 'random_set_shuffled', count: 40 };
+
+    const configFor = (programId: string): GenerationModeConfig => {
+        const cfg = value?.[programId];
+        return {
+            mode: cfg?.mode || DEFAULT.mode,
+            count: Number(cfg?.count) > 0 ? Number(cfg.count) : DEFAULT.count,
+        };
+    };
+
+    const update = (programId: string, patch: Partial<GenerationModeConfig>) => {
+        const current = configFor(programId);
+        onChange({ ...value, [programId]: { ...current, ...patch } });
+    };
+
+    return (
+        <div className="w-full max-w-5xl space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[640px]">
+                    <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-3 py-2 font-medium w-[35%]">Program</th>
+                            <th className="px-3 py-2 font-medium w-72">Generation Mode</th>
+                            <th className="px-3 py-2 font-medium w-28">Count</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        {programOptions.length === 0 && (
+                            <tr>
+                                <td colSpan={3} className="px-3 py-4 text-center text-gray-400 dark:text-gray-500">
+                                    No programs found.
+                                </td>
+                            </tr>
+                        )}
+                        {programOptions.map((program) => {
+                            const cfg = configFor(program.value);
+                            return (
+                                <tr key={program.value} className="bg-white dark:bg-transparent">
+                                    <td className="px-3 py-2 text-gray-900 dark:text-white font-medium">
+                                        {program.label}
+                                        {program.description && (
+                                            <span className="ml-1 text-xs text-gray-400">({program.description})</span>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <SettingsSelect
+                                            value={cfg.mode}
+                                            disabled={isReadonly}
+                                            options={GENERATION_MODES}
+                                            onChange={(next) => update(program.value, { mode: next })}
+                                            size="sm"
+                                        />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            disabled={isReadonly}
+                                            value={cfg.count}
+                                            onChange={(e) => update(program.value, { count: Number(e.target.value) || 1 })}
+                                            className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                        />
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                For the Employee program, the candidate's Level (Entry/Medium/Executive) further filters which question sets are eligible. Programs left at "Random set, shuffled" with count 40 keep the legacy behaviour.
+            </p>
         </div>
     );
 }

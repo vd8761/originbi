@@ -1150,6 +1150,7 @@ export class BulkCorporateRegistrationsService {
 
     isCollege = pCode && pCode.toUpperCase().includes('COLLEGE');
     isSchool = pCode && pCode.toUpperCase().includes('SCHOOL');
+    const isEmployee = !!pCode && !isCollege && !isSchool;
 
     // Resolve DepartmentDegreeId
     let departmentDegreeId: string | undefined = undefined;
@@ -1232,6 +1233,16 @@ export class BulkCorporateRegistrationsService {
           'Role Description',
           'roleDescription',
         ]) || undefined,
+      employeeLevel: isEmployee
+        ? this.normalizeEmployeeLevel(
+            this.getValue(rawData, [
+              'Level',
+              'EmployeeLevel',
+              'employee_level',
+              'level',
+            ]),
+          )
+        : undefined,
 
       password:
         this.getValue(rawData, ['Password', 'password']) || 'Welcome@123',
@@ -1451,6 +1462,19 @@ export class BulkCorporateRegistrationsService {
 
       if (!role) return 'Current Role is required for Employee programs';
       if (!desc) return 'Role Description is required for Employee programs';
+
+      // Level is optional (defaults to Entry), but reject clearly-invalid values.
+      const levelRaw =
+        row['Level'] ||
+        row['EmployeeLevel'] ||
+        row['employee_level'] ||
+        row['level'];
+      if (levelRaw) {
+        const lvl = this.normalizeString(String(levelRaw));
+        if (!['entry', 'medium', 'mid', 'executive', 'exec'].includes(lvl)) {
+          return `Level '${levelRaw}' invalid. Must be Entry, Medium, or Executive`;
+        }
+      }
     }
 
     // 4. Dates
@@ -1524,6 +1548,18 @@ export class BulkCorporateRegistrationsService {
 
   private normalizeString(str: string): string {
     return str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+  }
+
+  /**
+   * Maps a free-text Employee "Level" cell to the canonical
+   * Entry/Medium/Executive value. Defaults to 'Entry' when blank/unknown,
+   * matching the registration form's default.
+   */
+  private normalizeEmployeeLevel(raw?: string): string {
+    const norm = this.normalizeString(raw || '');
+    if (norm === 'medium' || norm === 'mid') return 'Medium';
+    if (norm === 'executive' || norm === 'exec') return 'Executive';
+    return 'Entry';
   }
 
   private parseDateTime(val: any): Date {

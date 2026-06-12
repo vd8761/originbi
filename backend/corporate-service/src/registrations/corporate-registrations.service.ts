@@ -334,6 +334,7 @@ export class CorporateRegistrationsService {
             currentYear: dto.currentYear,
             currentRole,
             roleDescription,
+            employeeLevel: dto.employeeLevel,
           },
         });
         await manager.save(registration);
@@ -608,6 +609,7 @@ export class CorporateRegistrationsService {
             currentYear: dto.currentYear,
             currentRole,
             roleDescription,
+            employeeLevel: dto.employeeLevel,
           },
         });
         await manager.save(registration);
