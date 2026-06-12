@@ -46,8 +46,8 @@ const RegistrationManagement: React.FC = () => {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab') as "registrations" | "individual" | "group" | "send-emails";
 
-  // Group Assessments view mode: combined "By Group" (default) vs per-window "By Assessment".
-  const initialGroupView = (searchParams.get('groupView') as "group" | "assessment") || "group";
+  // Group Assessments view mode: per-window "By Assessment" (default) vs combined "By Group".
+  const initialGroupView = (searchParams.get('groupView') as "group" | "assessment") || "assessment";
   const [groupView, setGroupView] = useState<"group" | "assessment">(initialGroupView);
   const [selectedGroupCombined, setSelectedGroupCombined] = useState<{ groupId: string; programId: string } | null>(null);
 

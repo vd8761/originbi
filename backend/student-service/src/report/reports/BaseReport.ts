@@ -390,6 +390,39 @@ export class BaseReport {
   }
 
   /**
+   * Determines whether usable ACI (Agile Compatibility Index) data is present.
+   *
+   * A report is allowed to generate from DISC data alone; ACI-dependent
+   * sections must call this guard and skip themselves when it returns false.
+   * An entry is considered "missing" when the array is empty/undefined or all
+   * five agile values are absent/zero (the shape we see for students who have
+   * not completed the ACI assessment).
+   *
+   * @param agileScores - The `agile_scores` array from the report data.
+   */
+  protected hasAci(
+    agileScores?:
+      | {
+          commitment?: number;
+          focus?: number;
+          openness?: number;
+          respect?: number;
+          courage?: number;
+        }[]
+      | null,
+  ): boolean {
+    const a = agileScores?.[0];
+    if (!a) return false;
+    const sum =
+      (a.commitment ?? 0) +
+      (a.focus ?? 0) +
+      (a.openness ?? 0) +
+      (a.respect ?? 0) +
+      (a.courage ?? 0);
+    return sum > 0;
+  }
+
+  /**
    * Checks if there is enough vertical space remaining on the current page.
    * If not, it adds a new page.
    *

@@ -701,90 +701,112 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             {/* Download Modal - Redesigned */}
             {showDownloadModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDownloadModal(false)}></div>
-                    <div className="bg-white dark:bg-[#19211C] rounded-2xl w-full max-w-lg p-0 shadow-2xl relative z-10 animate-fade-in-up overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadModal(false)}></div>
+                    <div className="bg-white dark:bg-[#19211C] rounded-2xl w-full max-w-lg p-0 shadow-2xl relative z-10 animate-fade-in-up overflow-hidden flex flex-col max-h-[90vh] ring-1 ring-black/5 dark:ring-white/10">
+                        {/* Accent bar */}
+                        <div className="h-1 w-full bg-gradient-to-r from-brand-green via-emerald-400 to-brand-green"></div>
+
                         {/* Modal Header */}
-                        <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-white/10">
-                            <div>
-                                <h3 className="text-xl font-bold text-brand-dark-primary dark:text-white">Process Report</h3>
-                                <p className="text-sm text-gray-500 mt-1">Select a department, then download or send via email.</p>
+                        <div className="flex justify-between items-start gap-4 px-6 pt-5 pb-4 border-b border-gray-100 dark:border-white/10">
+                            <div className="flex items-start gap-3 min-w-0">
+                                <div className="shrink-0 mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-green/10 text-brand-green ring-1 ring-brand-green/20">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="text-lg font-bold text-brand-dark-primary dark:text-white leading-tight">Process Report</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Select a department, choose a report type, then download or email it.</p>
+                                </div>
                             </div>
                             <button
                                 onClick={() => setShowDownloadModal(false)}
-                                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                                className="shrink-0 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                             >
-                                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
 
                         {/* Modal Body */}
-                        <div className="p-6 overflow-y-auto">
+                        <div className="px-6 py-5 overflow-y-auto space-y-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                             {/* Department List */}
-                            {departmentStats.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    No departments found for this group.
-                                </div>
-                            ) : (
-                                <div className="space-y-3 mb-6">
-                                    {departmentStats.map((dept) => {
-                                        // MBA departments get a special placement report — mirror the
-                                        // backend isMBA detection in reportQueueService.processPlacementReport.
-                                        const isMBA = (dept.name || '').toUpperCase().includes('MBA');
-                                        return (
-                                        <div
-                                            key={dept.id}
-                                            onClick={() => {
-                                                setSelectedDepartment(dept.id);
-                                                // If the current report type isn't compatible with
-                                                // the newly-selected department, snap to a sensible
-                                                // default ("mba" only valid for MBA depts).
-                                                if (reportType === 'mba' && !isMBA) setReportType('standard');
-                                            }}
-                                            className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-4 group
-                                                ${selectedDepartment === dept.id
-                                                    ? 'border-brand-green bg-brand-green/10 ring-1 ring-brand-green'
-                                                    : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
-                                        >
-                                            <div className="flex items-center gap-4 min-w-0 flex-1">
-                                                <div className={`w-5 h-5 shrink-0 rounded-full border flex items-center justify-center
-                                                    ${selectedDepartment === dept.id ? 'border-brand-green bg-brand-green' : 'border-gray-400'}`}>
-                                                    {selectedDepartment === dept.id && <div className="w-2 h-2 rounded-full bg-brand-dark-primary"></div>}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <p className={`font-semibold ${selectedDepartment === dept.id ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
-                                                            {dept.name}
-                                                        </p>
-                                                        {isMBA && (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md whitespace-nowrap shadow-sm bg-gradient-to-r from-amber-300 to-yellow-500 text-amber-900 ring-1 ring-amber-500/50">
-                                                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                                                                    <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
-                                                                </svg>
-                                                                Special MBA Report
-                                                            </span>
-                                                        )}
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">Department</p>
+                                {departmentStats.length === 0 ? (
+                                    <div className="text-center py-8 text-sm text-gray-500 rounded-xl border border-dashed border-gray-200 dark:border-white/10">
+                                        No departments found for this group.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {departmentStats.map((dept) => {
+                                            // MBA departments get a special placement report — mirror the
+                                            // backend isMBA detection in reportQueueService.processPlacementReport.
+                                            const isMBA = (dept.name || '').toUpperCase().includes('MBA');
+                                            const isSelected = selectedDepartment === dept.id;
+                                            const pct = Math.round((dept.completed / (dept.total || 1)) * 100);
+                                            const isComplete = dept.completed === dept.total && dept.total > 0;
+                                            return (
+                                                <div
+                                                    key={dept.id}
+                                                    onClick={() => {
+                                                        setSelectedDepartment(dept.id);
+                                                        // If the current report type isn't compatible with
+                                                        // the newly-selected department, snap to a sensible
+                                                        // default ("mba" only valid for MBA depts).
+                                                        if (reportType === 'mba' && !isMBA) setReportType('standard');
+                                                    }}
+                                                    className={`p-4 rounded-xl border cursor-pointer transition-all
+                                                        ${isSelected
+                                                            ? 'border-brand-green bg-brand-green/[0.07] ring-1 ring-brand-green shadow-sm'
+                                                            : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                            <div className={`w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors
+                                                                ${isSelected ? 'border-brand-green bg-brand-green' : 'border-gray-300 dark:border-gray-500'}`}>
+                                                                {isSelected && <div className="w-2 h-2 rounded-full bg-brand-dark-primary"></div>}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <p className={`font-semibold text-sm truncate ${isSelected ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
+                                                                        {dept.name}
+                                                                    </p>
+                                                                    {isMBA && (
+                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md whitespace-nowrap shadow-sm bg-gradient-to-r from-amber-300 to-yellow-500 text-amber-900 ring-1 ring-amber-500/50">
+                                                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                                <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
+                                                                            </svg>
+                                                                            Special MBA
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                                                    {dept.completed} of {dept.total || 0} candidates completed
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <span className={`shrink-0 inline-block whitespace-nowrap text-xs font-bold px-2 py-1 rounded-md
+                                                            ${isComplete
+                                                                ? 'bg-brand-green/15 text-brand-green'
+                                                                : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'}`}>
+                                                            {pct}%
+                                                        </span>
                                                     </div>
-                                                    <p className="text-xs text-gray-500 mt-0.5">
-                                                        {dept.completed} candidates completed
-                                                    </p>
+                                                    {/* Progress bar */}
+                                                    <div className="mt-3 h-1.5 w-full rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-brand-green' : 'bg-brand-green/60'}`}
+                                                            style={{ width: `${pct}%` }}
+                                                        ></div>
+                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            <div className="text-right shrink-0">
-                                                <span className={`inline-block whitespace-nowrap text-xs font-bold px-2 py-1 rounded-md ${dept.completed === dept.total
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
-                                                    }`}>
-                                                    {Math.round((dept.completed / (dept.total || 1)) * 100)}% Done
-                                                </span>
-                                            </div>
-                                        </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Report Type Chooser — always available. The
                                 "Special MBA Report" tile only shows for MBA
@@ -813,11 +835,11 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                     },
                                 ];
                                 const options = allOptions.filter((o) => (o.mbaOnly ? isMBASel : true));
-                                const cols = options.length >= 3 ? 'grid-cols-3' : 'grid-cols-2';
+                                const cols = options.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
                                 return (
-                                    <div className="mb-6">
-                                        <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5 block">Report Type</label>
-                                        <div className={`grid ${cols} gap-2`}>
+                                    <div>
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">Report Type</p>
+                                        <div className={`grid grid-cols-1 ${cols} gap-2.5`}>
                                             {options.map((opt) => {
                                                 const active = reportType === opt.value;
                                                 return (
@@ -825,24 +847,32 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                                         type="button"
                                                         key={opt.value}
                                                         onClick={() => setReportType(opt.value)}
-                                                        className={`text-left p-3 rounded-xl border transition-all ${active
-                                                            ? 'border-brand-green bg-brand-green/10 ring-1 ring-brand-green'
+                                                        className={`relative text-left p-3.5 rounded-xl border transition-all ${active
+                                                            ? 'border-brand-green bg-brand-green/[0.07] ring-1 ring-brand-green shadow-sm'
                                                             : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
                                                     >
-                                                        <div className="flex items-center gap-2">
+                                                        {active && (
+                                                            <span className="absolute top-2.5 right-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-green text-brand-dark-primary">
+                                                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                            </span>
+                                                        )}
+                                                        <div className="flex items-center gap-2 pr-5">
                                                             {opt.value === 'mba' && (
-                                                                <svg className="w-3.5 h-3.5 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                <svg className="w-4 h-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                                                     <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
                                                                 </svg>
                                                             )}
                                                             {opt.value === 'level1' && (
-                                                                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-brand-green/20 text-brand-green text-[9px] font-bold">L1</span>
+                                                                <span className="inline-flex shrink-0 items-center justify-center w-4 h-4 rounded-full bg-brand-green/20 text-brand-green text-[9px] font-bold">L1</span>
                                                             )}
-                                                            <p className={`text-sm font-semibold ${active ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
+                                                            {opt.value === 'standard' && (
+                                                                <svg className="w-4 h-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6h6v6m-9 4h12a2 2 0 002-2V7a2 2 0 00-2-2h-4l-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                            )}
+                                                            <p className={`text-sm font-semibold leading-tight ${active ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
                                                                 {opt.title}
                                                             </p>
                                                         </div>
-                                                        <p className="text-[11px] text-gray-500 mt-1 leading-snug">{opt.desc}</p>
+                                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5 leading-snug">{opt.desc}</p>
                                                     </button>
                                                 );
                                             })}
@@ -853,23 +883,29 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
                             {/* Email Input */}
                             <div>
-                                <label className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5 block">Send to Email (optional)</label>
-                                <input
-                                    type="email"
-                                    value={reportEmail}
-                                    onChange={(e) => setReportEmail(e.target.value)}
-                                    placeholder="Enter email address to send report"
-                                    className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green transition-colors"
-                                />
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">Send to Email <span className="normal-case font-normal text-gray-400">(optional)</span></p>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                    </span>
+                                    <input
+                                        type="email"
+                                        value={reportEmail}
+                                        onChange={(e) => setReportEmail(e.target.value)}
+                                        placeholder="Enter email address to send report"
+                                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green transition-colors"
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-[#FFFFFF05] flex gap-3">
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-[#FFFFFF05] flex flex-col-reverse sm:flex-row gap-3">
                             {/* Send Email Button */}
                             <button
                                 onClick={handleSendReportEmail}
                                 disabled={!selectedDepartment || !reportEmail || sendingReportEmail || generating}
-                                className="flex-1 px-4 py-3 rounded-xl border border-brand-green text-brand-green font-bold hover:bg-brand-green/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-green text-brand-green font-bold text-sm hover:bg-brand-green/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {sendingReportEmail ? (
                                     <>
@@ -892,7 +928,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                             <button
                                 onClick={handleConfirmDownload}
                                 disabled={!selectedDepartment || generating || sendingReportEmail}
-                                className="flex-1 px-4 py-3 rounded-xl bg-brand-green text-brand-dark-primary font-bold hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-brand-green text-brand-dark-primary font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {generating ? (
                                     <>

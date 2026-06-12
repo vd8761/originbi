@@ -331,16 +331,17 @@ export default function SettingsManagement() {
         if (item.valueType === 'string' || item.valueType === 'number') {
             if (item.category === 'metaphor' && item.key === 'question_selection_mode') {
                 return (
-                    <select
-                        id={item.key}
-                        disabled={item.isReadonly}
-                        value={String(item.value || 'random_single_set')}
-                        onChange={(e) => handleValueChange(item.category, item.key, e.target.value)}
-                        className={`block w-full max-w-lg rounded-xl border-0 py-2.5 px-4 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green sm:text-sm sm:leading-6 transition-all cursor-pointer ${item.isReadonly ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-black/20' : 'hover:ring-gray-300 dark:hover:ring-white/20'}`}
-                    >
-                        <option value="random_single_set">Pick random N questions from a random single set</option>
-                        <option value="random_all_sets">Pick random N questions from all sets</option>
-                    </select>
+                    <div className="block w-full max-w-lg">
+                        <SettingsSelect
+                            value={String(item.value || 'random_single_set')}
+                            disabled={item.isReadonly}
+                            options={[
+                                { value: 'random_single_set', label: 'Pick random N questions from a random single set' },
+                                { value: 'random_all_sets', label: 'Pick random N questions from all sets' },
+                            ]}
+                            onChange={(next) => handleValueChange(item.category, item.key, next)}
+                        />
+                    </div>
                 );
             }
 
@@ -436,6 +437,19 @@ export default function SettingsManagement() {
                 );
             }
 
+            // Per-program main-question generation mode (object keyed by
+            // program id -> { mode, count }).
+            if (item.category === 'assessment' && item.key === 'question_generation_mode') {
+                return (
+                    <GenerationModeEditor
+                        value={item.value && typeof item.value === 'object' && !Array.isArray(item.value) ? item.value : {}}
+                        isReadonly={item.isReadonly}
+                        programOptions={programOptions}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
             // Level 3 metaphor: STT provider (object) + supported languages (array of objects)
             if (item.category === 'metaphor' && item.key === 'stt_provider') {
                 return (
@@ -459,9 +473,31 @@ export default function SettingsManagement() {
             if (item.category === 'iat' && item.key === 'level2_replacement_rules') {
                 const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
                 return (
-                    <IatRulesEditor
+                    <ScopeRulesEditor
                         value={value}
                         isReadonly={item.isReadonly}
+                        programOptions={programOptions}
+                        departmentOptions={departmentOptions}
+                        departmentDegreeOptions={departmentDegreeOptions}
+                        loading={iatOptionsLoading}
+                        onChange={(next) => handleValueChange(item.category, item.key, next)}
+                    />
+                );
+            }
+
+            // Per-level scope rules (category 'levels', key like
+            // 'level3_scope_rules'). Reuses the same program/department/board
+            // rule editor as the legacy IAT routing.
+            if (item.category === 'levels' && item.key.endsWith('_scope_rules')) {
+                const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
+                const eyebrow = item.label.replace(/\s*\(scope\)\s*$/i, '') || 'Level';
+                return (
+                    <ScopeRulesEditor
+                        value={value}
+                        isReadonly={item.isReadonly}
+                        eyebrow={eyebrow}
+                        heading="Who receives this level"
+                        helpText="Empty selections match everyone. A registration matches when the program matches and at least one selected department, department-degree, or board condition matches. Leave all empty to apply this level to every registration."
                         programOptions={programOptions}
                         departmentOptions={departmentOptions}
                         departmentDegreeOptions={departmentDegreeOptions}
@@ -1167,6 +1203,108 @@ function DistributionEditor({
 }
 
 // ------------------------------------------------------------------
+// Per-program main-question generation mode editor.
+// Value shape: { [programId]: { mode, count } }
+// ------------------------------------------------------------------
+const GENERATION_MODES: SelectOption[] = [
+    { value: 'random_set_shuffled', label: 'Random set, shuffled questions' },
+    { value: 'random_set_ordered', label: 'Random set, ordered (first N)' },
+    { value: 'random_all_sets', label: 'Random N from all sets' },
+];
+
+interface GenerationModeConfig {
+    mode: string;
+    count: number;
+}
+
+function GenerationModeEditor({
+    value,
+    isReadonly,
+    programOptions,
+    onChange,
+}: {
+    value: Record<string, GenerationModeConfig>;
+    isReadonly: boolean;
+    programOptions: SelectOption[];
+    onChange: (next: Record<string, GenerationModeConfig>) => void;
+}) {
+    const DEFAULT: GenerationModeConfig = { mode: 'random_set_shuffled', count: 40 };
+
+    const configFor = (programId: string): GenerationModeConfig => {
+        const cfg = value?.[programId];
+        return {
+            mode: cfg?.mode || DEFAULT.mode,
+            count: Number(cfg?.count) > 0 ? Number(cfg.count) : DEFAULT.count,
+        };
+    };
+
+    const update = (programId: string, patch: Partial<GenerationModeConfig>) => {
+        const current = configFor(programId);
+        onChange({ ...value, [programId]: { ...current, ...patch } });
+    };
+
+    return (
+        <div className="w-full max-w-5xl space-y-3">
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-white/10">
+                <table className="w-full text-sm min-w-[640px]">
+                    <thead className="bg-gray-50 dark:bg-white/5 text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-3 py-2 font-medium w-[35%]">Program</th>
+                            <th className="px-3 py-2 font-medium w-72">Generation Mode</th>
+                            <th className="px-3 py-2 font-medium w-28">Count</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                        {programOptions.length === 0 && (
+                            <tr>
+                                <td colSpan={3} className="px-3 py-4 text-center text-gray-400 dark:text-gray-500">
+                                    No programs found.
+                                </td>
+                            </tr>
+                        )}
+                        {programOptions.map((program) => {
+                            const cfg = configFor(program.value);
+                            return (
+                                <tr key={program.value} className="bg-white dark:bg-transparent">
+                                    <td className="px-3 py-2 text-gray-900 dark:text-white font-medium">
+                                        {program.label}
+                                        {program.description && (
+                                            <span className="ml-1 text-xs text-gray-400">({program.description})</span>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <SettingsSelect
+                                            value={cfg.mode}
+                                            disabled={isReadonly}
+                                            options={GENERATION_MODES}
+                                            onChange={(next) => update(program.value, { mode: next })}
+                                            size="sm"
+                                        />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            disabled={isReadonly}
+                                            value={cfg.count}
+                                            onChange={(e) => update(program.value, { count: Number(e.target.value) || 1 })}
+                                            className="w-full rounded-lg border-0 bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-brand-green"
+                                        />
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+                For the Employee program, the candidate's Level (Entry/Medium/Executive) further filters which question sets are eligible. Programs left at "Random set, shuffled" with count 40 keep the legacy behaviour.
+            </p>
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
 // Level 3 metaphor — STT provider editor (object: {provider, params})
 // ------------------------------------------------------------------
 const STT_PROVIDERS = [
@@ -1456,7 +1594,7 @@ const SCHOOL_BOARD_OPTIONS: SelectOption[] = [
     { value: 'Other', label: 'Other' },
 ];
 
-function IatRulesEditor({
+function ScopeRulesEditor({
     value,
     isReadonly,
     programOptions,
@@ -1464,6 +1602,9 @@ function IatRulesEditor({
     departmentDegreeOptions,
     loading,
     onChange,
+    eyebrow = 'IAT Gen',
+    heading = 'Level 2 replacement routing',
+    helpText = 'Empty selections match all values in that field. A student matches when the program matches and at least one selected department, department-degree, or board condition matches.',
 }: {
     value: IatRuleConfig;
     isReadonly: boolean;
@@ -1472,6 +1613,9 @@ function IatRulesEditor({
     departmentDegreeOptions: SelectOption[];
     loading: boolean;
     onChange: (next: IatRuleConfig) => void;
+    eyebrow?: string;
+    heading?: string;
+    helpText?: string;
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const rules = Array.isArray(value?.rules) ? value.rules : [];
@@ -1511,10 +1655,10 @@ function IatRulesEditor({
             >
                 <div className="flex flex-col gap-4 border-b border-gray-200 px-6 py-5 dark:border-white/10 md:flex-row md:items-start md:justify-between">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">IAT Gen</p>
-                        <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">Level 2 replacement routing</h2>
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">{eyebrow}</p>
+                        <h2 className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">{heading}</h2>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-500 dark:text-gray-400">
-                            Empty selections match all values in that field. A student matches when the program matches and at least one selected department, department-degree, or board condition matches.
+                            {helpText}
                         </p>
                         {loading && (
                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading program and department options...</p>
@@ -1542,7 +1686,7 @@ function IatRulesEditor({
                 <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     {rules.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
-                            No IAT Gen replacement rules configured.
+                            No scope rules configured — applies to everyone.
                         </div>
                     ) : (
                         <div className="space-y-5">

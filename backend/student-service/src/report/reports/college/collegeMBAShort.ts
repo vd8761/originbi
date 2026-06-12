@@ -50,6 +50,8 @@ export class CollegeMBAShortReport extends BaseReport {
   private behavioralOrientation = '';
   private recommendedSpec!: SpecializationMeta;
   private declaredTrack: string | null = null;
+  /** Whether the student has usable ACI data driving the readiness profile. */
+  private aciAvailable = false;
 
   constructor(data: CollegeData, options?: PDFKit.PDFDocumentOptions) {
     super(options);
@@ -91,6 +93,7 @@ export class CollegeMBAShortReport extends BaseReport {
       BEHAVIORAL_ORIENTATION[primary] ||
       'Balanced Professional';
 
+    this.aciAvailable = this.hasAci(this.data.agile_scores);
     const agile: AgileScore = (this.data.agile_scores &&
       this.data.agile_scores[0]) || {
       commitment: 0,
@@ -474,6 +477,25 @@ export class CollegeMBAShortReport extends BaseReport {
       .fontSize(13)
       .fillColor(this.COLOR_DEEP_BLUE)
       .text('Work Readiness Profile', x, y, { lineBreak: false });
+
+    // When ACI is not completed the readiness percentages are all zero, which
+    // would render a misleading empty profile. Show a short explanatory note
+    // instead and skip the bars entirely.
+    if (!this.aciAvailable) {
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(9.5)
+        .fillColor(this.C_MUTED)
+        .text(
+          'Your Work Readiness Profile becomes available once you complete the ' +
+            'Agile Compatibility Index (ACI) assessment. The recommendations ' +
+            'above are based on your behavioural (DISC) profile.',
+          x,
+          y + 18,
+          { width: w },
+        );
+      return this.doc.y + 8;
+    }
 
     this.doc
       .font(this.FONT_REGULAR)

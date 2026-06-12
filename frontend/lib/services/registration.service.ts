@@ -36,6 +36,7 @@ export interface CreateRegistrationDto {
   group_name?: string;
   current_role?: string;
   role_description?: string;
+  employee_level?: string; // Entry | Medium | Executive (Employee program only)
 
   password?: string;
 
@@ -172,6 +173,7 @@ export const registrationService = {
       studentBoard: payload.student_board,
       currentRole: payload.current_role,
       roleDescription: payload.role_description,
+      employeeLevel: payload.employee_level,
       password: payload.password,
     };
 

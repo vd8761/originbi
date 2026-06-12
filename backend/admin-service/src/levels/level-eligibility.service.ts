@@ -1,0 +1,133 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { SettingsService } from '../settings/settings.service';
+
+/**
+ * Resolves which assessment levels a registration should receive, based on the
+ * admin-configurable `levels.*` settings (per-level enable flag + scope rules).
+ *
+ * This replaces the old global `assessment_levels.is_mandatory` decision for
+ * "who gets which level". `is_mandatory` is still honoured as a defensive
+ * fallback when a level's setting row is missing (e.g. migration not yet run).
+ *
+ * Scope-rule matching mirrors the previous IatEligibilityService: a rule
+ * matches when the program matches AND (when any department / department-degree
+ * / board condition is selected) at least one of those conditions matches.
+ * Empty rules on an enabled level = applies to everyone.
+ */
+
+export interface ScopeRule {
+  programIds?: Array<number | string>;
+  departmentDegreeIds?: Array<number | string>;
+  departmentIds?: Array<number | string>;
+  studentBoards?: string[];
+}
+
+export interface RegistrationScope {
+  programId?: number | string | null;
+  departmentDegreeId?: number | string | null;
+  departmentId?: number | string | null;
+  studentBoard?: string | null;
+}
+
+export interface LevelLike {
+  levelNumber: number;
+  isMandatory?: boolean;
+}
+
+@Injectable()
+export class LevelEligibilityService {
+  private readonly logger = new Logger(LevelEligibilityService.name);
+
+  constructor(private readonly settings: SettingsService) {}
+
+  /** Keep only the levels enabled for this registration, preserving order. */
+  async filterEnabledLevels<T extends LevelLike>(
+    levels: T[],
+    scope: RegistrationScope,
+  ): Promise<T[]> {
+    const out: T[] = [];
+    for (const level of levels) {
+      if (await this.isLevelEnabled(level, scope)) out.push(level);
+    }
+    return out;
+  }
+
+  async isLevelEnabled(
+    level: LevelLike,
+    scope: RegistrationScope,
+  ): Promise<boolean> {
+    const enabled = await this.readBool(`level${level.levelNumber}_enabled`);
+    // Missing setting -> fall back to the level's mandatory flag so behaviour
+    // matches the pre-feature default and nothing silently disappears.
+    if (enabled === null) return Boolean(level.isMandatory);
+    if (enabled === false) return false;
+
+    const rules = await this.readRules(`level${level.levelNumber}_scope_rules`);
+    if (rules.length === 0) return true; // empty = everyone
+    return rules.some((rule) => this.matchesRule(rule, scope));
+  }
+
+  private async readBool(key: string): Promise<boolean | null> {
+    try {
+      const value = await this.settings.getValue<boolean>('levels', key);
+      return typeof value === 'boolean' ? value : null;
+    } catch (err) {
+      this.logger.warn(
+        `Unable to read levels.${key}; using fallback. ${(err as Error)?.message}`,
+      );
+      return null;
+    }
+  }
+
+  private async readRules(key: string): Promise<ScopeRule[]> {
+    try {
+      const cfg = await this.settings.getValue<{ rules?: ScopeRule[] }>(
+        'levels',
+        key,
+      );
+      return Array.isArray(cfg?.rules) ? (cfg as { rules: ScopeRule[] }).rules : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private matchesRule(rule: ScopeRule, scope: RegistrationScope): boolean {
+    if (!this.idListMatches(rule.programIds, scope.programId)) return false;
+
+    const degreeIds = this.normalizeIds(rule.departmentDegreeIds);
+    const departmentIds = this.normalizeIds(rule.departmentIds);
+    const boards = (rule.studentBoards || [])
+      .map((board) => String(board || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    const hasSpecificScope =
+      degreeIds.length > 0 || departmentIds.length > 0 || boards.length > 0;
+    if (!hasSpecificScope) return true;
+
+    const degreeMatch =
+      degreeIds.length > 0 &&
+      degreeIds.includes(String(scope.departmentDegreeId || ''));
+    const departmentMatch =
+      departmentIds.length > 0 &&
+      departmentIds.includes(String(scope.departmentId || ''));
+    const boardMatch =
+      boards.length > 0 &&
+      boards.includes(String(scope.studentBoard || '').trim().toLowerCase());
+
+    return degreeMatch || departmentMatch || boardMatch;
+  }
+
+  private idListMatches(
+    values: Array<number | string> | undefined,
+    actual: number | string | null | undefined,
+  ): boolean {
+    const ids = this.normalizeIds(values);
+    return ids.length === 0 || ids.includes(String(actual || ''));
+  }
+
+  private normalizeIds(values: Array<number | string> | undefined): string[] {
+    return (values || [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+  }
+}

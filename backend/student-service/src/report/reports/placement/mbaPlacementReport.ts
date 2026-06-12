@@ -498,6 +498,21 @@ export class MBAPlacementReport extends BaseReport {
   private generatePlacementPriorities(): void {
     this.h1(MBA_PLACEMENT_CONTENT.priorities_title, { ensureSpace: 0.35 });
 
+    // Placement priorities are driven by ACI readiness. When no student in the
+    // cohort has completed ACI, the rankings fall back to behavioural (DISC)
+    // fit only - surface a short note so the reader interprets them correctly.
+    const cohortHasAci = this.students.some((s) =>
+      Object.values(s.readinessPct).some((v) => v > 0),
+    );
+    if (!cohortHasAci) {
+      this.pHtml(
+        '<i>Note: No ACI (Agile Compatibility Index) data is available for this ' +
+          'cohort. The shortlists below are based on behavioural (DISC) fit only ' +
+          'and will sharpen once students complete the ACI assessment.</i>',
+        { fontSize: 9, color: '#58595b', font: this.FONT_ITALIC },
+      );
+    }
+
     // Deploy-ready shortlist
     this.h2(MBA_PLACEMENT_CONTENT.deploy_ready_title);
     this.p(MBA_PLACEMENT_CONTENT.deploy_ready_text);

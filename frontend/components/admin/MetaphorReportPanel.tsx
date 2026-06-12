@@ -4,12 +4,9 @@ import { studentService } from '../../lib/services/student.service';
 import {
     ArrowLeftIcon,
     ArrowRightIcon,
-    BanIcon,
-    CheckIcon,
     ClockIcon,
     DownloadIcon,
     LoadingIcon,
-    ProfileIcon,
 } from '../icons';
 
 type MetaphorAnswer = MetaphorReportStatus['answers'][number];
@@ -29,18 +26,6 @@ interface MetaphorReportPanelProps {
     isStudent?: boolean;
     studentEmail?: string;
 }
-
-const InfoItem = ({ icon: Icon, label, value }: { icon: any; label: string; value: React.ReactNode }) => (
-    <div className="flex items-center gap-3 p-3 bg-gray-100 dark:bg-black/20 rounded-xl border border-gray-200 dark:border-white/5">
-        <div className="p-2 bg-gray-200 dark:bg-white/5 rounded-lg">
-            <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-        </div>
-        <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
-            <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mt-0.5">{value}</p>
-        </div>
-    </div>
-);
 
 const SidebarItem = ({ label, value, small }: { label: string; value: React.ReactNode; small?: boolean }) => (
     <div>
@@ -360,16 +345,10 @@ const MetaphorReportPanel: React.FC<MetaphorReportPanelProps> = ({
         <>
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
                 <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-6">
+                    {/* The Generated / Submitted / Missing / Report Status
+                        indicators are shown in the stats bar above (passed in
+                        via `stats`); the duplicate card row was removed. */}
                     {stats}
-
-                    {!isStudent && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <InfoItem icon={ProfileIcon} label="Generated Questions" value={data?.total != null ? String(data.total) : '--'} />
-                            <InfoItem icon={CheckIcon} label="Submitted" value={data?.answered != null ? String(data.answered) : '--'} />
-                            <InfoItem icon={BanIcon} label="Missing" value={data?.missing != null ? String(data.missing) : '--'} />
-                            <InfoItem icon={ClockIcon} label="Report Status" value={report ? 'Generated' : job?.status?.replace(/_/g, ' ') || 'Waiting'} />
-                        </div>
-                    )}
 
                     <div>
                         <div className="flex items-center justify-between mb-4">

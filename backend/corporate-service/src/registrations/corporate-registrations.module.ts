@@ -5,6 +5,7 @@ import { CorporateRegistrationsService } from './corporate-registrations.service
 import { CorporateRegistrationsController } from './corporate-registrations.controller';
 import { AssessmentModule } from '../assessment/assessment.module';
 import { SettingsModule } from '../settings/settings.module';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
 
 // Import from shared entities package
 import {
@@ -59,6 +60,10 @@ import { BulkCorporateRegistrationsController } from './bulk-corporate-registrat
     CorporateRegistrationsController,
     BulkCorporateRegistrationsController,
   ],
-  providers: [CorporateRegistrationsService, BulkCorporateRegistrationsService],
+  providers: [
+    CorporateRegistrationsService,
+    BulkCorporateRegistrationsService,
+    LevelEligibilityService,
+  ],
 })
 export class CorporateRegistrationsModule {}

@@ -393,14 +393,17 @@ export class IatService {
     });
     if (!attempt)
       throw new BadRequestException('Assessment attempt not found.');
+    // IAT Gen is now its own dedicated level (Level 3, pattern_type
+    // 'IAT_GEN'). The attempt only exists when the level was enabled for this
+    // registration, so eligibility no longer needs to be re-checked here.
     const level = attempt.assessmentLevel;
-    const isLevel2 =
-      level?.levelNumber === 2 ||
-      level?.name?.includes('Level 2') ||
-      String(level?.patternType || '').toUpperCase() === 'ACI';
-    if (!isLevel2)
+    const isIatLevel =
+      level?.levelNumber === 3 ||
+      String(level?.patternType || '').toUpperCase() === IAT_ASSESSMENT_KIND ||
+      Boolean(level?.name?.toUpperCase().includes('IAT'));
+    if (!isIatLevel)
       throw new BadRequestException(
-        'IAT Gen only applies to Level 2 attempts.',
+        'IAT Gen only applies to the IAT Gen level.',
       );
 
     const metadataAssessmentKind = attempt.metadata?.assessment_kind;
@@ -409,15 +412,6 @@ export class IatService {
         ? metadataAssessmentKind.toUpperCase()
         : '';
     if (metadataKind === IAT_ASSESSMENT_KIND) return attempt;
-
-    const isEligible = await this.eligibility.isIatRegistration(
-      attempt.registrationId,
-    );
-    if (!isEligible) {
-      throw new BadRequestException(
-        'This Level 2 attempt is configured for ACI, not IAT Gen.',
-      );
-    }
 
     attempt.metadata = {
       ...(attempt.metadata || {}),
@@ -775,34 +769,26 @@ export class IatService {
       where: { id: attempt.assessmentLevelId },
     });
     if (!currentLevel) return;
-    const nextLevel = await this.levelRepo
-      .createQueryBuilder('level')
-      .where('level.level_number > :levelNumber', {
+    // Attempts for every enabled level are pre-created at registration, so the
+    // "next level" is simply the next existing attempt in this session ordered
+    // by level number. We only unlock what already exists — disabled levels
+    // have no attempt and are skipped automatically.
+    const nextAttempt = await this.attemptRepo
+      .createQueryBuilder('attempt')
+      .innerJoin('attempt.assessmentLevel', 'level')
+      .where('attempt.assessmentSessionId = :sessionId', {
+        sessionId: attempt.assessmentSessionId,
+      })
+      .andWhere('level.level_number > :levelNumber', {
         levelNumber: currentLevel.levelNumber,
       })
-      .andWhere('level.is_mandatory = true')
       .orderBy('level.level_number', 'ASC')
       .getOne();
-    if (!nextLevel) return;
-    let nextAttempt = await this.attemptRepo.findOne({
-      where: {
-        assessmentSessionId: attempt.assessmentSessionId,
-        assessmentLevelId: nextLevel.id,
-      },
+    if (!nextAttempt) return;
+    const nextLevel = await this.levelRepo.findOne({
+      where: { id: nextAttempt.assessmentLevelId },
     });
-    if (!nextAttempt) {
-      nextAttempt = await this.attemptRepo.save(
-        this.attemptRepo.create({
-          assessmentSessionId: attempt.assessmentSessionId,
-          assessmentLevelId: nextLevel.id,
-          userId: attempt.userId,
-          registrationId: attempt.registrationId,
-          programId: attempt.programId,
-          status: 'NOT_STARTED',
-          metadata: {},
-        }),
-      );
-    }
+    if (!nextLevel) return;
     const unlockAt = new Date();
     unlockAt.setHours(
       unlockAt.getHours() + Number(nextLevel.unlockAfterHours || 0),
