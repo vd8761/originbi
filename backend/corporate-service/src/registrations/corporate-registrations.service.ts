@@ -729,7 +729,7 @@ export class CorporateRegistrationsService {
       .getOne();
     if (latestSession?.programId) return Number(latestSession.programId);
 
-    const programType = (registration.metadata as any)?.programType;
+    const programType = registration.metadata?.programType;
     if (programType) {
       const program = await this.findProgram(manager, programType);
       return Number(program.id);
@@ -745,7 +745,8 @@ export class CorporateRegistrationsService {
    * ongoing (non-terminal) session that would block assignment.
    */
   async previewIndividualExam(registrationId: number, corporateUserId: number) {
-    const corporateAccount = await this.resolveCorporateAccount(corporateUserId);
+    const corporateAccount =
+      await this.resolveCorporateAccount(corporateUserId);
 
     const manager = this.dataSource.manager;
     const registration = await manager
@@ -754,7 +755,9 @@ export class CorporateRegistrationsService {
     if (!registration) {
       throw new BadRequestException(`Registration ${registrationId} not found`);
     }
-    if (Number(registration.corporateAccountId) !== Number(corporateAccount.id)) {
+    if (
+      Number(registration.corporateAccountId) !== Number(corporateAccount.id)
+    ) {
       throw new BadRequestException(
         'This employee does not belong to your account.',
       );
@@ -815,7 +818,8 @@ export class CorporateRegistrationsService {
     if (!registrationId) {
       throw new BadRequestException('registrationId is required');
     }
-    const corporateAccount = await this.resolveCorporateAccount(corporateUserId);
+    const corporateAccount =
+      await this.resolveCorporateAccount(corporateUserId);
 
     const validFrom = examStart ? new Date(examStart) : new Date();
     const validTo = examEnd
