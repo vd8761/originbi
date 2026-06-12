@@ -12,6 +12,7 @@ import {
 
 import { RegistrationsService } from './registrations.service';
 import { BulkRegistrationsService } from './bulk-registrations.service';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
 import { RegistrationsController } from './registrations.controller';
 import { GroupsModule } from '../groups/groups.module';
 import { AssessmentModule } from '../assessment/assessment.module';
@@ -42,7 +43,11 @@ import { DegreeType } from '../departments/degree-type.entity';
     AssessmentModule,
     SettingsModule,
   ],
-  providers: [RegistrationsService, BulkRegistrationsService],
+  providers: [
+    RegistrationsService,
+    BulkRegistrationsService,
+    LevelEligibilityService,
+  ],
   controllers: [RegistrationsController],
 })
 export class RegistrationsModule {}

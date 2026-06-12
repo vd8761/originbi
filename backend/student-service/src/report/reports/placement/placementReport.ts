@@ -351,6 +351,20 @@ export class PlacementReport extends BaseReport {
 
     this.drawPersonalityGrid();
 
+    // The ACI distribution + corporate readiness tables are only meaningful when
+    // at least one student in the cohort has completed the ACI assessment.
+    // When none have, skip both tables (otherwise every student collapses into
+    // the lowest band and the summary is misleading).
+    const cohortHasAci = this.data.trait_distribution.some((group) =>
+      group.students_data.some((student) => (student.agile_score?.total ?? 0) > 0),
+    );
+    if (!cohortHasAci) {
+      logger.info(
+        '[PLACEMENT REPORT] No ACI data across cohort - skipping ACI distribution & corporate readiness tables.',
+      );
+      return;
+    }
+
     this.h2('Agile Compatibility Index Distribution');
     const aciDistHeader = [
       'ACI Level',
@@ -818,7 +832,11 @@ export class PlacementReport extends BaseReport {
    * @returns An array structure compatible with the PDFkit-table format
    */
   private processStudentRow(student: any, index: number): any[] {
-    const aciScore = student.agile_score?.total || 0;
+    const rawAci = student.agile_score?.total;
+    const aciScore = rawAci || 0;
+    // A student who has not completed the ACI assessment has no usable score.
+    // Show "N/A" across the ACI columns rather than a misleading 0/Developing.
+    const aciMissing = !rawAci || rawAci <= 0;
 
     // Find config by score
     const config =
@@ -850,10 +868,10 @@ export class PlacementReport extends BaseReport {
           },
         ],
       },
-      aciScore,
-      aciLevel,
-      corporateReadiness,
-      companyTier,
+      aciMissing ? 'N/A' : aciScore,
+      aciMissing ? 'N/A' : aciLevel,
+      aciMissing ? 'N/A' : corporateReadiness,
+      aciMissing ? 'N/A' : companyTier,
     ];
   }
 }

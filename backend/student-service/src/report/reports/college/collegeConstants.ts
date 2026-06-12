@@ -1344,4 +1344,157 @@ export const blendedTraits: {
       ],
     ],
   },
+
+  // ── Pure single-trait profiles ──────────────────────────────────────────
+  // Used when one dimension dominates strongly enough to resolve to a "pure"
+  // code (e.g. I = Pure Influence) instead of a two-letter blend. See
+  // CollegeLevel1Report.resolveProfileCode() and calculateDiscProfile().
+  D: {
+    name: 'Decisive Driver',
+    description:
+      'You are a bold, results-driven individual who takes charge and pushes relentlessly toward goals. Your decisiveness and confidence make you a natural leader in fast-paced, high-stakes environments.',
+    suggestions:
+      'Startup Founder, Business Strategist, Sales Director, Operations Lead',
+    key_behaviours: [
+      'Takes charge quickly and drives toward clear, ambitious goals.',
+      'Makes firm decisions confidently, even under pressure.',
+      'Focuses on results and removes obstacles to progress.',
+      'Thrives on challenge, competition and measurable outcomes.',
+      'Acts with urgency and keeps momentum high.',
+      'Leads from the front and sets high standards for the team.',
+    ],
+    typical_scenarios: [
+      'Leading a team to hit an aggressive target under tight deadlines.',
+      'Turning around an underperforming project through decisive action.',
+      'Driving a high-stakes negotiation to a successful close.',
+      'Launching a new initiative and pushing it through to delivery.',
+    ],
+    trait_mapping1: [
+      [
+        'Decisive Driver',
+        'CEO, Managing Director, Investment Banker, Business Development Head, Entrepreneur',
+        'Impatience, over-directness, difficulty delegating, low tolerance for routine',
+        'Decisiveness, goal focus, drive for results, leadership under pressure',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Decisive Driver',
+        'CEO, Managing Director, Investment Banker, Business Development Head, Entrepreneur',
+        'Impatience, over-directness, difficulty delegating, low tolerance for routine',
+        'Decisiveness, goal focus, drive for results, leadership under pressure',
+      ],
+    ],
+  },
+  I: {
+    name: 'Inspiring Influencer',
+    description:
+      'You are an energetic, persuasive communicator who connects with people effortlessly and rallies them around ideas. Your enthusiasm and optimism make you a natural motivator and relationship-builder.',
+    suggestions:
+      'Chief Marketing Officer, Brand Manager, PR Head, Talent Acquisition Head',
+    key_behaviours: [
+      'Builds rapport quickly and communicates with persuasive energy.',
+      'Inspires and motivates people around a shared vision.',
+      'Brings optimism and enthusiasm to every interaction.',
+      'Thrives in social, collaborative and public-facing roles.',
+      'Generates ideas and gets others excited to act on them.',
+      'Adapts easily and keeps team morale high.',
+    ],
+    typical_scenarios: [
+      'Rallying a team behind a bold new campaign or idea.',
+      'Winning over a sceptical client through persuasive storytelling.',
+      'Energising a room as the face of a brand or initiative.',
+      'Building a strong network of partners and collaborators.',
+    ],
+    trait_mapping1: [
+      [
+        'Inspiring Influencer',
+        'Chief Marketing Officer, Brand Manager, PR Head, Corporate Communications Head, Talent Acquisition Head',
+        'Loss of focus on detail, over-optimism, avoiding hard conversations, inconsistent follow-through',
+        'Persuasion, networking, motivation, creative communication',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Inspiring Influencer',
+        'Chief Marketing Officer, Brand Manager, PR Head, Corporate Communications Head, Talent Acquisition Head',
+        'Loss of focus on detail, over-optimism, avoiding hard conversations, inconsistent follow-through',
+        'Persuasion, networking, motivation, creative communication',
+      ],
+    ],
+  },
+  S: {
+    name: 'Steady Supporter',
+    description:
+      'You are a dependable, even-tempered individual who brings consistency and calm to everything you do. Your patience and loyalty make you the stabilising force teams rely on.',
+    suggestions:
+      'Chief People Officer, HR Manager, Operations Manager, Project Manager',
+    key_behaviours: [
+      'Delivers consistent, reliable results over time.',
+      'Stays calm and composed under pressure.',
+      'Supports and listens to others with genuine patience.',
+      'Builds trust through loyalty and dependability.',
+      'Prefers steady, well-planned progress over sudden change.',
+      'Fosters harmony and cooperation within the team.',
+    ],
+    typical_scenarios: [
+      'Keeping a team grounded and steady through a stressful period.',
+      'Quietly ensuring commitments are met without drama.',
+      'Mediating a conflict to restore harmony and cooperation.',
+      'Sustaining long-term progress on a complex, ongoing effort.',
+    ],
+    trait_mapping1: [
+      [
+        'Steady Supporter',
+        'Chief People Officer, HR Manager, Operations Manager, Project Manager, Customer Success Head',
+        'Resistance to change, difficulty saying no, avoiding conflict, slow to assert own needs',
+        'Reliability, patience, teamwork, calm under pressure',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Steady Supporter',
+        'Chief People Officer, HR Manager, Operations Manager, Project Manager, Customer Success Head',
+        'Resistance to change, difficulty saying no, avoiding conflict, slow to assert own needs',
+        'Reliability, patience, teamwork, calm under pressure',
+      ],
+    ],
+  },
+  C: {
+    name: 'Precise Analyst',
+    description:
+      'You are a careful, analytical thinker who values accuracy, structure and quality. Your attention to detail and logical rigour make you the one others trust to get things right.',
+    suggestions:
+      'Data Analyst, Financial Analyst, Risk Manager, Compliance Officer',
+    key_behaviours: [
+      'Works with precision and a high standard of accuracy.',
+      'Analyses problems logically before acting.',
+      'Follows structure, process and quality standards closely.',
+      'Spots details and risks others overlook.',
+      'Makes decisions based on data and evidence.',
+      'Delivers thorough, well-organised work.',
+    ],
+    typical_scenarios: [
+      'Auditing a process to catch errors before they become problems.',
+      'Building a rigorous, data-backed analysis for a key decision.',
+      'Designing a structured system that others can rely on.',
+      'Ensuring quality and compliance on a detail-critical deliverable.',
+    ],
+    trait_mapping1: [
+      [
+        'Precise Analyst',
+        'Data Analyst, Financial Analyst, Risk Manager, Quantitative Analyst, Compliance Officer',
+        'Over-analysis, perfectionism, slow decisions, reluctance to delegate',
+        'Analytical rigour, attention to detail, quality focus, structured thinking',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Precise Analyst',
+        'Data Analyst, Financial Analyst, Risk Manager, Quantitative Analyst, Compliance Officer',
+        'Over-analysis, perfectionism, slow decisions, reluctance to delegate',
+        'Analytical rigour, attention to detail, quality focus, structured thinking',
+      ],
+    ],
+  },
 };

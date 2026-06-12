@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager } from 'typeorm';
+import { Repository, EntityManager, SelectQueryBuilder } from 'typeorm';
 import {
   AssessmentLevel,
   AssessmentQuestion,
@@ -8,7 +8,35 @@ import {
   AssessmentAnswer,
   AssessmentAttempt,
   OriginbiSetting,
+  Registration,
 } from '@originbi/shared-entities';
+
+/**
+ * Per-program main-question generation mode, stored in originbi_settings
+ * (category 'assessment', key 'question_generation_mode'). The stored value is
+ * an object keyed by program id -> QuestionGenerationConfig.
+ *
+ *  - random_set_shuffled: pick ONE random set, then `count` questions in random
+ *    order (the legacy behaviour).
+ *  - random_set_ordered:  pick ONE random set, then the first `count` questions
+ *    in their authored order (external_code / id ascending).
+ *  - random_all_sets:     ignore set boundaries, pick `count` random questions
+ *    across every set for the program/level.
+ */
+type QuestionGenerationMode =
+  | 'random_set_shuffled'
+  | 'random_set_ordered'
+  | 'random_all_sets';
+
+interface QuestionGenerationConfig {
+  mode: QuestionGenerationMode;
+  count: number;
+}
+
+const DEFAULT_GENERATION_CONFIG: QuestionGenerationConfig = {
+  mode: 'random_set_shuffled',
+  count: 40,
+};
 
 /**
  * One group within the admin-configurable open-question distribution.
@@ -49,51 +77,9 @@ export class AssessmentGenerationService {
       `Generating Level 1 questions for attempt ${attempt.id}, program ${attempt.programId}`,
     );
 
-    // 1. Find Available Sets for this Program + Level
-    const setsResult = await manager
-      .createQueryBuilder(AssessmentQuestion, 'q')
-      .select('DISTINCT q.set_number', 'setNumber')
-      .where('q.program_id = :programId', { programId: attempt.programId })
-      .andWhere('q.assessment_level_id = :levelId', {
-        levelId: attempt.assessmentLevelId,
-      })
-      .andWhere('q.is_active = true')
-      .andWhere('q.is_deleted = false')
-      .getRawMany<{ setNumber: number }>();
-
-    if (!setsResult || setsResult.length === 0) {
-      this.logger.error(
-        `No active question sets found for Program ${attempt.programId} Level ${attempt.assessmentLevelId}. Blocking assessment creation.`,
-      );
-      // Throw (not silent return) so the registration transaction rolls back and
-      // the user gets a clear "questions unavailable" error instead of an empty
-      // assessment. Covers the case where all questions are deactivated.
-      throw new Error('No active questions available for this program/level.');
-    }
-
-    // 2. Pick One Set Randomly
-    const sets = setsResult.map((s) => s.setNumber);
-    const selectedSet: number = sets[Math.floor(Math.random() * sets.length)];
-
-    this.logger.log(
-      `Selected Set ${selectedSet} (from [${sets.join(', ')}]) for Attempt ${
-        attempt.id
-      }`,
-    );
-
-    // 3. Fetch Main Questions (Set-Based)
-    const mainQuestions = await manager
-      .createQueryBuilder(AssessmentQuestion, 'q')
-      .where('q.program_id = :programId', { programId: attempt.programId })
-      .andWhere('q.assessment_level_id = :levelId', {
-        levelId: attempt.assessmentLevelId,
-      })
-      .andWhere('q.set_number = :setNumber', { setNumber: selectedSet })
-      .andWhere('q.is_active = true')
-      .andWhere('q.is_deleted = false')
-      .orderBy('RANDOM()')
-      .limit(40)
-      .getMany();
+    // 1-3. Resolve the level (Entry/Medium/Executive) and pick the main
+    // questions per the admin-configured per-program generation mode.
+    const mainQuestions = await this.selectMainQuestions(manager, attempt);
 
     // 2. Fetch open questions per the admin-configurable distribution
     // (originbi_settings -> assessment.open_question_distribution).
@@ -136,6 +122,162 @@ export class AssessmentGenerationService {
 
     this.logger.log(
       `Generated ${answersToInsert.length} answers for attempt ${attempt.id}`,
+    );
+  }
+
+  /**
+   * Resolves the Employee difficulty level (Entry/Medium/Executive) stored on
+   * the registration. Returns null for non-employee registrations (no board
+   * filtering), so other programs keep their existing behaviour.
+   */
+  private async resolveEmployeeLevel(
+    manager: EntityManager,
+    attempt: AssessmentAttempt,
+  ): Promise<string | null> {
+    if (!attempt.registrationId) return null;
+    const registration = await manager.findOne(Registration, {
+      where: { id: attempt.registrationId },
+    });
+    const level = registration?.metadata?.employeeLevel;
+    return level ? String(level).trim() : null;
+  }
+
+  /**
+   * Reads the per-program main-question generation config from
+   * originbi_settings (category 'assessment', key 'question_generation_mode').
+   * The stored value is an object keyed by program id. Falls back to the legacy
+   * default (random_set_shuffled, 40) when missing/invalid.
+   */
+  private async getGenerationConfig(
+    manager: EntityManager,
+    programId: number,
+  ): Promise<QuestionGenerationConfig> {
+    try {
+      const setting = await manager.findOne(OriginbiSetting, {
+        where: {
+          category: 'assessment',
+          settingKey: 'question_generation_mode',
+        },
+      });
+      const value = setting?.value as
+        | Record<string, Partial<QuestionGenerationConfig>>
+        | undefined;
+      const cfg = value?.[String(programId)];
+      if (cfg && cfg.mode) {
+        return {
+          mode: cfg.mode,
+          count:
+            Number(cfg.count) > 0
+              ? Number(cfg.count)
+              : DEFAULT_GENERATION_CONFIG.count,
+        };
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Could not read question_generation_mode setting, using default. ${
+          (err as Error)?.message
+        }`,
+      );
+    }
+    return DEFAULT_GENERATION_CONFIG;
+  }
+
+  /**
+   * Selects the main (DISC) questions for an attempt, applying:
+   *  - the Program + Level filter (always),
+   *  - the Employee difficulty level filter via the `board` column (when set),
+   *  - the admin-configured per-program generation mode.
+   */
+  private async selectMainQuestions(
+    manager: EntityManager,
+    attempt: AssessmentAttempt,
+  ): Promise<AssessmentQuestion[]> {
+    const boardLevel = await this.resolveEmployeeLevel(manager, attempt);
+    const config = await this.getGenerationConfig(manager, attempt.programId);
+
+    const applyBaseFilters = (
+      qb: SelectQueryBuilder<AssessmentQuestion>,
+    ): SelectQueryBuilder<AssessmentQuestion> => {
+      qb.where('q.program_id = :programId', { programId: attempt.programId })
+        .andWhere('q.assessment_level_id = :levelId', {
+          levelId: attempt.assessmentLevelId,
+        })
+        .andWhere('q.is_active = true')
+        .andWhere('q.is_deleted = false');
+      if (boardLevel) {
+        qb.andWhere('q.board = :board', { board: boardLevel });
+      }
+      return qb;
+    };
+
+    // random_all_sets: ignore set boundaries entirely.
+    if (config.mode === 'random_all_sets') {
+      const rows = await applyBaseFilters(
+        manager.createQueryBuilder(AssessmentQuestion, 'q'),
+      )
+        .orderBy('RANDOM()')
+        .limit(config.count)
+        .getMany();
+      this.ensureQuestionsFound(rows, attempt, boardLevel, null);
+      return rows;
+    }
+
+    // set-based modes: find the available sets first, then pick one at random.
+    const setsResult = await applyBaseFilters(
+      manager
+        .createQueryBuilder(AssessmentQuestion, 'q')
+        .select('DISTINCT q.set_number', 'setNumber'),
+    ).getRawMany<{ setNumber: number }>();
+
+    if (!setsResult || setsResult.length === 0) {
+      this.ensureQuestionsFound([], attempt, boardLevel, null);
+    }
+
+    const sets = setsResult.map((s) => s.setNumber);
+    const selectedSet = sets[Math.floor(Math.random() * sets.length)];
+    this.logger.log(
+      `Selected Set ${selectedSet} (from [${sets.join(', ')}]) for Attempt ${
+        attempt.id
+      } [mode=${config.mode}, level=${boardLevel ?? 'N/A'}]`,
+    );
+
+    const qb = applyBaseFilters(
+      manager.createQueryBuilder(AssessmentQuestion, 'q'),
+    ).andWhere('q.set_number = :setNumber', { setNumber: selectedSet });
+
+    // random_set_ordered keeps authored order; random_set_shuffled randomizes.
+    const rows = await (
+      config.mode === 'random_set_ordered'
+        ? qb.orderBy('q.external_code', 'ASC').addOrderBy('q.id', 'ASC')
+        : qb.orderBy('RANDOM()')
+    )
+      .limit(config.count)
+      .getMany();
+
+    this.ensureQuestionsFound(rows, attempt, boardLevel, selectedSet);
+    return rows;
+  }
+
+  /**
+   * Throws a clear error (rolling back the registration transaction) when no
+   * questions are available, so the user never gets an empty assessment.
+   */
+  private ensureQuestionsFound(
+    rows: AssessmentQuestion[],
+    attempt: AssessmentAttempt,
+    boardLevel: string | null,
+    selectedSet: number | null,
+  ): void {
+    if (rows && rows.length > 0) return;
+    this.logger.error(
+      `No active questions found for Program ${attempt.programId} Level ${
+        attempt.assessmentLevelId
+      } (level=${boardLevel ?? 'N/A'}, set=${selectedSet ?? 'any'}). Blocking assessment creation.`,
+    );
+    throw new Error(
+      `No active questions available for this program/level${
+        boardLevel ? ` (${boardLevel})` : ''
+      }.`,
     );
   }
 

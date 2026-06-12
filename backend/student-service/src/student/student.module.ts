@@ -30,6 +30,7 @@ import {
 import { SettingsModule } from '../settings/settings.module';
 import { MetaphorModule } from '../metaphor/metaphor.module';
 import { IatModule } from '../iat/iat.module';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
 
 @Module({
   imports: [
@@ -59,7 +60,12 @@ import { IatModule } from '../iat/iat.module';
     IatModule,
   ],
   controllers: [StudentController, SubscriptionController],
-  providers: [StudentService, SubscriptionService, StudentProcessor],
+  providers: [
+    StudentService,
+    SubscriptionService,
+    StudentProcessor,
+    LevelEligibilityService,
+  ],
   exports: [StudentService, SubscriptionService],
 })
 export class StudentModule {}

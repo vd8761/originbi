@@ -312,6 +312,14 @@ export class SchoolReport extends BaseReport {
         this.data.school_level_id === 1 ? SSLC_TOC_CONTENT : HSC_TOC_CONTENT;
     }
 
+    // Drop the ACI entry from the contents when the section is skipped, so the
+    // TOC matches the rendered report (and numbering stays sequential).
+    if (!this.hasAci(this.data.agile_scores)) {
+      tocContent = tocContent.filter(
+        (item) => !item.includes('Agile Compatibility Index'),
+      );
+    }
+
     // TOC items gap by TOC items count
     let tocItemsGap = 10;
     if (tocContent.length > 10 && tocContent.length < 13) {
@@ -702,7 +710,16 @@ export class SchoolReport extends BaseReport {
       color: this.COLOR_BLACK,
     });
 
-    this.generateACI();
+    // ACI is optional: render the Agile Compatibility Index only when the
+    // student has completed the ACI assessment; otherwise skip it (the section
+    // reads agile_scores[0] unguarded) and continue with the DISC-only sections.
+    if (this.hasAci(this.data.agile_scores)) {
+      this.generateACI();
+    } else {
+      logger.info(
+        '[School REPORT] ACI data absent - skipping Agile Compatibility Index section.',
+      );
+    }
 
     // 7. Executive Behavioral SnapShot
     this.h1('Your Personalized Behavioral Charts');

@@ -206,11 +206,15 @@ async function processSessionRows(
       session.session_id,
     ]);
 
-    if (!level1Only && attemptsResult.rows.length < 2) {
+    // DISC is the only mandatory assessment. ACI (Agile) is optional: when it
+    // is absent the report degrades to DISC-only (ACI sections are skipped at
+    // render time), so we no longer require a second completed attempt here.
+    // Only skip when there are no completed attempts at all.
+    if (attemptsResult.rows.length === 0) {
       logger.warn(
-        `User ${session.user_id} (Session ${session.session_id}) has fewer than 2 completed attempts. Skipping.`,
+        `User ${session.user_id} (Session ${session.session_id}) has no completed attempts. Skipping.`,
       );
-      continue; // Full/short reports need both DISC + Agile
+      continue;
     }
 
     // Merge Metadata
@@ -234,10 +238,11 @@ async function processSessionRows(
     }
 
     if (!level1Only && !agileData) {
-      logger.warn(
-        `User ${session.user_id} missing Agile data. Skipping.`,
+      // Not fatal: build a DISC-only report. transformedAgile below defaults to
+      // zeros, so hasAci() returns false and ACI sections are skipped cleanly.
+      logger.info(
+        `User ${session.user_id} missing Agile data - generating DISC-only report (ACI sections skipped).`,
       );
-      continue;
     }
 
     // Transform Data

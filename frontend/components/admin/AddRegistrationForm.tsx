@@ -46,6 +46,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     student_board: "",
     current_role: "",
     role_description: "",
+    employee_level: "Entry",
     password: "",
   });
 
@@ -89,6 +90,13 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   ];
 
   const boardOptions = getEnabledBoards();
+
+  // Employee program difficulty levels (drives which question sets are assigned)
+  const employeeLevels = [
+    { value: "Entry", label: "Entry" },
+    { value: "Medium", label: "Medium" },
+    { value: "Executive", label: "Executive" },
+  ];
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -549,6 +557,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   handleInputChange("student_board", "");
                   handleInputChange("current_role", "");
                   handleInputChange("role_description", "");
+                  handleInputChange("employee_level", "Entry");
                 }}
                 onOpenChange={(isOpen) => handleOpenStatus("program", isOpen)}
                 placeholder="Choose Program Type"
@@ -737,6 +746,25 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 onOpenChange={(isOpen) => handleOpenStatus("group", isOpen)}
               />
             </div>
+
+            {/* Level (Employee only) */}
+            {isEmployeeProgram && (
+              <div
+                className={`relative animate-fade-in ${getZIndex("employeeLevel")}`}
+                onMouseEnter={() => setActiveField("employeeLevel")}
+                onMouseLeave={() => setActiveField(null)}
+              >
+                <CustomSelect
+                  label="Level"
+                  required
+                  options={employeeLevels}
+                  value={formData.employee_level || "Entry"}
+                  onChange={(val) => handleInputChange("employee_level", val)}
+                  onOpenChange={(isOpen) => handleOpenStatus("employeeLevel", isOpen)}
+                  placeholder="Select Level"
+                />
+              </div>
+            )}
 
             {/* Current Role (Employee only) */}
             {isEmployeeProgram && (

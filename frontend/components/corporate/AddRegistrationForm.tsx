@@ -43,7 +43,15 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     current_year: "",
     current_role: "",
     role_description: "",
+    employee_level: "Entry",
   });
+
+  // Employee program difficulty levels (drives which question sets are assigned)
+  const employeeLevels = [
+    { value: "Entry", label: "Entry" },
+    { value: "Medium", label: "Medium" },
+    { value: "Executive", label: "Executive" },
+  ];
 
   const isEmployeeProgram =
     String(formData.program_id || "").trim().toUpperCase() === "EMPLOYEE";
@@ -180,6 +188,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         currentYear: formData.current_year,
         currentRole: formData.current_role,
         roleDescription: formData.role_description,
+        employeeLevel: formData.employee_level,
       };
 
       await corporateRegistrationService.registerCandidate(payload, userIdStr);
@@ -396,6 +405,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   handleInputChange("program_id", val);
                   handleInputChange("current_role", "");
                   handleInputChange("role_description", "");
+                  handleInputChange("employee_level", "Entry");
                 }}
                 onOpenChange={(isOpen) => handleOpenStatus("program", isOpen)}
                 placeholder="Choose Program Type"
@@ -482,6 +492,25 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 className={baseInputClasses}
               />
             </div>
+
+            {/* Level (Employee only) */}
+            {isEmployeeProgram && (
+              <div
+                className={`relative animate-fade-in ${getZIndex("employeeLevel")}`}
+                onMouseEnter={() => setActiveField("employeeLevel")}
+                onMouseLeave={() => setActiveField(null)}
+              >
+                <CustomSelect
+                  label="Level"
+                  required
+                  options={employeeLevels}
+                  value={formData.employee_level || "Entry"}
+                  onChange={(val) => handleInputChange("employee_level", val)}
+                  onOpenChange={(isOpen) => handleOpenStatus("employeeLevel", isOpen)}
+                  placeholder="Select Level"
+                />
+              </div>
+            )}
 
             {/* Current Role (Employee only) */}
             {isEmployeeProgram && (

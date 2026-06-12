@@ -23,6 +23,27 @@ interface OpenQuestionGroup {
   selection?: 'random' | 'set_random' | 'set_sequential'; // 'random' = N random of type; 'set_random' = pick one set then N random within; 'set_sequential' = one set in fixed order
 }
 
+/**
+ * Per-program main-question generation mode, stored in originbi_settings
+ * (category 'assessment', key 'question_generation_mode') as an object keyed by
+ * program id -> QuestionGenerationConfig. See the corporate generation service
+ * for the full description of each mode.
+ */
+type QuestionGenerationMode =
+  | 'random_set_shuffled'
+  | 'random_set_ordered'
+  | 'random_all_sets';
+
+interface QuestionGenerationConfig {
+  mode: QuestionGenerationMode;
+  count: number;
+}
+
+const DEFAULT_GENERATION_CONFIG: QuestionGenerationConfig = {
+  mode: 'random_set_shuffled',
+  count: 40,
+};
+
 @Injectable()
 export class AssessmentGenerationService {
   private readonly logger = new Logger(AssessmentGenerationService.name);
@@ -110,6 +131,13 @@ export class AssessmentGenerationService {
       where: { id: attempt.programId },
     });
     const isSchool = program?.code === 'SCHOOL_STUDENT';
+
+    // The `board` column sub-segments main questions: by exam board for School,
+    // and by difficulty level (Entry/Medium/Executive) for the Employee program.
+    const employeeLevel = registration?.metadata?.employeeLevel
+      ? String(registration.metadata.employeeLevel).trim()
+      : null;
+    const boardFilter: string | null = isSchool ? studentBoard : employeeLevel;
 
     // ---------------------------------------------------------
     // LEVEL 2 (ACI) LOGIC
@@ -247,8 +275,11 @@ export class AssessmentGenerationService {
     // LEVEL 1 & GENERIC LOGIC
     // ---------------------------------------------------------
 
+    // Admin-configured per-program main-question generation mode.
+    const genConfig = await this.getGenerationConfig(manager, attempt.programId);
+
     // 2. Find Available Sets
-    // Filter by Board if School Program
+    // Filter by Board (School board OR Employee difficulty level)
     let setQuery = manager
       .createQueryBuilder(AssessmentQuestion, 'q')
       .select('DISTINCT q.set_number', 'setNumber')
@@ -259,8 +290,8 @@ export class AssessmentGenerationService {
       .andWhere('q.is_active = true')
       .andWhere('q.is_deleted = false');
 
-    if (isSchool && studentBoard) {
-      setQuery = setQuery.andWhere('q.board = :board', { board: studentBoard });
+    if (boardFilter) {
+      setQuery = setQuery.andWhere('q.board = :board', { board: boardFilter });
     }
 
     const setsResult = await setQuery.getRawMany<{ setNumber: number }>();
@@ -319,26 +350,41 @@ export class AssessmentGenerationService {
       await manager.save(session);
     }
 
-    // 4. Fetch Main Questions (Set-Based)
+    // 4. Fetch Main Questions per the configured generation mode.
     let mainQuestionsQuery = manager
       .createQueryBuilder(AssessmentQuestion, 'q')
       .where('q.assessment_level_id = :levelId', {
         levelId: attempt.assessmentLevelId,
       })
       .andWhere('q.program_id = :programId', { programId: attempt.programId })
-      .andWhere('q.set_number = :setNumber', { setNumber: selectedSet })
       .andWhere('q.is_active = true')
-      .andWhere('q.is_deleted = false')
-      .orderBy('RANDOM()');
+      .andWhere('q.is_deleted = false');
 
-    if (isSchool && studentBoard && useBoardFilter) {
+    // random_all_sets draws across every set; the other modes stay within the
+    // single set chosen above.
+    if (genConfig.mode !== 'random_all_sets') {
+      mainQuestionsQuery = mainQuestionsQuery.andWhere(
+        'q.set_number = :setNumber',
+        { setNumber: selectedSet },
+      );
+    }
+
+    if (boardFilter && useBoardFilter) {
       mainQuestionsQuery = mainQuestionsQuery.andWhere('q.board = :board', {
-        board: studentBoard,
+        board: boardFilter,
       });
     }
 
-    if (isLevel1) {
-      mainQuestionsQuery.limit(40);
+    // random_set_ordered keeps authored order; the others randomize.
+    mainQuestionsQuery =
+      genConfig.mode === 'random_set_ordered'
+        ? mainQuestionsQuery
+            .orderBy('q.external_code', 'ASC')
+            .addOrderBy('q.id', 'ASC')
+        : mainQuestionsQuery.orderBy('RANDOM()');
+
+    if (isLevel1 || genConfig.mode === 'random_all_sets') {
+      mainQuestionsQuery.limit(genConfig.count);
     }
 
     const mainQuestions = await mainQuestionsQuery.getMany();
@@ -427,6 +473,46 @@ export class AssessmentGenerationService {
         `Generated ${answersToInsert.length} answers (Set ${selectedSet}) for Attempt ${attempt.id}`,
       );
     }
+  }
+
+  /**
+   * Reads the per-program main-question generation config from
+   * originbi_settings (category 'assessment', key 'question_generation_mode').
+   * The stored value is an object keyed by program id. Falls back to the legacy
+   * default (random_set_shuffled, 40) when missing/invalid.
+   */
+  private async getGenerationConfig(
+    manager: EntityManager,
+    programId: number,
+  ): Promise<QuestionGenerationConfig> {
+    try {
+      const setting = await manager.findOne(OriginbiSetting, {
+        where: {
+          category: 'assessment',
+          settingKey: 'question_generation_mode',
+        },
+      });
+      const value = setting?.value as
+        | Record<string, Partial<QuestionGenerationConfig>>
+        | undefined;
+      const cfg = value?.[String(programId)];
+      if (cfg && cfg.mode) {
+        return {
+          mode: cfg.mode,
+          count:
+            Number(cfg.count) > 0
+              ? Number(cfg.count)
+              : DEFAULT_GENERATION_CONFIG.count,
+        };
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Could not read question_generation_mode setting, using default. ${
+          (err as Error)?.message
+        }`,
+      );
+    }
+    return DEFAULT_GENERATION_CONFIG;
   }
 
   /**

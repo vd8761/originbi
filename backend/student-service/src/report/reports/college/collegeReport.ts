@@ -269,15 +269,23 @@ export class CollegeReport extends BaseReport {
     // Set the starting Y position for the first item
     let currentY = 45 * this.MM;
 
+    // Drop the ACI entry from the contents when the section is skipped, so the
+    // TOC matches the rendered report (and numbering stays sequential).
+    const tocItems = this.hasAci(this.data.agile_scores)
+      ? COLLEGE_TOC_CONTENT
+      : COLLEGE_TOC_CONTENT.filter(
+          (item) => !item.includes('Agile Compatibility Index'),
+        );
+
     // TOC items gap by TOC items count
     let tocItemsGap = 10;
-    if (COLLEGE_TOC_CONTENT.length > 10 && COLLEGE_TOC_CONTENT.length < 13) {
+    if (tocItems.length > 10 && tocItems.length < 13) {
       tocItemsGap = 8;
-    } else if (COLLEGE_TOC_CONTENT.length >= 13) {
+    } else if (tocItems.length >= 13) {
       tocItemsGap = 10;
     }
 
-    COLLEGE_TOC_CONTENT.forEach((item, index) => {
+    tocItems.forEach((item, index) => {
       // 2. Check for overflow
       if (currentY > bottomLimit) {
         this.doc.addPage();
@@ -504,7 +512,16 @@ export class CollegeReport extends BaseReport {
         nestedIndent: 30,
       },
     );
-    this.generateACI();
+    // ACI is optional: render the Agile Compatibility Index only when the
+    // student has completed the ACI assessment; otherwise skip it and continue
+    // with the DISC-only sections.
+    if (this.hasAci(this.data.agile_scores)) {
+      this.generateACI();
+    } else {
+      logger.info(
+        '[CollegeREPORT] ACI data absent - skipping Agile Compatibility Index section.',
+      );
+    }
     this.h1('Your Personalized Behavioural Snapshot');
     this.h3('What Makes You Exceptional');
     this.pHtml(contentBlock.your_personalized_behavioral_charts_1);
