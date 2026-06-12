@@ -8,11 +8,14 @@ import ExcelExportButton from '../ui/ExcelExportButton';
 import DateRangeFilter, { DateRangeOption } from '../ui/DateRangeFilter';
 import DateRangePickerModal from '../ui/DateRangePickerModal';
 import GroupCandidateAssessmentPreview from './GroupCandidateAssessmentPreview';
+import AssignIndividualExamModal from '../admin/AssignIndividualExamModal';
+import { corporateRegistrationService } from '../../lib/services/corporateRegistration.service';
 
 interface EmployeePreviewProps {
     registration: Registration;
     onBack: () => void;
     corporateEmail: string;
+    corporateUserId?: string;
 }
 
 const format = (d: Date | null) => {
@@ -23,7 +26,7 @@ const format = (d: Date | null) => {
     return `${year}-${month}-${day}`;
 };
 
-const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack, corporateEmail }) => {
+const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack, corporateEmail, corporateUserId }) => {
     // Assessment List State
     const [sessions, setSessions] = useState<AssessmentSession[]>([]);
     const [loading, setLoading] = useState(true);
@@ -47,6 +50,9 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
     // Selected View for Assessments
     const [view, setView] = useState<'list' | 'assessment-preview'>('list');
     const [selectedSession, setSelectedSession] = useState<AssessmentSession | null>(null);
+    const [isAssignExamOpen, setIsAssignExamOpen] = useState(false);
+
+    const registrationId = (registration as any).registrationId || registration.id;
 
     const fetchSessions = useCallback(async () => {
         // Handle mismatched property names (backend sends userId, type expects user_id)
@@ -179,6 +185,24 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
                 onClose={() => setIsDateModalOpen(false)}
                 onApply={handleDateModalApply}
                 initialRange={{ start: startDate, end: endDate, label: dateRangeLabel }}
+            />
+            <AssignIndividualExamModal
+                isOpen={isAssignExamOpen}
+                fullName={registration.full_name}
+                loadPreview={() =>
+                    corporateRegistrationService.getIndividualExamPreview(
+                        registrationId,
+                        corporateUserId || '',
+                    )
+                }
+                assignExam={(examStart, examEnd) =>
+                    corporateRegistrationService.assignIndividualExam(
+                        { registrationId, examStart, examEnd },
+                        corporateUserId || '',
+                    )
+                }
+                onClose={() => setIsAssignExamOpen(false)}
+                onSuccess={() => fetchSessions()}
             />
             {/* Header */}
             <div>
@@ -355,7 +379,10 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
 
                         <ExcelExportButton onClick={handleExport} />
 
-                        <button className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer">
+                        <button
+                            onClick={() => setIsAssignExamOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-brand-green border border-transparent rounded-lg text-sm font-medium text-white hover:bg-brand-green/90 transition-all shadow-lg shadow-brand-green/20 cursor-pointer"
+                        >
                             <span>Assign New exam</span>
                             <PlusIcon className="w-4 h-4 text-white" />
                         </button>

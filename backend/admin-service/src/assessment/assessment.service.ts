@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import PDFDocument from 'pdfkit';
 import {
   AssessmentSession,
@@ -18,6 +18,7 @@ import { Department } from '../departments/department.entity';
 import { DepartmentDegree } from '../departments/department-degree.entity';
 import { DegreeType } from '../departments/degree-type.entity';
 import { AssessmentGenerationService } from './assessment-generation.service';
+import { LevelEligibilityService } from '../levels/level-eligibility.service';
 
 @Injectable()
 export class AssessmentService {
@@ -45,7 +46,218 @@ export class AssessmentService {
     private readonly deptDegreeRepo: Repository<DepartmentDegree>,
     private readonly dataSource: DataSource,
     private readonly assessmentGenService: AssessmentGenerationService,
+    private readonly levelEligibility: LevelEligibilityService,
   ) {}
+
+  /** Terminal session statuses — a user with only these can receive a new exam. */
+  private static readonly TERMINAL_SESSION_STATUSES = [
+    'COMPLETED',
+    'EXPIRED',
+    'PARTIALLY_EXP',
+    'PARTIALLY_EXPIRED',
+  ];
+
+  /** True when a level is the Level 1 Behavioral (DISC) level. */
+  private isBehavioralLevel(level: AssessmentLevel): boolean {
+    return (
+      level.levelNumber === 1 ||
+      String(level.patternType || '').toUpperCase() === 'DISC' ||
+      level.name === 'Level 1'
+    );
+  }
+
+  /**
+   * Resolve the assessment levels a registration should receive, in order,
+   * from the admin-configurable `levels.*` settings (enable flag +
+   * program/department/board scope). Mirrors the registration-time logic so
+   * the preview and the actual assignment always agree with current settings.
+   */
+  private async resolveEnabledLevelsForRegistration(
+    manager: EntityManager,
+    registration: Registration,
+    programId: number,
+  ): Promise<AssessmentLevel[]> {
+    const levels = await manager.getRepository(AssessmentLevel).find({
+      order: { sortOrder: 'ASC' },
+    });
+
+    let departmentId: number | string | null = null;
+    if (registration.departmentDegreeId) {
+      const rows = await manager.query(
+        `SELECT department_id FROM department_degrees WHERE id = $1 LIMIT 1`,
+        [registration.departmentDegreeId],
+      );
+      departmentId = rows?.[0]?.department_id ?? null;
+    }
+
+    return this.levelEligibility.filterEnabledLevels(levels, {
+      programId,
+      departmentDegreeId: registration.departmentDegreeId,
+      departmentId,
+      studentBoard: registration.studentBoard,
+    });
+  }
+
+  /**
+   * Preview what a brand-new individual exam would assign to a single user:
+   * the program and the levels currently enabled for their registration scope.
+   * Also reports whether the user currently has an ongoing (non-terminal)
+   * session, in which case a new exam cannot be assigned.
+   */
+  async previewIndividualExam(registrationId: number) {
+    const registration = await this.dataSource
+      .getRepository(Registration)
+      .findOne({ where: { id: registrationId as any } });
+    if (!registration) {
+      throw new BadRequestException(`Registration ${registrationId} not found`);
+    }
+    if (!registration.programId) {
+      throw new BadRequestException(
+        'Registration has no program; cannot assign an exam.',
+      );
+    }
+
+    const programId = Number(registration.programId);
+    const program = await this.dataSource
+      .getRepository(Program)
+      .findOne({ where: { id: programId as any } });
+
+    const levels = await this.resolveEnabledLevelsForRegistration(
+      this.dataSource.manager,
+      registration,
+      programId,
+    );
+
+    const ongoingSession = await this.dataSource
+      .getRepository(AssessmentSession)
+      .createQueryBuilder('s')
+      .where('s.user_id = :uid', { uid: registration.userId })
+      .andWhere('s.status NOT IN (:...terminal)', {
+        terminal: AssessmentService.TERMINAL_SESSION_STATUSES,
+      })
+      .getOne();
+
+    return {
+      registrationId: Number(registration.id),
+      userId: Number(registration.userId),
+      program: program
+        ? {
+            id: Number(program.id),
+            name: program.name,
+            assessmentTitle: program.assessmentTitle,
+          }
+        : null,
+      levels: levels.map((l) => ({
+        id: Number(l.id),
+        levelNumber: l.levelNumber,
+        name: l.name,
+        patternType: l.patternType,
+      })),
+      canAssign: !ongoingSession,
+      ongoingStatus: ongoingSession?.status ?? null,
+    };
+  }
+
+  /**
+   * Assign a brand-new individual exam (date window only) to a single user.
+   * Reuses the user's registration program + current level settings. Creates a
+   * fresh standalone AssessmentSession (no group) + mandatory-level attempts,
+   * generating Level-1 questions up-front. Blocks when the user has an ongoing
+   * (non-terminal) session. The new session becomes their latest exam.
+   */
+  async assignIndividualExam(input: {
+    registrationId: number;
+    examStart?: string;
+    examEnd?: string;
+  }) {
+    const { registrationId, examStart, examEnd } = input;
+    if (!registrationId) {
+      throw new BadRequestException('registrationId is required');
+    }
+
+    const validFrom = examStart ? new Date(examStart) : new Date();
+    const validTo = examEnd
+      ? new Date(examEnd)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    return this.dataSource.transaction(async (manager) => {
+      const registration = await manager
+        .getRepository(Registration)
+        .findOne({ where: { id: registrationId as any } });
+      if (!registration) {
+        throw new BadRequestException(
+          `Registration ${registrationId} not found`,
+        );
+      }
+      if (!registration.programId) {
+        throw new BadRequestException(
+          'Registration has no program; cannot assign an exam.',
+        );
+      }
+      const programId = Number(registration.programId);
+
+      // Block assignment while a non-terminal session exists — only users with
+      // a completed/expired exam may receive a new one.
+      const ongoingSession = await manager
+        .getRepository(AssessmentSession)
+        .createQueryBuilder('s')
+        .where('s.user_id = :uid', { uid: registration.userId })
+        .andWhere('s.status NOT IN (:...terminal)', {
+          terminal: AssessmentService.TERMINAL_SESSION_STATUSES,
+        })
+        .getOne();
+      if (ongoingSession) {
+        throw new BadRequestException(
+          `User has an ongoing assessment (Status: ${ongoingSession.status}). Cannot assign a new exam.`,
+        );
+      }
+
+      const session = manager.create(AssessmentSession, {
+        userId: registration.userId,
+        registrationId: registration.id,
+        programId,
+        groupId: null,
+        groupAssessmentId: null,
+        status: 'NOT_STARTED',
+        validFrom,
+        validTo,
+        metadata: { source: 'ADMIN_ASSIGN_INDIVIDUAL_EXAM' },
+      });
+      await manager.save(session);
+
+      const levels = await this.resolveEnabledLevelsForRegistration(
+        manager,
+        registration,
+        programId,
+      );
+
+      for (const level of levels) {
+        const attempt = manager.create(AssessmentAttempt, {
+          userId: registration.userId,
+          registrationId: registration.id,
+          programId,
+          assessmentSessionId: session.id,
+          assessmentLevelId: level.id,
+          status: 'NOT_STARTED',
+        });
+        await manager.save(attempt);
+
+        if (this.isBehavioralLevel(level)) {
+          await this.assessmentGenService.generateQuestions(attempt, manager);
+        }
+      }
+
+      return {
+        sessionId: Number(session.id),
+        registrationId: Number(registration.id),
+        userId: Number(registration.userId),
+        programId,
+        levelsAssigned: levels.length,
+        validFrom,
+        validTo,
+      };
+    });
+  }
 
   async findAllSessions(
     page: number,

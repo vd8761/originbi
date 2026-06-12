@@ -26,6 +26,27 @@ export class AssessmentController {
     });
   }
 
+  @Get('individual-exam-preview')
+  async previewIndividualExam(@Query('registrationId') registrationId: string) {
+    return this.assessmentService.previewIndividualExam(Number(registrationId));
+  }
+
+  @Post('assign-individual-exam')
+  async assignIndividualExam(
+    @Body()
+    body: {
+      registrationId: number;
+      examStart?: string;
+      examEnd?: string;
+    },
+  ) {
+    return this.assessmentService.assignIndividualExam({
+      registrationId: Number(body.registrationId),
+      examStart: body.examStart,
+      examEnd: body.examEnd,
+    });
+  }
+
   @Get('sessions')
   async findAllSessions(
     @Query('page') page = '1',
