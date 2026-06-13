@@ -744,6 +744,27 @@ export class StudentService {
         );
         totalCount = Number(rows?.[0]?.total || 0);
         answeredCount = Number(rows?.[0]?.completed || 0);
+
+        // The attempt's iat_attempt_modules rows are only provisioned when the
+        // candidate actually starts the exam. Before that the count above is 0,
+        // which would surface as "0 modules" on the assessment card and in the
+        // begin-test modal. Fall back to the count of modules this candidate is
+        // routed to via the scope rules so the real total shows up-front.
+        if (totalCount === 0) {
+          const activeModules: Array<{ id: number }> =
+            await this.sessionRepo.manager.query(
+              `SELECT id FROM iat_modules
+               WHERE is_active = true AND is_deleted = false
+               ORDER BY module_order ASC`,
+            );
+          const eligibleModules =
+            await this.iatEligibility.filterModulesForRegistration(
+              attempt.registrationId,
+              attempt.programId,
+              activeModules,
+            );
+          totalCount = eligibleModules.length;
+        }
       } else if (assessmentKind === 'METAPHOR') {
         const rows = await this.answerRepo.query(
           `SELECT COUNT(*)::int AS total,
@@ -754,6 +775,19 @@ export class StudentService {
         );
         totalCount = Number(rows?.[0]?.total || 0);
         answeredCount = Number(rows?.[0]?.completed || 0);
+
+        // Metaphor questions are lazily generated per candidate, so the answers
+        // table is empty until the exam is opened. Fall back to the configured
+        // question_count so the card/modal show the real total before start.
+        if (totalCount === 0) {
+          const configuredCount = Number(
+            (await this.settingsService.getValue<number>(
+              'metaphor',
+              'question_count',
+            )) ?? 20,
+          );
+          totalCount = Number.isFinite(configuredCount) ? configuredCount : 20;
+        }
       }
       let status = attempt.status;
       let unlockTime: Date | null = null;
