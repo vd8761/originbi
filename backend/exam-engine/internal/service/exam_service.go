@@ -202,9 +202,9 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 					var query string
 					var args []interface{}
 
-						if program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
-							// Balanced Category Selection with Board Priority
-							query = `
+					if program.Code == "SCHOOL_STUDENT" && studentBoard != "" {
+						// Balanced Category Selection with Board Priority
+						query = `
 								INSERT INTO assessment_answers (
 									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
 									main_question_id, question_source, status, question_sequence, created_at, updated_at
@@ -226,14 +226,14 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 								) t
 								WHERE rnk <= 5
 							`
-							args = []interface{}{
-								attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-								*attempt.AssessmentLevelID, *traitID, studentBoard,
-								*attempt.AssessmentLevelID, *traitID,
-							}
-						} else {
-							// Balanced Category Selection (Generic Trait)
-							query = `
+						args = []interface{}{
+							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+							*attempt.AssessmentLevelID, *traitID, studentBoard,
+							*attempt.AssessmentLevelID, *traitID,
+						}
+					} else {
+						// Balanced Category Selection (Generic Trait)
+						query = `
 								INSERT INTO assessment_answers (
 									assessment_attempt_id, assessment_session_id, user_id, registration_id, program_id, assessment_level_id, 
 									main_question_id, question_source, status, question_sequence, created_at, updated_at
@@ -250,11 +250,11 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 								) t
 								WHERE rnk <= 5
 							`
-							args = []interface{}{
-								attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
-								*attempt.AssessmentLevelID, *traitID,
-							}
+						args = []interface{}{
+							attempt.ID, attempt.AssessmentSessionID, attempt.UserID, attempt.RegistrationID, attempt.ProgramID, *attempt.AssessmentLevelID,
+							*attempt.AssessmentLevelID, *traitID,
 						}
+					}
 
 					fmt.Printf("[GetExamQuestions - Fallback] Generating Balanced Category Questions for Attempt %d. Trait=%d, Board=%s\n", attempt.ID, *traitID, studentBoard)
 					genResult := db.Exec(query, args...)
@@ -286,6 +286,39 @@ func (s *ExamService) GetExamQuestions(attemptID int64, studentID int64) ([]mode
 	}
 
 	return answers, nil
+}
+
+// generateReportNumber mints the next OBI report number for a session using the
+// canonical convention: OBI-G{group}-{MM/YY}-{programCode}-{seq}. Shared by the
+// Level 1 early-create and the full-completion paths so both produce identical
+// numbering.
+func (s *ExamService) generateReportNumber(tx *gorm.DB, session models.AssessmentSession, now time.Time) string {
+	var program models.Program
+	tx.First(&program, session.ProgramID)
+
+	groupIDStr := ""
+	if session.GroupID != nil {
+		groupIDStr = fmt.Sprintf("G%d-", *session.GroupID)
+	}
+
+	dateStr := now.Format("01/06") // Month/Year (e.g., 06/25)
+	shortProgramCode := program.Code
+	switch program.Code {
+	case "COLLEGE_STUDENT":
+		shortProgramCode = "CS"
+	case "SCHOOL_STUDENT":
+		shortProgramCode = "SS"
+	case "EMPLOYEE":
+		shortProgramCode = "E"
+	case "CXO_GENERAL":
+		shortProgramCode = "CG"
+	}
+	reportPrefix := fmt.Sprintf("OBI-%s%s-%s-", groupIDStr, dateStr, shortProgramCode)
+
+	var count int64
+	tx.Model(&models.AssessmentReports{}).Where("report_number LIKE ?", reportPrefix+"%").Count(&count)
+	seqNum := count + 1
+	return fmt.Sprintf("%s%03d", reportPrefix, seqNum)
 }
 
 func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
@@ -635,33 +668,78 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 				return err
 			}
 
+			// --- 🟢 ASSIGN REPORT NUMBER AT LEVEL 1 ---
+			// As soon as Level 1 (Behavioural/DISC) completes, mint the OBI
+			// report number so the Level 1 report can be downloaded with a real
+			// reference while later levels are still pending. The ACI / Level-3/4
+			// score snapshot is backfilled when the whole session completes (see
+			// the completion block below). Idempotent: only creates if absent.
+			if currentLevel.LevelNumber == 1 || currentLevel.PatternType == "DISC" || currentLevel.Name == "Level 1" {
+				var existingReport models.AssessmentReports
+				if err := tx.Where("assessment_session_id = ?", answerRecord.AssessmentSessionID).First(&existingReport).Error; err != nil {
+					var repSession models.AssessmentSession
+					if err := tx.First(&repSession, answerRecord.AssessmentSessionID).Error; err == nil {
+						reportNumber := s.generateReportNumber(tx, repSession, now)
+						discJSON := "{}"
+						if val, ok := metaMap["disc_scores"]; ok {
+							if b, e := json.Marshal(val); e == nil {
+								discJSON = string(b)
+							}
+						}
+						earlyReport := models.AssessmentReports{
+							AssessmentSessionID: repSession.ID,
+							ReportNumber:        reportNumber,
+							GeneratedAt:         now,
+							DiscScores:          discJSON,
+							AgileScores:         "{}",
+							Level3Scores:        "{}",
+							Level4Scores:        "{}",
+							OverallSincerity:    sincerityIndex,
+							DominantTraitID:     traitID,
+							Metadata:            "{}",
+						}
+						// Isolate the insert in a savepoint so a unique-number race
+						// (two students finishing Level 1 at the same instant) can
+						// never abort the whole answer-submission transaction — it
+						// just skips the early row and falls back to creating it at
+						// completion.
+						createErr := tx.Transaction(func(tx2 *gorm.DB) error {
+							return tx2.Create(&earlyReport).Error
+						})
+						if createErr != nil {
+							fmt.Printf("[SubmitAnswer] Skipped early L1 Assessment Report (will create at completion): %v\n", createErr)
+						} else {
+							fmt.Printf("[SubmitAnswer] Early L1 Assessment Report created: %s\n", reportNumber)
+						}
+					}
+				}
+			}
+
 			// 5. Next Level Setup (Level 2 Generation)
 			var nextLevel models.AssessmentLevel
+			var nextAttempt models.AssessmentAttempt
 			hasNextLevel := false
 
-			// Check if a next level generally exists in the system (Check only MANDATORY levels)
-			if err := tx.Where("level_number > ? AND is_mandatory = ?", currentLevel.LevelNumber, true).Order("level_number ASC").First(&nextLevel).Error; err == nil {
+			// Advance only through the levels this candidate was actually
+			// SCHEDULED for — i.e. the next mandatory level they already have an
+			// attempt for. We deliberately do NOT auto-create attempts for
+			// mandatory levels that weren't assigned to this registration (e.g.
+			// ACI when only Behavioural + IAT Gen + Metaphor were scheduled), so
+			// the exam and the report follow exactly the assigned set. A level
+			// enabled after registration must be added via re-assignment.
+			nextLevelErr := tx.
+				Table("assessment_levels").
+				Select("assessment_levels.*").
+				Joins("JOIN assessment_attempts aa ON aa.assessment_level_id = assessment_levels.id AND aa.assessment_session_id = ?", answerRecord.AssessmentSessionID).
+				Where("assessment_levels.level_number > ? AND assessment_levels.is_mandatory = ?", currentLevel.LevelNumber, true).
+				Order("assessment_levels.level_number ASC").
+				First(&nextLevel).Error
 
-				// Check if this specific user/session HAS an attempt for this next level.
-				var nextAttempt models.AssessmentAttempt
-				attemptErr := tx.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error
-
-				// If the level was enabled AFTER this student registered, the attempt
-				// won't exist yet. Create it so the student proceeds to the next level
-				// instead of being sent to the report (any exam can be toggled on/off).
-				if attemptErr != nil {
-					levelID := nextLevel.ID
-					nextAttempt = models.AssessmentAttempt{
-						AssessmentSessionID: answerRecord.AssessmentSessionID,
-						UserID:              answerRecord.UserID,
-						RegistrationID:      answerRecord.RegistrationID,
-						ProgramID:           answerRecord.ProgramID,
-						AssessmentLevelID:   &levelID,
-						Status:              "NOT_STARTED",
-					}
-					if createErr := tx.Create(&nextAttempt).Error; createErr != nil {
-						fmt.Printf("[SubmitAnswer] Failed to create next-level attempt (level %d): %v\n", nextLevel.LevelNumber, createErr)
-					}
+			if nextLevelErr == nil {
+				// The join guarantees this candidate has an attempt for the
+				// level; load it so we can unlock it.
+				if attemptErr := tx.Where("assessment_session_id = ? AND assessment_level_id = ?", answerRecord.AssessmentSessionID, nextLevel.ID).First(&nextAttempt).Error; attemptErr != nil {
+					fmt.Printf("[SubmitAnswer] Next-level attempt lookup failed (level %d): %v\n", nextLevel.LevelNumber, attemptErr)
 				}
 
 				if nextAttempt.ID != 0 {
@@ -912,6 +990,53 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 							fmt.Printf("ERROR: Failed to create Assessment Report: %v\n", err)
 						} else {
 							fmt.Printf("SUCCESS: Assessment Report Created. ID: %d\n", newReport.ID)
+						}
+					} else {
+						// Report already exists — it was created when Level 1
+						// completed (so the Level 1 report could be downloaded
+						// early). Backfill the full score snapshot now that every
+						// level is done, keeping the original report number.
+						var attempts []models.AssessmentAttempt
+						tx.Where("assessment_session_id = ?", session.ID).Find(&attempts)
+
+						discScores := "{}"
+						agileScores := "{}"
+						var overallSincerity float64
+						var dominantTraitID *int64
+
+						for _, att := range attempts {
+							var level models.AssessmentLevel
+							tx.First(&level, att.AssessmentLevelID)
+
+							var meta map[string]interface{}
+							if att.Metadata != "" && att.Metadata != "{}" {
+								json.Unmarshal([]byte(att.Metadata), &meta)
+							}
+
+							if level.LevelNumber == 1 || level.Name == "Level 1" || level.PatternType == "DISC" {
+								if val, ok := meta["disc_scores"]; ok {
+									bytes, _ := json.Marshal(val)
+									discScores = string(bytes)
+								}
+								overallSincerity = att.SincerityIndex
+								dominantTraitID = att.DominantTraitID
+							} else if level.LevelNumber == 2 || level.Name == "Level 2" {
+								if val, ok := meta["agile_scores"]; ok {
+									bytes, _ := json.Marshal(val)
+									agileScores = string(bytes)
+								}
+							}
+						}
+
+						if err := tx.Model(&existingReport).Updates(map[string]interface{}{
+							"disc_scores":       discScores,
+							"agile_scores":      agileScores,
+							"overall_sincerity": overallSincerity,
+							"dominant_trait_id": dominantTraitID,
+						}).Error; err != nil {
+							fmt.Printf("ERROR: Failed to backfill Assessment Report %d: %v\n", existingReport.ID, err)
+						} else {
+							fmt.Printf("SUCCESS: Assessment Report %d backfilled (%s).\n", existingReport.ID, existingReport.ReportNumber)
 						}
 					}
 

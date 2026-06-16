@@ -423,7 +423,7 @@ const DonutChart = ({ total, traits }: { total: number; traits: TraitData[] }) =
     );
 };
 
-const PersonalityDistribution = ({ data }: { data: PersonalityDistributionData }) => {
+const PersonalityDistribution = ({ data, onKnowMore }: { data: PersonalityDistributionData; onKnowMore?: () => void }) => {
     const traits = data.topTraits.length > 0 ? data.topTraits : [];
     return (
         <div className="glass-card shadow-none dark:bg-white/[0.08] rounded-[32px] p-6 h-full font-['Haskoy'] flex flex-col justify-between">
@@ -443,7 +443,10 @@ const PersonalityDistribution = ({ data }: { data: PersonalityDistributionData }
                         </span>
                     </div>
                 </div>
-                <button className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] hover:underline whitespace-nowrap">
+                <button
+                    onClick={onKnowMore}
+                    className="font-medium text-[clamp(13px,1vw,15px)] text-[#1ED36A] hover:underline whitespace-nowrap cursor-pointer"
+                >
                     Know More
                 </button>
             </div>
@@ -950,7 +953,10 @@ const CorporateDashboard: React.FC = () => {
             {/* 3. Middle Grid: Personality, Participants */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
                 <div className="lg:col-span-4">
-                    <PersonalityDistribution data={stats?.personalityDistribution ?? { totalWithTraits: 0, topTraits: [] }} />
+                    <PersonalityDistribution
+                        data={stats?.personalityDistribution ?? { totalWithTraits: 0, topTraits: [] }}
+                        onKnowMore={() => router.push('/corporate/personality-overview')}
+                    />
                 </div>
                 <div className="lg:col-span-8">
                     <ParticipantsTable

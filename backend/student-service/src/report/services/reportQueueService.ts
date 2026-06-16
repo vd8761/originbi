@@ -7,6 +7,7 @@ import archiver = require('archiver');
 import {
   fetchGroupAssessmentData,
   fetchUserAssessmentData,
+  ensureReportNumber,
 } from '../helpers/groupReportHelper';
 import { MergedReportData } from '../types/types';
 import {
@@ -544,6 +545,21 @@ export const reportQueueService = {
         progress: 'Generating PDF...',
       });
 
+      // Read-path safety net: if this session has no report number yet (e.g.
+      // its Level 1 completed before the exam-engine started minting one, or a
+      // pre-completion Level 1 download), mint it now so both the filename and
+      // the number printed on the PDF are real instead of "Nil".
+      if (!user.exam_ref_no || user.exam_ref_no === 'Nil') {
+        try {
+          const minted = await ensureReportNumber(user.assigned_exam_id);
+          if (minted) user.exam_ref_no = minted;
+        } catch (err) {
+          logger.warn(
+            `[JOB:${jobId}] ensureReportNumber failed: ${(err as Error).message}`,
+          );
+        }
+      }
+
       const formattedName = (user.full_name || '')
         .replace(/[^a-zA-Z]+/g, ' ')
         .trim()
@@ -554,7 +570,15 @@ export const reportQueueService = {
         )
         .join('_');
 
-      const formattedReportNo = (user.exam_ref_no || '')
+      // Treat a missing/"Nil" reference as empty and fall back to the BI
+      // registration id, so the filename never reads "<name>_Nil.pdf".
+      const rawReportRef =
+        !user.exam_ref_no || user.exam_ref_no === 'Nil'
+          ? user.bi_registration_ID
+            ? `BI-${user.bi_registration_ID}`
+            : ''
+          : user.exam_ref_no;
+      const formattedReportNo = (rawReportRef || '')
         .replace(/[^a-zA-Z0-9]+/g, '_')
         .replace(/_+/g, '_')
         .replace(/^_|_$/g, '');

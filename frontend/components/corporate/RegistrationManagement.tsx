@@ -18,6 +18,7 @@ import ExcelExportButton from '../ui/ExcelExportButton';
 import RegistrationTable from '../ui/RegistrationTable';
 import AssessmentSessionsTable from "./AssessmentSessionsTable";
 import GroupAssessmentPreview from "./GroupAssessmentPreview";
+import GroupCombinedPreview from "./GroupCombinedPreview";
 import GroupCandidateAssessmentPreview from "./GroupCandidateAssessmentPreview";
 import CorporateBulkEmailTab from "./CorporateBulkEmailTab";
 
@@ -37,7 +38,7 @@ const useDebounce = (value: string, delay: number) => {
 };
 
 const RegistrationManagement: React.FC = () => {
-  type ViewState = 'list' | 'add' | 'preview' | 'assessment-preview' | 'group-assessment-preview' | 'group-candidate-assessment-preview';
+  type ViewState = 'list' | 'add' | 'preview' | 'assessment-preview' | 'group-assessment-preview' | 'group-combined-preview' | 'group-candidate-assessment-preview';
   const [view, setView] = useState<ViewState>("list");
 
   const [activeTab, setActiveTab] = useState<"registrations" | "individual" | "group" | "send-emails">("registrations");
@@ -59,6 +60,10 @@ const RegistrationManagement: React.FC = () => {
   // Selected Items for Previews
   const [selectedSession, setSelectedSession] = useState<AssessmentSession | null>(null);
   const [selectedGroupSessionId, setSelectedGroupSessionId] = useState<string | null>(null);
+  // Combined "By Group" report target (group + program across all windows).
+  const [selectedGroupCombined, setSelectedGroupCombined] = useState<{ groupId: string; programId: string } | null>(null);
+  // Where the group-candidate report should return to on Back.
+  const [groupCandidateBack, setGroupCandidateBack] = useState<'group-assessment-preview' | 'group-combined-preview' | 'list'>('list');
 
   // Independent Tab Counts
   const [tabCounts, setTabCounts] = useState<{
@@ -298,8 +303,18 @@ const RegistrationManagement: React.FC = () => {
 
       // If we are in Group View, use the passed session directly as selectedSession
       setSelectedSession(session as AssessmentSession);
+      setGroupCandidateBack('group-assessment-preview');
       setView('group-candidate-assessment-preview');
     }
+  };
+
+  // Open a candidate report from the combined "By Group" view. Only the id is
+  // available there; the report component refetches full details by id.
+  const handleViewCombinedCandidate = (id: string) => {
+    if (!id) return;
+    setSelectedSession({ id } as AssessmentSession);
+    setGroupCandidateBack('group-combined-preview');
+    setView('group-candidate-assessment-preview');
   };
 
   // Render Views
@@ -314,6 +329,21 @@ const RegistrationManagement: React.FC = () => {
         sessionId={selectedGroupSessionId || ""}
         onBack={() => setView('list')}
         onViewSession={handleViewGroupCandidateSession}
+        onViewCombined={(groupId, programId) => {
+          setSelectedGroupCombined({ groupId: String(groupId), programId: String(programId) });
+          setView('group-combined-preview');
+        }}
+      />
+    );
+  }
+
+  if (view === 'group-combined-preview' && selectedGroupCombined) {
+    return (
+      <GroupCombinedPreview
+        groupId={selectedGroupCombined.groupId}
+        programId={selectedGroupCombined.programId}
+        onBack={() => setView('group-assessment-preview')}
+        onViewSession={handleViewCombinedCandidate}
       />
     );
   }
@@ -322,20 +352,7 @@ const RegistrationManagement: React.FC = () => {
     return (
       <GroupCandidateAssessmentPreview
         session={selectedSession}
-        onBack={() => {
-          // If we came from Group Assessment Preview, we should go back there?
-          // Currently 'onBack' in Admin goes to 'list' if it was individual.
-          // But if it was nested? 
-          // The breadcrumb says Group Assessment Preview.
-          // So we should go back to group-assessment-preview.
-          // But we need to know where we came from.
-          // Simple logic: if selectedGroupSessionId is set, go back to group view.
-          if (selectedGroupSessionId) {
-            setView('group-assessment-preview');
-          } else {
-            setView('list');
-          }
-        }}
+        onBack={() => setView(groupCandidateBack)}
       />
     );
   }

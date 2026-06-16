@@ -45,6 +45,44 @@ export const corporateDashboardService = {
         return res.json();
     },
 
+    async getPersonalityOverview(email: string, startDate?: string, endDate?: string): Promise<{
+        totalWithTraits: number;
+        distinctTraits: number;
+        traits: Array<{
+            code: string;
+            name: string;
+            description: string | null;
+            colorRgb: string;
+            imageKey: string;
+            characterImage: string;
+            count: number;
+            percentage: number;
+            keyStrengths: any[];
+            roleAlignment: any[];
+            keyBehaviors: any[];
+        }>;
+    }> {
+        const token = AuthService.getToken();
+        const query = new URLSearchParams({
+            email,
+            ...(startDate && { startDate }),
+            ...(endDate && { endDate }),
+        });
+        const res = await fetch(`${API_URL}/dashboard/personality-overview?${query.toString()}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            throw new Error("Failed to fetch personality overview");
+        }
+
+        return res.json();
+    },
+
     async getLedger(email: string, page = 1, limit = 10, search = ''): Promise<{ data: any[], total: number }> {
         const token = AuthService.getToken();
         const res = await fetch(
