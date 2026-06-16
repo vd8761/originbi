@@ -13,7 +13,6 @@ import {
     JobsIcon,
     LockIcon,
     ProfileIcon,
-    BanIcon,
     DownloadIcon,
     LoadingIcon,
 } from '../icons';
@@ -191,6 +190,29 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     // Level 1 Behavioural (DISC-only) short report — College only.
     const isLevel1ReportAvailable = programCode === 'COLLEGE_STUDENT' || programId === 2;
 
+    // Level 1 (DISC / Behavioural Insight) completion. The Level 1 report only
+    // needs Level 1 data, so it can be downloaded as soon as Level 1 is done —
+    // the full & short reports still require every assigned level to finish.
+    const level1Level = levels.find((l: any) =>
+        Number(l.levelNumber ?? l.level_number ?? 0) === 1 ||
+        String(l.patternType || l.pattern_type || '').toUpperCase() === 'DISC' ||
+        l.name === 'Behavioral Insight'
+    );
+    const level1Attempt = session?.attempts?.find((a: any) =>
+        String(a.assessmentLevelId) === String(level1Level?.id) ||
+        (a.assessmentLevel && String(a.assessmentLevel.id) === String(level1Level?.id))
+    );
+    const isSessionComplete = status === 'COMPLETED';
+    const isLevel1Completed = level1Attempt?.status === 'COMPLETED';
+    const canDownloadLevel1 = isLevel1ReportAvailable && isLevel1Completed;
+    const canOpenDownloadMenu = isSessionComplete || canDownloadLevel1;
+    // The Employee report renders DISC-only when ACI is absent, so it can be
+    // downloaded as soon as Level 1 is done — the ACI sections fill in once
+    // that level completes. Other non-College programs still require full
+    // completion before their report is downloadable.
+    const isEmployeeProgram = programCode === 'EMPLOYEE' || programId === 3;
+    const canDownloadFull = isSessionComplete || (isEmployeeProgram && isLevel1Completed);
+
     // Close download dropdown on outside click
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -207,6 +229,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     // Shared download handler
     const handleDownloadReport = async (variant: 'full' | 'short' | 'level1' = 'full') => {
         if (isDownloadingRef.current) return;
+        // Short reports require the whole assessment to be completed. The full
+        // report needs completion too, except for Employees whose report
+        // degrades to DISC-only after Level 1. The Level 1 report only needs
+        // Level 1.
+        if (variant === 'short' && !isSessionComplete) return;
+        if (variant === 'full' && !canDownloadFull) return;
+        if (variant === 'level1' && !isSessionComplete && !isLevel1Completed) return;
         if (!session?.userId) {
             alert("User ID not found for this session.");
             return;
@@ -284,7 +313,10 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
             return aId === String(lvl?.id) || alId === String(lvl?.id);
         }));
-    const visibleLevels = session?.attempts?.length ? levels.filter(levelHasAttempt) : levels;
+    // Always drive the level tabs off the candidate's ACTUAL attempts — never
+    // the global level list. A candidate who wasn't scheduled for a level
+    // (e.g. ACI / Level 2) has no attempt for it, so its tab must not appear.
+    const visibleLevels = levels.filter(levelHasAttempt);
 
     // Calculation for progress bar
     const totalMandatoryLevels = visibleLevels.length || 4; // fallback
@@ -423,11 +455,11 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     ) : isShortReportAvailable ? (
                         <div className="relative" ref={downloadDropdownRef}>
                             <button
-                                onClick={() => status === 'COMPLETED' && setShowDownloadDropdown(!showDownloadDropdown)}
-                                disabled={status !== 'COMPLETED'}
-                                title={status !== 'COMPLETED' ? 'Exam must be completed to download report' : ''}
+                                onClick={() => canOpenDownloadMenu && setShowDownloadDropdown(!showDownloadDropdown)}
+                                disabled={!canOpenDownloadMenu}
+                                title={!canOpenDownloadMenu ? 'Complete Level 1 to download the Level 1 report' : ''}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                    status === 'COMPLETED'
+                                    canOpenDownloadMenu
                                     ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
                                     : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
                                 }`}
@@ -440,7 +472,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                 <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                                     <button
                                         onClick={() => handleDownloadReport('full')}
-                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                        disabled={!isSessionComplete}
+                                        title={!isSessionComplete ? 'Complete all assigned levels to download the full report' : ''}
+                                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${
+                                            isSessionComplete
+                                            ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
+                                            : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                        }`}
                                     >
                                         <DownloadIcon className="w-3 h-3 text-brand-green" />
                                         Full Report
@@ -448,7 +486,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                     <div className="border-t border-gray-100 dark:border-white/5" />
                                     <button
                                         onClick={() => handleDownloadReport('short')}
-                                        className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                        disabled={!isSessionComplete}
+                                        title={!isSessionComplete ? 'Complete all assigned levels to download the short report' : ''}
+                                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${
+                                            isSessionComplete
+                                            ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
+                                            : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                        }`}
                                     >
                                         <DownloadIcon className="w-3 h-3 text-blue-500" />
                                         Short Report
@@ -458,7 +502,13 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                             <div className="border-t border-gray-100 dark:border-white/5" />
                                             <button
                                                 onClick={() => handleDownloadReport('level1')}
-                                                className="w-full text-left px-4 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
+                                                disabled={!isSessionComplete && !isLevel1Completed}
+                                                title={!isSessionComplete && !isLevel1Completed ? 'Complete Level 1 to download the Level 1 report' : ''}
+                                                className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${
+                                                    isSessionComplete || isLevel1Completed
+                                                    ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
+                                                    : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                                }`}
                                             >
                                                 <DownloadIcon className="w-3 h-3 text-purple-500" />
                                                 Level 1 Report
@@ -471,10 +521,10 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     ) : (
                         <button
                             onClick={() => handleDownloadReport('full')}
-                            disabled={status !== 'COMPLETED'}
-                            title={status !== 'COMPLETED' ? 'Exam must be completed to download report' : ''}
+                            disabled={!canDownloadFull}
+                            title={!canDownloadFull ? (isEmployeeProgram ? 'Complete Level 1 to download the report' : 'Exam must be completed to download report') : ''}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                status === 'COMPLETED'
+                                canDownloadFull
                                 ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
                                 : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
                             }`}
@@ -944,9 +994,11 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             return (
                                 <>
                                     {renderLevelReport('DISC', discData.breakdown, discData.compatibility, discAttempt, discLevel, true)}
-                                    {hasIatLevel2
+                                    {/* Only show ACI when the candidate was actually scheduled for it
+                                        (has a Level-2 attempt). Otherwise the section is omitted. */}
+                                    {aciAttempt && (hasIatLevel2
                                         ? renderIatReport(aciAttempt, aciLevel)
-                                        : renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true)}
+                                        : renderLevelReport('ACI', aciData.breakdown, aciData.compatibility, aciAttempt, aciLevel, true))}
                                     {hasDedicatedIat && renderIatReport(iatLevelAttempt, iatLevel)}
                                 </>
                             );
@@ -1013,12 +1065,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                                 {isActive ? (
                                     <span className='bg-brand-green rounded-full p-[1px]'><CheckIcon className="w-2 h-2 text-black" /></span>
                                 ) : (
-                                    !accessible && (
-                                        <div className="flex items-center gap-1">
-                                            <LockIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
-                                            <BanIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
-                                        </div>
-                                    )
+                                    !accessible && <LockIcon className="w-3 h-3 text-gray-400 dark:text-white/70" />
                                 )}
                             </div>
                         );

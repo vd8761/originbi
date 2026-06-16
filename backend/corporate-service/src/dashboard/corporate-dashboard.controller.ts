@@ -31,6 +31,18 @@ export class CorporateDashboardController {
     return this.dashboardService.getStats(email, startDate, endDate);
   }
 
+  @Get('personality-overview')
+  getPersonalityOverview(
+    @Query('email') email: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+    return this.dashboardService.getPersonalityOverview(email, startDate, endDate);
+  }
+
   @Post('forgot-password/initiate')
   initiateReset(@Body('email') email: string) {
     if (!email) {
