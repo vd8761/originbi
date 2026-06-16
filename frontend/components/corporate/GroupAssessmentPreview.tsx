@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { assessmentService } from '../../lib/services/assessment.service';
+import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, EyeVisibleIcon, FilterFunnelIcon } from '../icons';
 import ExcelExportButton from '../ui/ExcelExportButton';
 
@@ -7,6 +8,9 @@ interface GroupAssessmentPreviewProps {
     sessionId: string;
     onBack: () => void;
     onViewSession: (session: any) => void;
+    // Opens the combined "By Group" report across all windows of this
+    // (group, program). Optional so the component still works standalone.
+    onViewCombined?: (groupId: string | number, programId: string | number) => void;
 }
 
 const formatDate = (dateStr?: string) => {
@@ -25,7 +29,7 @@ const formatDate = (dateStr?: string) => {
     }
 };
 
-const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ sessionId, onBack, onViewSession }) => {
+const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ sessionId, onBack, onViewSession, onViewCombined }) => {
     const [groupData, setGroupData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -34,6 +38,25 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [showEntriesDropdown, setShowEntriesDropdown] = useState(false);
     const [statusFilter, setStatusFilter] = useState('All');
     const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
+    // Group placement report (Download / Email) state
+    const [showDownloadModal, setShowDownloadModal] = useState(false);
+    const [departmentStats, setDepartmentStats] = useState<any[]>([]);
+    const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
+    const [downloadLoading, setDownloadLoading] = useState(false);
+    // Report-type chooser. Defaults to the dept-appropriate handbook
+    // (MBA → "mba", everything else → "standard"). "level1" is the Level 1
+    // Placement Report and is available for every department.
+    const [reportType, setReportType] = useState<'mba' | 'standard' | 'level1'>('mba');
+
+    const [generating, setGenerating] = useState(false);
+    const [progress, setProgress] = useState('');
+    const isDownloadingRef = useRef(false);
+
+    // Email State
+    const [reportEmail, setReportEmail] = useState('');
+    const [sendingReportEmail, setSendingReportEmail] = useState(false);
+    const [reportEmailSent, setReportEmailSent] = useState(false);
 
     // Fetch Data
     const fetchGroupData = useCallback(async () => {
@@ -51,6 +74,172 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     useEffect(() => {
         fetchGroupData();
     }, [fetchGroupData]);
+
+    const handleDownloadReportClick = async () => {
+        setDownloadLoading(true);
+        try {
+            const stats = await assessmentService.getGroupDepartmentStats(sessionId);
+            setDepartmentStats(stats.departments || []);
+            // If single department, select it automatically and default the
+            // report type to whichever handbook best matches that department.
+            if (stats.departments?.length > 0) {
+                const first = stats.departments[0];
+                setSelectedDepartment(first.id);
+                const firstIsMBA = (first?.name || '').toUpperCase().includes('MBA');
+                setReportType(firstIsMBA ? 'mba' : 'standard');
+            } else {
+                setReportType('standard');
+            }
+            setShowDownloadModal(true);
+        } catch (error) {
+            console.error("Failed to fetch department stats", error);
+        } finally {
+            setDownloadLoading(false);
+        }
+    };
+
+    const handleConfirmDownload = async () => {
+        if (!selectedDepartment || !groupData?.group?.id) return;
+        if (isDownloadingRef.current) return;
+
+        try {
+            isDownloadingRef.current = true;
+            setGenerating(true);
+            setProgress('Initializing...');
+
+            // 1. Start Job — always send reportType so the backend knows which
+            // report variant to generate (standard, mba, or level1).
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true&reportType=${reportType}`));
+            const startData = await startRes.json();
+
+            if (!startData.success || !startData.jobId) {
+                throw new Error("Failed to start report generation");
+            }
+
+            const jobId = startData.jobId;
+
+            // 2. Poll Status
+            let isComplete = false;
+            while (!isComplete && isDownloadingRef.current) {
+                try {
+                    const statusRes = await fetch(buildReportApiUrl(`/download/status/${jobId}?json=true`));
+                    const statusData = await statusRes.json();
+
+                    if (statusData.status === 'PROCESSING') {
+                        setProgress(statusData.progress || 'Processing...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    } else if (statusData.status === 'COMPLETED') {
+                        isComplete = true;
+                        setProgress('Download Starting...');
+
+                        if (!statusData.downloadUrl) {
+                            throw new Error('Download URL missing from report status.');
+                        }
+
+                        // Trigger Download
+                        window.location.href = buildReportApiUrl(statusData.downloadUrl);
+
+                        // Close Modal after a delay
+                        setTimeout(() => {
+                            setGenerating(false);
+                            setProgress('');
+                            setShowDownloadModal(false);
+                        }, 2000);
+                    } else if (statusData.status === 'ERROR') {
+                        isComplete = true;
+                        throw new Error(statusData.error || 'Generation failed');
+                    }
+                } catch (err) {
+                    isComplete = true;
+                    console.error("Polling error", err);
+                    setProgress('Error!');
+                    setGenerating(false);
+                }
+            }
+
+        } catch (error) {
+            console.error("Download failed", error);
+            setProgress('Failed');
+            setGenerating(false);
+        } finally {
+            isDownloadingRef.current = false;
+        }
+    };
+
+    const handleSendReportEmail = async () => {
+        if (!selectedDepartment || !groupData?.group?.id) return;
+        if (!reportEmail || !reportEmail.includes('@')) {
+            alert('Please enter a valid email address.');
+            return;
+        }
+
+        try {
+            setSendingReportEmail(true);
+
+            // 1. Start Generation — always send reportType.
+            const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true&reportType=${reportType}`));
+            const startData = await startRes.json();
+
+            if (!startData.success || !startData.jobId) {
+                throw new Error('Failed to start report generation');
+            }
+
+            const jobId = startData.jobId;
+
+            // 2. Poll until complete
+            let isComplete = false;
+            while (!isComplete) {
+                const statusRes = await fetch(buildReportApiUrl(`/download/status/${jobId}?json=true`));
+                const statusData = await statusRes.json();
+
+                if (statusData.status === 'PROCESSING') {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } else if (statusData.status === 'COMPLETED') {
+                    isComplete = true;
+
+                    if (!statusData.downloadUrl) {
+                        throw new Error('Download URL missing from report status.');
+                    }
+
+                    // 3. Trigger send email with the download URL
+                    const selectedDept = departmentStats.find((d: any) => d.id === selectedDepartment);
+                    const deptFullName = selectedDept?.name || '';
+                    // Extract degree type from name (e.g. "B.Tech. Information Technology" -> degreeType="B.Tech.", dept="Information Technology")
+                    const deptNameParts = deptFullName.match(/^(B\.Tech\.|M\.Tech\.|B\.E\.|M\.E\.|B\.Sc\.|M\.Sc\.|BCA|MCA|MBA|B\.Com|M\.Com|B\.A\.|M\.A\.)\s*(.+)$/i);
+                    const degreeType = deptNameParts ? deptNameParts[1] : '';
+                    const deptName = deptNameParts ? deptNameParts[2] : deptFullName;
+
+                    const studentApiBase = process.env.NEXT_PUBLIC_STUDENT_API_URL || '';
+                    const sendRes = await fetch(`${studentApiBase}/student/send-placement-report-email`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            groupId: groupData.group.id,
+                            departmentId: selectedDepartment,
+                            toEmail: reportEmail,
+                            downloadUrl: buildReportApiUrl(statusData.downloadUrl),
+                            studentCount: selectedDept?.completed || 0,
+                            degreeType,
+                            departmentName: deptName,
+                        }),
+                    });
+
+                    if (!sendRes.ok) throw new Error('Failed to send email');
+
+                    setReportEmailSent(true);
+                    setTimeout(() => setReportEmailSent(false), 5000);
+                } else if (statusData.status === 'ERROR') {
+                    isComplete = true;
+                    throw new Error(statusData.error || 'Generation failed');
+                }
+            }
+        } catch (error) {
+            console.error('Send report email failed', error);
+            alert('Failed to send report email. Please try again.');
+        } finally {
+            setSendingReportEmail(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -89,6 +278,15 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const total = filteredSessions.length;
     const totalPages = Math.ceil(total / limit) || 1;
     const paginatedSessions = filteredSessions.slice((page - 1) * limit, page * limit);
+
+    // Safely determine program ID (fallback to session programId if group-level program is missing/misconfigured)
+    const actualProgramId = groupData?.program?.id
+        ? Number(groupData.program.id)
+        : (allSessions.length > 0 ? Number(allSessions[0].programId) : null);
+
+    // The group placement report is generated from Level 1 DISC scores and is
+    // currently available for College Student groups only.
+    const isCollegeStudentProgram = actualProgramId === 2;
 
     const handlePageChange = (newPage: number) => {
         if (newPage >= 1 && newPage <= totalPages) {
@@ -329,6 +527,39 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                 </div>
                 {/* Actions */}
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+                    {/* Combined "By Group" report across all windows */}
+                    {onViewCombined && groupData?.group?.id && actualProgramId && (
+                        <button
+                            onClick={() => onViewCombined(groupData.group.id, actualProgramId as number)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm"
+                        >
+                            <span>Combined Report</span>
+                            <svg className="w-5 h-5 text-brand-green" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                    )}
+                    {/* Process Report Button (group placement report) */}
+                    <button
+                        onClick={handleDownloadReportClick}
+                        disabled={downloadLoading || !isCollegeStudentProgram}
+                        title={!isCollegeStudentProgram ? "Available for College Students only" : ""}
+                        className={`flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium transition-all shadow-sm disabled:opacity-70 disabled:cursor-not-allowed
+                            ${!isCollegeStudentProgram
+                                ? 'text-gray-400 dark:text-gray-500'
+                                : 'text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30'}`}
+                    >
+                        <span>{downloadLoading ? "Loading..." : "Process Report"}</span>
+                        {downloadLoading ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-green"></div>
+                        ) : (
+                            <svg className={`w-5 h-5 ${!isCollegeStudentProgram ? 'text-gray-400' : 'text-brand-green'}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        )}
+                    </button>
+
                     <div className="relative">
                         <button
                             onClick={() => setShowFilterDropdown(!showFilterDropdown)}
@@ -461,6 +692,257 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
                 <div className="w-full sm:w-1/3 sm:block hidden order-3"></div>
             </div>
+
+            {/* Download Modal — group placement report */}
+            {showDownloadModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadModal(false)}></div>
+                    <div className="bg-white dark:bg-[#19211C] rounded-2xl w-full max-w-lg p-0 shadow-2xl relative z-10 animate-fade-in-up overflow-hidden flex flex-col max-h-[90vh] ring-1 ring-black/5 dark:ring-white/10">
+                        {/* Accent bar */}
+                        <div className="h-1 w-full bg-gradient-to-r from-brand-green via-emerald-400 to-brand-green"></div>
+
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-start gap-4 px-6 pt-5 pb-4 border-b border-gray-100 dark:border-white/10">
+                            <div className="flex items-start gap-3 min-w-0">
+                                <div className="shrink-0 mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-green/10 text-brand-green ring-1 ring-brand-green/20">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="text-lg font-bold text-brand-dark-primary dark:text-white leading-tight">Process Report</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Select a department, choose a report type, then download or email it.</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowDownloadModal(false)}
+                                className="shrink-0 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                            >
+                                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="px-6 py-5 overflow-y-auto space-y-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+                            {/* Department List */}
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">Department</p>
+                                {departmentStats.length === 0 ? (
+                                    <div className="text-center py-8 text-sm text-gray-500 rounded-xl border border-dashed border-gray-200 dark:border-white/10">
+                                        No departments found for this group.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {departmentStats.map((dept) => {
+                                            // MBA departments get a special placement report — mirror the
+                                            // backend isMBA detection in reportQueueService.processPlacementReport.
+                                            const isMBA = (dept.name || '').toUpperCase().includes('MBA');
+                                            const isSelected = selectedDepartment === dept.id;
+                                            const pct = Math.round((dept.completed / (dept.total || 1)) * 100);
+                                            const isComplete = dept.completed === dept.total && dept.total > 0;
+                                            return (
+                                                <div
+                                                    key={dept.id}
+                                                    onClick={() => {
+                                                        setSelectedDepartment(dept.id);
+                                                        // If the current report type isn't compatible with
+                                                        // the newly-selected department, snap to a sensible
+                                                        // default ("mba" only valid for MBA depts).
+                                                        if (reportType === 'mba' && !isMBA) setReportType('standard');
+                                                    }}
+                                                    className={`p-4 rounded-xl border cursor-pointer transition-all
+                                                        ${isSelected
+                                                            ? 'border-brand-green bg-brand-green/[0.07] ring-1 ring-brand-green shadow-sm'
+                                                            : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                            <div className={`w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors
+                                                                ${isSelected ? 'border-brand-green bg-brand-green' : 'border-gray-300 dark:border-gray-500'}`}>
+                                                                {isSelected && <div className="w-2 h-2 rounded-full bg-brand-dark-primary"></div>}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <p className={`font-semibold text-sm truncate ${isSelected ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
+                                                                        {dept.name}
+                                                                    </p>
+                                                                    {isMBA && (
+                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md whitespace-nowrap shadow-sm bg-gradient-to-r from-amber-300 to-yellow-500 text-amber-900 ring-1 ring-amber-500/50">
+                                                                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                                <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
+                                                                            </svg>
+                                                                            Special MBA
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                                                    {dept.completed} of {dept.total || 0} candidates completed
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <span className={`shrink-0 inline-block whitespace-nowrap text-xs font-bold px-2 py-1 rounded-md
+                                                            ${isComplete
+                                                                ? 'bg-brand-green/15 text-brand-green'
+                                                                : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'}`}>
+                                                            {pct}%
+                                                        </span>
+                                                    </div>
+                                                    {/* Progress bar */}
+                                                    <div className="mt-3 h-1.5 w-full rounded-full bg-gray-100 dark:bg-white/10 overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-brand-green' : 'bg-brand-green/60'}`}
+                                                            style={{ width: `${pct}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Report Type Chooser — always available. The
+                                "Special MBA Report" tile only shows for MBA
+                                departments; the Standard and Level 1 reports
+                                are available for every department. */}
+                            {(() => {
+                                const sel = departmentStats.find((d: any) => d.id === selectedDepartment);
+                                const isMBASel = (sel?.name || '').toUpperCase().includes('MBA');
+                                if (!sel) return null;
+                                const allOptions: { value: 'mba' | 'standard' | 'level1'; title: string; desc: string; mbaOnly?: boolean }[] = [
+                                    {
+                                        value: 'mba',
+                                        title: 'Special MBA Report',
+                                        desc: 'Specialization-fit handbook (Finance, HR, BA, Ops, Marketing).',
+                                        mbaOnly: true,
+                                    },
+                                    {
+                                        value: 'standard',
+                                        title: 'Standard Placement Report',
+                                        desc: 'The regular DISC-style placement handbook.',
+                                    },
+                                    {
+                                        value: 'level1',
+                                        title: 'Level 1 Placement Report',
+                                        desc: 'Group specialization & trait mapping driven by Level 1 DISC scores.',
+                                    },
+                                ];
+                                const options = allOptions.filter((o) => (o.mbaOnly ? isMBASel : true));
+                                const cols = options.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
+                                return (
+                                    <div>
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">Report Type</p>
+                                        <div className={`grid grid-cols-1 ${cols} gap-2.5`}>
+                                            {options.map((opt) => {
+                                                const active = reportType === opt.value;
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        key={opt.value}
+                                                        onClick={() => setReportType(opt.value)}
+                                                        className={`relative text-left p-3.5 rounded-xl border transition-all ${active
+                                                            ? 'border-brand-green bg-brand-green/[0.07] ring-1 ring-brand-green shadow-sm'
+                                                            : 'border-gray-200 dark:border-white/10 hover:border-brand-green/50 hover:bg-gray-50 dark:hover:bg-white/5'}`}
+                                                    >
+                                                        {active && (
+                                                            <span className="absolute top-2.5 right-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-green text-brand-dark-primary">
+                                                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                            </span>
+                                                        )}
+                                                        <div className="flex items-center gap-2 pr-5">
+                                                            {opt.value === 'mba' && (
+                                                                <svg className="w-4 h-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                    <path d="M12 2.5l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 17.6l-5.9 3.1 1.13-6.58L2.45 9.44l6.6-.96L12 2.5z" />
+                                                                </svg>
+                                                            )}
+                                                            {opt.value === 'level1' && (
+                                                                <span className="inline-flex shrink-0 items-center justify-center w-4 h-4 rounded-full bg-brand-green/20 text-brand-green text-[9px] font-bold">L1</span>
+                                                            )}
+                                                            {opt.value === 'standard' && (
+                                                                <svg className="w-4 h-4 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6h6v6m-9 4h12a2 2 0 002-2V7a2 2 0 00-2-2h-4l-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                            )}
+                                                            <p className={`text-sm font-semibold leading-tight ${active ? 'text-brand-green' : 'text-brand-dark-primary dark:text-white'}`}>
+                                                                {opt.title}
+                                                            </p>
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1.5 leading-snug">{opt.desc}</p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Email Input */}
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">Send to Email <span className="normal-case font-normal text-gray-400">(optional)</span></p>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                    </span>
+                                    <input
+                                        type="email"
+                                        value={reportEmail}
+                                        onChange={(e) => setReportEmail(e.target.value)}
+                                        placeholder="Enter email address to send report"
+                                        className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-sm text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-green/30 focus:border-brand-green transition-colors"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-[#FFFFFF05] flex flex-col-reverse sm:flex-row gap-3">
+                            {/* Send Email Button */}
+                            <button
+                                onClick={handleSendReportEmail}
+                                disabled={!selectedDepartment || !reportEmail || sendingReportEmail || generating}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-brand-green text-brand-green font-bold text-sm hover:bg-brand-green/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {sendingReportEmail ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-green"></div>
+                                        <span>Sending...</span>
+                                    </>
+                                ) : reportEmailSent ? (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                        <span>Email Sent!</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                        <span>Send Email</span>
+                                    </>
+                                )}
+                            </button>
+                            {/* Download Report Button */}
+                            <button
+                                onClick={handleConfirmDownload}
+                                disabled={!selectedDepartment || generating || sendingReportEmail}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-brand-green text-brand-dark-primary font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {generating ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-dark-primary"></div>
+                                        <span>{progress}</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>Download Report</span>
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                        </svg>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );

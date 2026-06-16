@@ -432,6 +432,85 @@ export class CorporateDashboardService {
     };
   }
 
+  /**
+   * Full personality overview for the "Know More" page: every personality
+   * type (superhero character) present in the corporate's workforce, with the
+   * head-count per type plus the trait's narrative content (key strengths,
+   * role alignment, key behaviours) so the page can compare them side by side.
+   * Unlike getPersonalityDistribution this is not limited to the top few.
+   */
+  async getPersonalityOverview(
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
+    const corpId = await this.getCorporateAccountIdByEmail(email);
+
+    const dateQuery =
+      startDate && endDate
+        ? ` AND aa.created_at >= '${startDate} 00:00:00' AND aa.created_at <= '${endDate} 23:59:59'`
+        : '';
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        pt.id,
+        pt.code,
+        pt.blended_style_name AS trait_name,
+        pt.blended_style_desc AS trait_desc,
+        pt.color_rgb,
+        pt.metadata,
+        COUNT(aa.id) AS count
+      FROM assessment_attempts aa
+      JOIN registrations r ON aa.registration_id = r.id
+      JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+      WHERE r.corporate_account_id = $1
+        AND r.is_deleted = false
+        AND r.is_tech_assessment IN (0, 2)
+        AND aa.dominant_trait_id IS NOT NULL
+        ${dateQuery}
+      GROUP BY pt.id, pt.code, pt.blended_style_name, pt.blended_style_desc, pt.color_rgb, pt.metadata
+      ORDER BY count DESC, pt.blended_style_name ASC
+      `,
+      [corpId],
+    );
+
+    const normalizeColor = (raw: string | null): string =>
+      raw &&
+      !raw.startsWith('#') &&
+      !raw.startsWith('rgb') &&
+      raw.includes(',')
+        ? `rgb(${raw})`
+        : raw || '#1ED36A';
+
+    const total = (rows || []).reduce(
+      (sum: number, row: any) => sum + parseInt((row.count as string) || '0', 10),
+      0,
+    );
+
+    const traits = (rows || []).map((row: any) => {
+      const meta = row.metadata || {};
+      const traitName = (row.trait_name || '').trim();
+      const imageKey = traitName.replace(/\s+/g, '_');
+      const count = parseInt((row.count as string) || '0', 10);
+      return {
+        code: row.code,
+        name: traitName,
+        description: row.trait_desc || null,
+        colorRgb: normalizeColor(row.color_rgb),
+        imageKey,
+        characterImage: `/traits/Corporate_${imageKey}.png`,
+        count,
+        percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+        keyStrengths: meta.key_strengths || meta.keyStrengths || [],
+        roleAlignment: meta.role_alignment || meta.roleAlignment || [],
+        keyBehaviors: meta.key_behaviors || meta.keyBehaviors || [],
+      };
+    });
+
+    return { totalWithTraits: total, distinctTraits: traits.length, traits };
+  }
+
   private async getPersonalityDistribution(
     corpId: number,
     startDate?: string,

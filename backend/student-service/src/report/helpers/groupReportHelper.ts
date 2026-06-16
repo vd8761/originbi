@@ -13,6 +13,140 @@ import {
 import { SCHOOL_LEVEL_ID, SCHOOL_STREAM_ID } from '../reports/BaseConstants';
 import { ReportVariant } from './reportFactory';
 
+/**
+ * Ensures an `assessment_reports` row (and therefore an OBI report number)
+ * exists for a session, minting one on the fly if absent. This is a read-path
+ * safety net: the exam-engine assigns the number when Level 1 completes, but
+ * sessions whose Level 1 was finished before that change shipped (or a rare
+ * race) can still lack one. When such a report is downloaded we mint it here so
+ * the filename and the number printed on the PDF are real instead of "Nil".
+ *
+ * It NEVER touches the exam-submission flow. The number uses the same
+ * `OBI-G{group}-{MM/YY}-{code}-{seq}` convention as the exam-engine, and the
+ * insert is idempotent — when the session later completes the exam-engine finds
+ * this row and backfills the ACI/Level-3/4 score snapshot onto it.
+ *
+ * @returns the report number, or null when one can't be determined (e.g. no
+ *          completed Level 1 yet) so callers can fall back gracefully.
+ */
+export async function ensureReportNumber(
+  sessionId: string | number,
+): Promise<string | null> {
+  if (!sessionId) return null;
+  const client = await getPool().connect();
+  try {
+    // 1. Already has one?
+    const existing = await client.query(
+      `SELECT report_number FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
+      [sessionId],
+    );
+    if (existing.rows[0]?.report_number) {
+      return existing.rows[0].report_number as string;
+    }
+
+    // 2. Resolve program / group for the prefix.
+    const sess = await client.query(
+      `SELECT s.group_id, p.code AS program_code
+         FROM assessment_sessions s
+         JOIN programs p ON p.id = s.program_id
+        WHERE s.id = $1 LIMIT 1`,
+      [sessionId],
+    );
+    if (!sess.rows[0]) return null;
+    const groupId: number | null = sess.rows[0].group_id ?? null;
+    const programCode: string = sess.rows[0].program_code || '';
+
+    // 3. Require a completed Level 1 (DISC) attempt — its data seeds the row.
+    const att = await client.query(
+      `SELECT aa.dominant_trait_id, aa.sincerity_index, aa.metadata
+         FROM assessment_attempts aa
+         JOIN assessment_levels al ON aa.assessment_level_id = al.id
+        WHERE aa.assessment_session_id = $1
+          AND aa.status = 'COMPLETED'
+          AND (al.level_number = 1 OR al.pattern_type = 'DISC' OR al.name = 'Level 1')
+        LIMIT 1`,
+      [sessionId],
+    );
+    if (!att.rows[0]) return null;
+
+    const shortMap: Record<string, string> = {
+      COLLEGE_STUDENT: 'CS',
+      SCHOOL_STUDENT: 'SS',
+      EMPLOYEE: 'E',
+      CXO_GENERAL: 'CG',
+    };
+    const shortCode = shortMap[programCode] || programCode || 'X';
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yy = String(now.getFullYear()).slice(2);
+    const prefix = `OBI-${groupId ? `G${groupId}-` : ''}${mm}/${yy}-${shortCode}-`;
+
+    // Seed scores from the L1 attempt (agile/level3/4 backfilled at completion).
+    let discJson = '{}';
+    try {
+      const meta =
+        typeof att.rows[0].metadata === 'string'
+          ? JSON.parse(att.rows[0].metadata)
+          : att.rows[0].metadata || {};
+      if (meta?.disc_scores) discJson = JSON.stringify(meta.disc_scores);
+    } catch {
+      discJson = '{}';
+    }
+    const dominantTraitId = att.rows[0].dominant_trait_id ?? null;
+    const sincerity = att.rows[0].sincerity_index ?? 0;
+
+    // 4. Mint + insert idempotently. A unique-number race (another session in
+    //    the same prefix minting at once) can't corrupt anything — we roll back
+    //    and re-read; the row is created by whoever wins, else at completion.
+    try {
+      await client.query('BEGIN');
+      const cnt = await client.query(
+        `SELECT COUNT(*)::int AS c FROM assessment_reports WHERE report_number LIKE $1`,
+        [prefix + '%'],
+      );
+      const seq = ((cnt.rows[0]?.c as number) ?? 0) + 1;
+      const reportNumber = `${prefix}${String(seq).padStart(3, '0')}`;
+      const ins = await client.query(
+        `INSERT INTO assessment_reports
+           (assessment_session_id, report_number, generated_at, disc_scores,
+            agile_scores, level3_scores, level4_scores, overall_sincerity,
+            dominant_trait_id, metadata)
+         VALUES ($1, $2, NOW(), $3, '{}', '{}', '{}', $4, $5, '{}')
+         ON CONFLICT (assessment_session_id) DO NOTHING
+         RETURNING report_number`,
+        [sessionId, reportNumber, discJson, sincerity, dominantTraitId],
+      );
+      await client.query('COMMIT');
+      if (ins.rows[0]?.report_number) {
+        return ins.rows[0].report_number as string;
+      }
+    } catch (e) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* ignore */
+      }
+      logger.warn(
+        `ensureReportNumber: mint failed for session ${sessionId}: ${(e as Error).message}`,
+      );
+    }
+
+    // 5. Conflict / concurrent creation — re-read whatever is now there.
+    const reselect = await client.query(
+      `SELECT report_number FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
+      [sessionId],
+    );
+    return (reselect.rows[0]?.report_number as string) || null;
+  } catch (e) {
+    logger.warn(
+      `ensureReportNumber: failed for session ${sessionId}: ${(e as Error).message}`,
+    );
+    return null;
+  } finally {
+    client.release();
+  }
+}
+
 export async function fetchGroupAssessmentData(
   groupId: string,
   programId?: string | number,
