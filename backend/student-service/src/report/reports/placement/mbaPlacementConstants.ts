@@ -14,9 +14,15 @@ export const MBA_PLACEMENT_CONTENT = {
   executive_summary_text: (count: number) =>
     `<p>This handbook summarizes the MBA specialization assessment conducted for <b>${count} students</b>. Each student is matched to the MBA specialization where their work-readiness profile and behavioral orientation fit best, and grouped accordingly. It helps placement officers target the right recruiters and plan focused grooming before campus drives.</p>`,
 
-  spec_chart_title: 'Specialization Distribution',
+  spec_chart_title: 'Specialization Fitment Overview',
   spec_chart_description:
-    'The distribution shows how the cohort’s best-fit specializations are spread across Finance, HR, Business Analytics, Operations, and Marketing - highlighting where the batch’s strengths concentrate.',
+    'Each student is matched to the MBA specialization their profile fits best. The pie shows how the cohort’s best-fit specializations are spread across Finance, HR, Business Analytics, Operations, and Marketing - highlighting where the batch’s strengths concentrate.',
+
+  cohort_glance_title: 'Cohort at a Glance',
+
+  readiness_radar_title: 'Cohort Readiness Profile',
+  readiness_radar_description:
+    'The radar averages the cohort’s five work-readiness indicators (0-100). A balanced shape signals all-round readiness; a dented axis flags the area to prioritise in pre-placement grooming.',
 
   readiness_band_title: 'Placement-Readiness Distribution',
   readiness_band_description:
@@ -31,6 +37,20 @@ export const MBA_PLACEMENT_CONTENT = {
   grooming_title: 'Grooming List',
   grooming_text:
     'Students with a Moderate or Low best-fit score - plan structured coaching on their weaker readiness areas before interviews.',
+
+  elective_title: 'Elective-Wise Placement Fit',
+  elective_intro:
+    'A quick guide to the five MBA specializations this cohort is mapped against, and how many students fit each one best.',
+  elective_about_title: 'About the Electives',
+  elective_headcount_title: 'Strongest-Fit Headcount by Elective',
+  elective_legend: (n: number) =>
+    `Each student’s strongest-fit specialization is counted once  ·  Total students: ${n}.`,
+
+  master_grid_title: 'Specialization Master Grid',
+  master_grid_intro:
+    "Every student on a single page - their character and best-fit ranking across the five MBA specializations (1 = strongest fit), with the top future roles their profile points to.",
+  master_grid_legend:
+    '1 = Strongest Fit   ·   5 = Weakest Fit   ·   Each student’s strongest-fit specialization is highlighted in green.',
 
   testimonials: [
     {
