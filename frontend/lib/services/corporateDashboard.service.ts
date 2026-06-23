@@ -83,6 +83,50 @@ export const corporateDashboardService = {
         return res.json();
     },
 
+    async getBehaviouralCohort(
+        email: string,
+        startDate?: string,
+        endDate?: string,
+    ): Promise<any> {
+        const token = AuthService.getToken();
+        const query = new URLSearchParams({
+            email,
+            ...(startDate && { startDate }),
+            ...(endDate && { endDate }),
+        });
+        const res = await fetch(`${API_URL}/dashboard/behavioural-cohort?${query.toString()}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+        if (!res.ok) throw new Error("Failed to load behavioural overview");
+        return res.json();
+    },
+
+    async getInnerPatternsCohort(
+        email: string,
+        startDate?: string,
+        endDate?: string,
+    ): Promise<any> {
+        const token = AuthService.getToken();
+        const query = new URLSearchParams({
+            email,
+            ...(startDate && { startDate }),
+            ...(endDate && { endDate }),
+        });
+        const res = await fetch(`${API_URL}/dashboard/inner-patterns-cohort?${query.toString()}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+        if (!res.ok) throw new Error("Failed to load inner patterns overview");
+        return res.json();
+    },
+
     async getLedger(email: string, page = 1, limit = 10, search = ''): Promise<{ data: any[], total: number }> {
         const token = AuthService.getToken();
         const res = await fetch(

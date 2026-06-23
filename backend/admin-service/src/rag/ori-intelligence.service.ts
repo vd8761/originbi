@@ -10,7 +10,7 @@ import { invokeWithFallback } from './utils/llm-fallback';
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
  * ║                    BI INTELLIGENCE SERVICE                                ║
- * ║       Advanced AI Brain — Professional Career Intelligence               ║
+ * ║       Advanced AI Brain - Professional Career Intelligence               ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  CAPABILITIES:                                                            ║
  * ║  • Personalized career guidance based on user's assessment data          ║
@@ -285,7 +285,7 @@ export class OriIntelligenceService {
         // "What is my personality" / "my style"
         if (q.includes('my personality') || q.includes('my style') || q.includes('my type')) {
             if (profile?.personalityStyle) {
-                return `Based on your assessment, your personality style is **${profile.personalityStyle}**.\n\n${profile.personalityDescription || ''}\n\nI can suggest career paths aligned with your personality profile — just ask.`;
+                return `Based on your assessment, your personality style is **${profile.personalityStyle}**.\n\n${profile.personalityDescription || ''}\n\nI can suggest career paths aligned with your personality profile - just ask.`;
             }
             return `Your personality assessment has not been completed yet. Once you complete the OriginBI assessment, I can provide personalized career guidance tailored to your profile.`;
         }
@@ -309,7 +309,7 @@ export class OriIntelligenceService {
         // "About me" / "my profile"
         if (q.includes('about me') || q.includes('my profile') || q.includes('tell me about me')) {
             if (profile) {
-                let response = `**Profile Summary — ${profile.name}**\n\n`;
+                let response = `**Profile Summary - ${profile.name}**\n\n`;
                 response += `**Email**: ${profile.email}\n`;
                 if (profile.personalityStyle) {
                     response += `**Personality Style**: ${profile.personalityStyle}\n`;
@@ -494,7 +494,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
         } catch (error) {
             this.logger.warn(`LLM request failed in answerAnyQuestion: ${error.message}`);
 
-            return `I'm experiencing high demand at the moment. Please try again in a minute — I'll be ready to help with your question then.`;
+            return `I'm experiencing high demand at the moment. Please try again in a minute - I'll be ready to help with your question then.`;
         }
     }
 
@@ -549,7 +549,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
                 response += '\n';
             });
 
-            response += `\n*I can provide a more detailed analysis on any of these options — just ask.*`;
+            response += `\n*I can provide a more detailed analysis on any of these options - just ask.*`;
             return response;
         }
 
@@ -610,13 +610,13 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
-     *  AI COUNSELLOR — Premium Student Career Guidance Engine
+     *  AI COUNSELLOR - Premium Student Career Guidance Engine
      *  A deeply personalised, empathetic, and expert career counsellor
      *  that leverages the student's full psychometric + assessment profile.
      * ═══════════════════════════════════════════════════════════════════════ */
 
     /**
-     * Answer a question in AI Counsellor mode — world-class career counselling
+     * Answer a question in AI Counsellor mode - world-class career counselling
      */
     async answerCounsellorQuestion(
         question: string,
@@ -633,16 +633,16 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
         const eligibleCareers = this.getEligibleCareers(profile?.personalityStyle);
         const careerList = eligibleCareers
             .slice(0, 5)
-            .map((c, i) => `${i + 1}. ${c.roleName} (${c.department}) — ${c.matchScore}% match | ${c.reasoning}`)
+            .map((c, i) => `${i + 1}. ${c.roleName} (${c.department}) - ${c.matchScore}% match | ${c.reasoning}`)
             .join('\n');
 
         // Agile level interpretation
         let agileLevel = 'Not assessed';
         if (agile !== undefined) {
-            if (agile >= 100) agileLevel = `Agile Naturalist (${agile}/125) — lives agile naturally`;
-            else if (agile >= 75) agileLevel = `Agile Adaptive (${agile}/125) — thrives in dynamic environments`;
-            else if (agile >= 50) agileLevel = `Agile Learner (${agile}/125) — open to growth, needs guidance`;
-            else agileLevel = `Agile Resistant (${agile}/125) — prefers structure, benefits from gradual flexibility`;
+            if (agile >= 100) agileLevel = `Agile Naturalist (${agile}/125) - lives agile naturally`;
+            else if (agile >= 75) agileLevel = `Agile Adaptive (${agile}/125) - thrives in dynamic environments`;
+            else if (agile >= 50) agileLevel = `Agile Learner (${agile}/125) - open to growth, needs guidance`;
+            else agileLevel = `Agile Resistant (${agile}/125) - prefers structure, benefits from gradual flexibility`;
         }
 
           const learningIntent = /\b(teach|learn|learning|step\s*by\s*step|roadmap|explain|understand|beginner|start from|practice)\b/i.test(question);
@@ -684,7 +684,7 @@ Keep response under 200 words. Be specific and actionable. Do not use excessive 
         } catch (error) {
             this.logger.warn(`LLM request failed in counsellor mode: ${error.message}`);
 
-            return `I'm experiencing a momentary pause, ${name.split(' ')[0]}. Please try asking again in a moment — I'm here to help you navigate your career path.`;
+            return `I'm experiencing a momentary pause, ${name.split(' ')[0]}. Please try asking again in a moment - I'm here to help you navigate your career path.`;
         }
     }
 

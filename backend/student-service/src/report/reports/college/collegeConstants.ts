@@ -1350,7 +1350,7 @@ export const blendedTraits: {
   // code (e.g. I = Pure Influence) instead of a two-letter blend. See
   // CollegeLevel1Report.resolveProfileCode() and calculateDiscProfile().
   D: {
-    name: 'Decisive Driver',
+    name: 'Bold Driver',
     description:
       'You are a bold, results-driven individual who takes charge and pushes relentlessly toward goals. Your decisiveness and confidence make you a natural leader in fast-paced, high-stakes environments.',
     suggestions:
@@ -1371,7 +1371,7 @@ export const blendedTraits: {
     ],
     trait_mapping1: [
       [
-        'Decisive Driver',
+        'Bold Driver',
         'CEO, Managing Director, Investment Banker, Business Development Head, Entrepreneur',
         'Impatience, over-directness, difficulty delegating, low tolerance for routine',
         'Decisiveness, goal focus, drive for results, leadership under pressure',
@@ -1379,7 +1379,7 @@ export const blendedTraits: {
     ],
     trait_mapping2: [
       [
-        'Decisive Driver',
+        'Bold Driver',
         'CEO, Managing Director, Investment Banker, Business Development Head, Entrepreneur',
         'Impatience, over-directness, difficulty delegating, low tolerance for routine',
         'Decisiveness, goal focus, drive for results, leadership under pressure',
@@ -1387,7 +1387,7 @@ export const blendedTraits: {
     ],
   },
   I: {
-    name: 'Inspiring Influencer',
+    name: 'Inspiring Motivator',
     description:
       'You are an energetic, persuasive communicator who connects with people effortlessly and rallies them around ideas. Your enthusiasm and optimism make you a natural motivator and relationship-builder.',
     suggestions:
@@ -1408,7 +1408,7 @@ export const blendedTraits: {
     ],
     trait_mapping1: [
       [
-        'Inspiring Influencer',
+        'Inspiring Motivator',
         'Chief Marketing Officer, Brand Manager, PR Head, Corporate Communications Head, Talent Acquisition Head',
         'Loss of focus on detail, over-optimism, avoiding hard conversations, inconsistent follow-through',
         'Persuasion, networking, motivation, creative communication',
@@ -1416,7 +1416,7 @@ export const blendedTraits: {
     ],
     trait_mapping2: [
       [
-        'Inspiring Influencer',
+        'Inspiring Motivator',
         'Chief Marketing Officer, Brand Manager, PR Head, Corporate Communications Head, Talent Acquisition Head',
         'Loss of focus on detail, over-optimism, avoiding hard conversations, inconsistent follow-through',
         'Persuasion, networking, motivation, creative communication',
@@ -1424,7 +1424,7 @@ export const blendedTraits: {
     ],
   },
   S: {
-    name: 'Steady Supporter',
+    name: 'Steadfast Anchor',
     description:
       'You are a dependable, even-tempered individual who brings consistency and calm to everything you do. Your patience and loyalty make you the stabilising force teams rely on.',
     suggestions:
@@ -1445,7 +1445,7 @@ export const blendedTraits: {
     ],
     trait_mapping1: [
       [
-        'Steady Supporter',
+        'Steadfast Anchor',
         'Chief People Officer, HR Manager, Operations Manager, Project Manager, Customer Success Head',
         'Resistance to change, difficulty saying no, avoiding conflict, slow to assert own needs',
         'Reliability, patience, teamwork, calm under pressure',
@@ -1453,7 +1453,7 @@ export const blendedTraits: {
     ],
     trait_mapping2: [
       [
-        'Steady Supporter',
+        'Steadfast Anchor',
         'Chief People Officer, HR Manager, Operations Manager, Project Manager, Customer Success Head',
         'Resistance to change, difficulty saying no, avoiding conflict, slow to assert own needs',
         'Reliability, patience, teamwork, calm under pressure',
@@ -1461,7 +1461,7 @@ export const blendedTraits: {
     ],
   },
   C: {
-    name: 'Precise Analyst',
+    name: 'Precise Perfectionist',
     description:
       'You are a careful, analytical thinker who values accuracy, structure and quality. Your attention to detail and logical rigour make you the one others trust to get things right.',
     suggestions:
@@ -1482,7 +1482,7 @@ export const blendedTraits: {
     ],
     trait_mapping1: [
       [
-        'Precise Analyst',
+        'Precise Perfectionist',
         'Data Analyst, Financial Analyst, Risk Manager, Quantitative Analyst, Compliance Officer',
         'Over-analysis, perfectionism, slow decisions, reluctance to delegate',
         'Analytical rigour, attention to detail, quality focus, structured thinking',
@@ -1490,7 +1490,7 @@ export const blendedTraits: {
     ],
     trait_mapping2: [
       [
-        'Precise Analyst',
+        'Precise Perfectionist',
         'Data Analyst, Financial Analyst, Risk Manager, Quantitative Analyst, Compliance Officer',
         'Over-analysis, perfectionism, slow decisions, reluctance to delegate',
         'Analytical rigour, attention to detail, quality focus, structured thinking',

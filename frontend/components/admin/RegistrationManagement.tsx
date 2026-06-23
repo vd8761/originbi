@@ -283,7 +283,7 @@ const RegistrationManagement: React.FC = () => {
   };
 
   const handleToggleAiCounsellor = async (id: string, currentState: boolean) => {
-    // Optimistic update — flip the toggle instantly in the UI
+    // Optimistic update - flip the toggle instantly in the UI
     setUsers(prev => prev.map(u => u.id === id ? { ...u, has_ai_counsellor: !currentState } : u));
     try {
       await registrationService.toggleAiCounsellor(id, !currentState);
@@ -741,7 +741,7 @@ const RegistrationManagement: React.FC = () => {
           )}
         </div>
 
-        {/* Per-page + arrows — hidden on send-emails tab, send-emails version shown instead */}
+        {/* Per-page + arrows - hidden on send-emails tab, send-emails version shown instead */}
         {activeTab !== 'send-emails' && (
         <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
           <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">
@@ -806,7 +806,7 @@ const RegistrationManagement: React.FC = () => {
         </div>
         )}
 
-        {/* Send Emails tab pagination — same position as the per-page/arrows for other tabs */}
+        {/* Send Emails tab pagination - same position as the per-page/arrows for other tabs */}
         {activeTab === 'send-emails' && (() => {
           const seTotal = sendEmailsTotal;
           const seTotalPages = Math.max(1, Math.ceil(seTotal / sendEmailsEntriesPerPage));
@@ -861,7 +861,7 @@ const RegistrationManagement: React.FC = () => {
         })()}
       </div>
 
-      {/* Search + filters + buttons row — hidden on send-emails tab (it has its own) */}
+      {/* Search + filters + buttons row - hidden on send-emails tab (it has its own) */}
       {activeTab !== 'send-emails' && (
       <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
         {/* Search */}
@@ -999,7 +999,7 @@ const RegistrationManagement: React.FC = () => {
 
           <ExcelExportButton onClick={handleExport} />
 
-          {/* Send Emails button — only visible on Individual Assessment tab */}
+          {/* Send Emails button - only visible on Individual Assessment tab */}
           {activeTab === 'individual' && (
             <button
               onClick={() => { setShowSendEmailsTab(true); setActiveTab('send-emails'); }}
@@ -1097,7 +1097,7 @@ const RegistrationManagement: React.FC = () => {
 
       </div>
 
-      {/* Bottom pagination + footer — hidden on send-emails tab */}
+      {/* Bottom pagination + footer - hidden on send-emails tab */}
       {activeTab !== 'send-emails' && (
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary pt-6 pb-2">
         {/* Left: Links */}

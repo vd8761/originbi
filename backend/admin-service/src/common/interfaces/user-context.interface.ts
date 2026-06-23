@@ -15,7 +15,7 @@ export interface UserContext {
   /** AWS Cognito subject UUID (from users.cognito_sub) */
   cognitoSub?: string;
 
-  /** Corporate account ID — resolved from corporate_accounts.id (only for CORPORATE role) */
+  /** Corporate account ID - resolved from corporate_accounts.id (only for CORPORATE role) */
   corporateId?: number;
 
   /** User's display name */
@@ -24,10 +24,10 @@ export interface UserContext {
   /** Group ID if assigned */
   groupId?: number;
 
-  /** Registration ID — resolved from registrations.id (for STUDENT role) */
+  /** Registration ID - resolved from registrations.id (for STUDENT role) */
   registrationId?: number;
 
-  /** Affiliate account ID — resolved from affiliate_accounts.id (for AFFILIATE role) */
+  /** Affiliate account ID - resolved from affiliate_accounts.id (for AFFILIATE role) */
   affiliateId?: number;
 
   /** Cognito sub UUID (pass-through for fallback lookups) */

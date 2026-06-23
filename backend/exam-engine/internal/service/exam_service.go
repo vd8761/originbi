@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -511,25 +510,15 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 					GROUP BY o.disc_factor
 				`, answerRecord.AssessmentAttemptID).Scan(&scores)
 
-				var validScores []ScoreResult
 				for _, s := range scores {
 					totalScore += s.Total
 					if s.DiscFactor != "" {
 						scoreMap[s.DiscFactor] = s.Total
-						validScores = append(validScores, s)
 					}
 				}
 
-				// Determine Dominant Factor
-				sort.Slice(validScores, func(i, j int) bool {
-					return validScores[i].Total > validScores[j].Total
-				})
-
-				if len(validScores) >= 2 {
-					dominantFactor = validScores[0].DiscFactor + validScores[1].DiscFactor
-				} else if len(validScores) == 1 {
-					dominantFactor = validScores[0].DiscFactor
-				}
+				// Determine Dominant Factor (pure-trait aware - see disc_trait.go).
+				dominantFactor = ResolveDominantFactor(scoreMap)
 
 				// Find Dominant Trait ID
 				if dominantFactor != "" {
@@ -700,7 +689,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 						}
 						// Isolate the insert in a savepoint so a unique-number race
 						// (two students finishing Level 1 at the same instant) can
-						// never abort the whole answer-submission transaction — it
+						// never abort the whole answer-submission transaction - it
 						// just skips the early row and falls back to creating it at
 						// completion.
 						createErr := tx.Transaction(func(tx2 *gorm.DB) error {
@@ -721,7 +710,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 			hasNextLevel := false
 
 			// Advance only through the levels this candidate was actually
-			// SCHEDULED for — i.e. the next mandatory level they already have an
+			// SCHEDULED for - i.e. the next mandatory level they already have an
 			// attempt for. We deliberately do NOT auto-create attempts for
 			// mandatory levels that weren't assigned to this registration (e.g.
 			// ACI when only Behavioural + IAT Gen + Metaphor were scheduled), so
@@ -992,7 +981,7 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 							fmt.Printf("SUCCESS: Assessment Report Created. ID: %d\n", newReport.ID)
 						}
 					} else {
-						// Report already exists — it was created when Level 1
+						// Report already exists - it was created when Level 1
 						// completed (so the Level 1 report could be downloaded
 						// early). Backfill the full score snapshot now that every
 						// level is done, keeping the original report number.
@@ -1270,7 +1259,7 @@ func (s *ExamService) IsLastLevel(attemptID int64) (bool, error) {
 
 	// "Last level" = there is NO higher MANDATORY level still to do. We count
 	// mandatory LEVELS (not attempts), because a higher level may be enabled
-	// after the student registered and not yet have an attempt — completing the
+	// after the student registered and not yet have an attempt - completing the
 	// current level creates/unlocks it. This keeps the student in the assessment
 	// (no premature report) whenever Level 3/4/... is turned on.
 	var count int64

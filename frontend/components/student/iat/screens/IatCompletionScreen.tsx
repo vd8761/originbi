@@ -12,7 +12,7 @@ export default function IatCompletionScreen({ onExit }: { onExit?: () => void })
         </div>
         <h1 className="text-[clamp(24px,3.2vw,34px)] font-bold">Assessment completed</h1>
         <p className="mt-3 text-sm leading-7 text-black dark:text-white">
-          Thank you — your responses have been submitted successfully. You can now return to the
+          Thank you - your responses have been submitted successfully. You can now return to the
           assessment dashboard.
         </p>
 

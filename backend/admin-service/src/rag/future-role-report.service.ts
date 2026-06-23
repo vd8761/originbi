@@ -239,7 +239,7 @@ ${hasScore ? '| **Assessment Score** | [Score] |' : ''}
 
 ## 1. Behavioral Alignment Summary
 
-[3-4 paragraph detailed analysis of the candidate's behavioral profile. Explain their dominant traits, strengths, interpersonal style, work approach, and how these traits align with potential career paths. Be specific and insightful — reference their behavioral style characteristics directly.]
+[3-4 paragraph detailed analysis of the candidate's behavioral profile. Explain their dominant traits, strengths, interpersonal style, work approach, and how these traits align with potential career paths. Be specific and insightful - reference their behavioral style characteristics directly.]
 
 ---
 
@@ -305,9 +305,9 @@ ${hasScore ? '| **Assessment Score** | [Score] |' : ''}
 **🎯 ${isStudent ? 'Career' : 'Future Role'} Readiness Score:** [XX]%
 **📊 Assessment:** [explanation of the score]
 
-- 80-100%: **High Readiness** — Ready for career entry / role transition
-- 60-79%: **Moderate Readiness** — Needs targeted development
-- 0-59%: **Building Phase** — Significant development needed
+- 80-100%: **High Readiness** - Ready for career entry / role transition
+- 60-79%: **Moderate Readiness** - Needs targeted development
+- 0-59%: **Building Phase** - Significant development needed
 
 ---
 
@@ -366,10 +366,10 @@ ${isStudent ? `To maximize career readiness, the following development areas are
 ---
 
 IMPORTANT RULES:
-1. Be specific and analytical — use real insights derived from the behavioral profile data provided
+1. Be specific and analytical - use real insights derived from the behavioral profile data provided
 2. Skill scores should range from 2.5 to 5.0, be realistic and VARIED (not all similar)
-3. Provide actionable, practical insights — not generic advice
-4. ALL tables MUST use Markdown pipe format (| col1 | col2 |) — NEVER ASCII box characters
+3. Provide actionable, practical insights - not generic advice
+4. ALL tables MUST use Markdown pipe format (| col1 | col2 |) - NEVER ASCII box characters
 5. Do NOT mention assessment methodology names like "DISC" or "Agile ACI" directly
 6. NEVER include dates in the report
 7. ${isStudent ? 'Do NOT include experience-related fields. This is a STUDENT. Focus on potential, growth, and career direction.' : 'Customize for the professional context.'}

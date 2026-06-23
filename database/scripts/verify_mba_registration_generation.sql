@@ -7,7 +7,7 @@
 -- Read-only.
 -- ============================================================
 
--- Block A — MAIN vs OPEN breakdown for the candidate's latest Level-1 attempt.
+-- Block A - MAIN vs OPEN breakdown for the candidate's latest Level-1 attempt.
 WITH params AS (SELECT 'REPLACE_WITH_REGISTERED_EMAIL@example.com'::text AS email),
 u AS (SELECT id FROM users, params WHERE users.email = params.email),
 att AS (
@@ -27,7 +27,7 @@ ORDER BY ans.question_source;
 -- EXPECT (default 20-random config, no survey yet): MAIN = 40, OPEN = 20.
 
 
--- Block B — overall checks for that attempt.
+-- Block B - overall checks for that attempt.
 WITH params AS (SELECT 'REPLACE_WITH_REGISTERED_EMAIL@example.com'::text AS email),
 u AS (SELECT id FROM users, params WHERE users.email = params.email),
 att AS (
@@ -64,7 +64,7 @@ SELECT * FROM (
 ) checks ORDER BY n;
 
 
--- Block C — the interleave pattern (first 12 rows; expect MAIN,MAIN,OPEN repeating).
+-- Block C - the interleave pattern (first 12 rows; expect MAIN,MAIN,OPEN repeating).
 WITH params AS (SELECT 'REPLACE_WITH_REGISTERED_EMAIL@example.com'::text AS email),
 u AS (SELECT id FROM users, params WHERE users.email = params.email),
 att AS (

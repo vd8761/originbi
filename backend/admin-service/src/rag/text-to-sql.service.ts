@@ -13,7 +13,7 @@ import { invokeWithFallback } from './utils/llm-fallback';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                 TEXT-TO-SQL ENGINE — "JARVIS MODE"                        ║
+ * ║                 TEXT-TO-SQL ENGINE - "JARVIS MODE"                        ║
  * ║        Translates any natural language question into safe SQL             ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  FLOW:                                                                    ║
@@ -236,7 +236,7 @@ export class TextToSqlService {
 
   /**
    * Generate SQL from natural language using the LLM with full schema context.
-   * This is the core prompt engineering — the brain of Jarvis.
+   * This is the core prompt engineering - the brain of Jarvis.
    */
   private async generateSql(
     question: string,
@@ -564,11 +564,11 @@ Formatted response:`;
         return `**${entries[0][1]}**`;
       }
 
-      // Single row with multiple fields — table format for consistency in UI.
+      // Single row with multiple fields - table format for consistency in UI.
       return this.buildMarkdownTable([row]);
     }
 
-    // 2+ rows — create a neat table
+    // 2+ rows - create a neat table
     const table = this.buildMarkdownTable(data.slice(0, 12));
     if (data.length > 12) {
       return `${table}\n\n*Showing 12 of ${data.length} total results.*`;
@@ -732,28 +732,28 @@ Formatted response:`;
   private buildRoleContext(user: UserContext): string {
     switch (user.role) {
       case 'ADMIN':
-        return `Role: ADMIN — Full access to all tables and data. No scoping restrictions. Can view all companies, all candidates, all system data.`;
+        return `Role: ADMIN - Full access to all tables and data. No scoping restrictions. Can view all companies, all candidates, all system data.`;
 
       case 'CORPORATE':
-        return `Role: CORPORATE — Company ID: ${user.corporateId}
+        return `Role: CORPORATE - Company ID: ${user.corporateId}
 IMPORTANT: All queries on registrations/assessments MUST be scoped to this company.
 The SQL validator will auto-inject corporate_account_id filters, but you should still write clean queries.
 This user can only see candidates registered under their corporate account.`;
 
       case 'STUDENT':
-        return `Role: STUDENT — User ID: ${user.id}
+        return `Role: STUDENT - User ID: ${user.id}
 IMPORTANT: This user can ONLY see their own data. 
 All queries on registrations MUST be filtered to user_id = ${user.id}.
 They can also view public reference data (career_roles, courses, programs, personality_traits).
 The SQL validator will auto-inject user_id filters.`;
 
       case 'AFFILIATE':
-        return `Role: AFFILIATE — Affiliate ID: ${user.affiliateId}
+        return `Role: AFFILIATE - Affiliate ID: ${user.affiliateId}
 This user can only see their own affiliate data: their account, referrals, and settlements.
 The SQL validator will auto-inject affiliate_account_id filters.`;
 
       default:
-        return `Role: ${user.role} — Limited access. Treat as STUDENT-level permissions.`;
+        return `Role: ${user.role} - Limited access. Treat as STUDENT-level permissions.`;
     }
   }
 
@@ -851,7 +851,7 @@ The SQL validator will auto-inject affiliate_account_id filters.`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // QUERY DECOMPOSER — Breaks complex multi-part questions into sub-queries
+  // QUERY DECOMPOSER - Breaks complex multi-part questions into sub-queries
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
@@ -933,13 +933,13 @@ Complex question: "${question}"
 
 Rules:
 - Each sub-question must be independently answerable with a single SQL SELECT
-- Preserve the user's original intent — don't change the meaning
+- Preserve the user's original intent - don't change the meaning
 - Keep sub-questions short and focused
 - If the question is actually simple (can be done in 1 query), return just ["${question}"]
 - Return ONLY a JSON array of strings, no explanation
 
 Example:
-Input: "Compare KIOT IT and KIOT CSE batches — which has higher scores and better completion rate"
+Input: "Compare KIOT IT and KIOT CSE batches - which has higher scores and better completion rate"
 Output: ["What is the average score and completion rate for batch KIOT IT?", "What is the average score and completion rate for batch KIOT CSE?"]
 
 JSON array:`;
@@ -1044,7 +1044,7 @@ JSON array:`;
 
       // ── Step 3: Synthesize all sub-results into one cohesive response ──
       const synthesisInput = subResults.map((r, i) => {
-        if (r.error) return `Sub-question ${i + 1}: "${r.question}"\nResult: Error — ${r.error}`;
+        if (r.error) return `Sub-question ${i + 1}: "${r.question}"\nResult: Error - ${r.error}`;
         if (r.data.length === 0) return `Sub-question ${i + 1}: "${r.question}"\nResult: No data found`;
         return `Sub-question ${i + 1}: "${r.question}"\nData (${r.data.length} rows):\n${JSON.stringify(r.data.slice(0, 8))}`;
       }).join('\n\n');
@@ -1059,14 +1059,14 @@ ${synthesisInput}
 SYNTHESIS RULES:
 1. Combine all data into ONE unified response that directly answers the original question
 2. If this is a comparison, use a comparison table or side-by-side format
-3. Highlight the KEY INSIGHT — what's the main takeaway? (bold it)
+3. Highlight the KEY INSIGHT - what's the main takeaway? (bold it)
 4. Use markdown: tables for multi-row data, bullet points for summaries, bold for important values
-5. Be analytical — don't just list data, draw conclusions:
+5. Be analytical - don't just list data, draw conclusions:
    - "**KIOT IT** outperforms KIOT CSE by 15 points on average (78.3 vs 63.1)"
-   - "**Completion rate is critically low** at 23% — only 15 of 67 candidates finished"
+   - "**Completion rate is critically low** at 23% - only 15 of 67 candidates finished"
 6. Add a brief analytical summary at the end if there are 2+ dimensions of data
 7. NEVER fabricate data not in the results above
-8. Start with the answer immediately — no filler, no "Based on the data..."
+8. Start with the answer immediately - no filler, no "Based on the data..."
 9. Keep it concise but complete
 
 Synthesized response:`;
@@ -1098,7 +1098,7 @@ Synthesized response:`;
         warnings: subResults.filter(r => r.error).map(r => `Sub-query failed: ${r.error}`),
       };
     } catch (err) {
-      this.logger.warn(`Complex query decomposition failed: ${err.message} — falling back to single query`);
+      this.logger.warn(`Complex query decomposition failed: ${err.message} - falling back to single query`);
       return null;
     }
   }

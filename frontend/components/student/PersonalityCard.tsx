@@ -6,12 +6,12 @@ interface PersonalityCardProps {
 }
 
 const PersonalityCard: React.FC<PersonalityCardProps> = ({ reportData, isLoadingReport }) => {
-    const [trait, setTrait] = useState<{ id: number; name: string; code: string; colorRgb: string } | null>(null);
+    const [trait, setTrait] = useState<{ id: number; name: string; code: string; colorRgb: string; imageName?: string } | null>(null);
     const [isLoadingUser, setIsLoadingUser] = useState(true);
     const [isImageLoading, setIsImageLoading] = useState(true);
 
     useEffect(() => {
-        let storedTrait: { id: number; name: string; code: string; colorRgb: string } | null = null;
+        let storedTrait: { id: number; name: string; code: string; colorRgb: string; imageName?: string } | null = null;
         try {
             const userStr = localStorage.getItem('user');
             if (userStr) {
@@ -80,7 +80,15 @@ const PersonalityCard: React.FC<PersonalityCardProps> = ({ reportData, isLoading
     if (traitName.toLowerCase().startsWith('the ')) {
         traitName = traitName.substring(4);
     }
-    const traitImageKey = traitName.replace(/\s+/g, '_');
+    // The superhero image may differ from the name: a Pure Trait keeps its own
+    // name but borrows its top-two blend's artwork (imageName, set by the
+    // backend) since pure traits have no dedicated image yet. Blends use their
+    // own name for both.
+    let imageName = trait?.imageName || traitName;
+    if (imageName.toLowerCase().startsWith('the ')) {
+        imageName = imageName.substring(4);
+    }
+    const traitImageKey = imageName.replace(/\s+/g, '_');
     const imageSrc = `/student_traits/${traitImageKey}.png`;
 
     const nameWords = traitName.split(' ');

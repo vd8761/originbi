@@ -1,4 +1,4 @@
-# HSC School Report — Complete Documentation
+# HSC School Report - Complete Documentation
 
 > **Report Category:** School Level → HSC (Class 11/12, `school_level_id === 2`)
 > **Source file:** `backend/student-service/src/report/reports/school/SchoolReport.ts`
@@ -12,14 +12,14 @@
 2. [Input Data Model](#2-input-data-model)
 3. [Report Section Map (HSC)](#3-report-section-map-hsc)
 4. [Shared vs HSC-exclusive Sections](#4-shared-vs-hsc-exclusive-sections)
-5. [Content Generation — HSC-Specific Sections](#5-content-generation--hsc-specific-sections)
+5. [Content Generation - HSC-Specific Sections](#5-content-generation--hsc-specific-sections)
    - 5.1 Future Pathways: Your Stream
    - 5.2 Career Odyssey Roadmap
    - 5.3 Course Compatibility Matrix
    - 5.4 Your Reach Institutions
 6. [Shared Sections (Referenced from SSLC Doc)](#6-shared-sections)
 7. [Content Variations](#7-content-variations)
-8. [Technical Reference — HSC-specific Logic](#8-technical-reference--hsc-specific-logic)
+8. [Technical Reference - HSC-specific Logic](#8-technical-reference--hsc-specific-logic)
 9. [Comparison: SSLC vs HSC](#9-comparison-sslc-vs-hsc)
 
 ---
@@ -29,10 +29,10 @@
 The **HSC Report** is generated for Class 11/12 students (`school_level_id === 2`). It shares the entire common personality/behavioral pipeline with SSLC but diverges in its academic sections to focus on the **student's actual enrolled stream** (not a recommendation engine) and adds **Reach Institutions** (NIRF-ranked colleges) relevant to their stream and personality.
 
 The HSC report is unique from SSLC in that it:
-- Uses the student's **enrolled stream** (`school_stream_id`) — not a computed recommendation
+- Uses the student's **enrolled stream** (`school_stream_id`) - not a computed recommendation
 - Shows **only the enrolled stream's** content page and roadmap (not all 6 streams)
 - Includes the **Course Compatibility Matrix** using their actual stream (DB-driven, full list)
-- Includes **Your Reach Institutions** — NIRF-ranked colleges filtered by stream and personality
+- Includes **Your Reach Institutions** - NIRF-ranked colleges filtered by stream and personality
 - Does **not** include "Where You Fit Best" stream recommendation section
 - Does **not** show all 6 stream selection content pages
 
@@ -45,7 +45,7 @@ Identical to SSLC with one key difference:
 | Field | Type | HSC Usage |
 |---|---|---|
 | `school_level_id` | `2` | Triggers HSC branch |
-| `school_stream_id` | `number` (1–6) | **Required for HSC** — identifies enrolled stream |
+| `school_stream_id` | `number` (1–6) | **Required for HSC** - identifies enrolled stream |
 | All other fields | Same as SSLC | See SSLC documentation |
 
 **Stream ID mapping:**
@@ -65,7 +65,7 @@ Identical to SSLC with one key difference:
 
 ```
 1.  Cover Page                                              [SHARED]
-2.  Table of Contents (HSC variant — 18 items)              [HSC-variant]
+2.  Table of Contents (HSC variant - 18 items)              [HSC-variant]
 3.  Introductory Pages                                      [SHARED]
 4.  General Characteristics [DISC-typed]                    [SHARED]
 5.  Core Personality Profile [Pattern-typed]                [SHARED]
@@ -113,7 +113,7 @@ Identical to SSLC with one key difference:
 | Introductory Pages | ✅ | ✅ | Identical |
 | General Characteristics | ✅ | ✅ | DISC-typed, identical |
 | Strengths & ACI | ✅ | ✅ | Identical |
-| Behavioral Charts | ✅ | ✅ | Radar/Rings/Stress/Agile/Heatmap — identical |
+| Behavioral Charts | ✅ | ✅ | Radar/Rings/Stress/Agile/Heatmap - identical |
 | Blended Style Mapping | ✅ | ✅ | 12 combinations, identical |
 | Career Alignment Index | ✅ | ✅ | Identical |
 | Career Fit Analysis | ✅ | ✅ | Identical |
@@ -134,7 +134,7 @@ Identical to SSLC with one key difference:
 
 ---
 
-## 5. Content Generation — HSC-Specific Sections
+## 5. Content Generation - HSC-Specific Sections
 
 ### 5.1 Future Pathways: Your Stream *(HSC-exclusive)*
 **Method:** `generateStreamSelectionContent(streamKey)`
@@ -156,12 +156,12 @@ Called once using the student's enrolled stream (`STREAM_NAMES[school_stream_id]
 
 | Stream (`school_stream_id`) | Field 1 | Field 2 | Field 3 | Field 4 |
 |---|---|---|---|---|
-| 1 — PCMB | Engineering & Technology | Medicine & Allied Health | Research & Pure Sciences | Mathematics & Data |
-| 2 — PCB | Medicine & Allied Health | Biosciences & Biotechnology | Environmental & Agricultural | Pharmacy & Nutrition |
-| 3 — PCM | Engineering & Technology | Mathematics & Computing | Architecture & Design | Data Science & AI |
-| 4 — PCBZ | Zoology & Wildlife | Environmental Science | Veterinary & Animal Sciences | Biotechnology |
-| 5 — Commerce | Business & Management | Finance & Accounting | Economics & Policy | Marketing & Media |
-| 6 — Humanities | Social Sciences | Languages & Literature | Law & Governance | Arts, Design & Media |
+| 1 - PCMB | Engineering & Technology | Medicine & Allied Health | Research & Pure Sciences | Mathematics & Data |
+| 2 - PCB | Medicine & Allied Health | Biosciences & Biotechnology | Environmental & Agricultural | Pharmacy & Nutrition |
+| 3 - PCM | Engineering & Technology | Mathematics & Computing | Architecture & Design | Data Science & AI |
+| 4 - PCBZ | Zoology & Wildlife | Environmental Science | Veterinary & Animal Sciences | Biotechnology |
+| 5 - Commerce | Business & Management | Finance & Accounting | Economics & Policy | Marketing & Media |
+| 6 - Humanities | Social Sciences | Languages & Literature | Law & Governance | Arts, Design & Media |
 
 Each field card also has:
 - A field-specific `vibe` description sentence (tone/personality of that field)
@@ -212,7 +212,7 @@ Fetched asynchronously from DB: `getCompatibilityMatrixDetails(traitCode, school
   - H3: department name
   - All courses for that department rendered as horizontal bar rows
 
-**Bar chart layout (standard mode — not 3-column like SSLC):**
+**Bar chart layout (standard mode - not 3-column like SSLC):**
 - Y-axis line + X-axis baseline
 - X-axis ticks from 50 to 100 (every 10)
 - One row per course: short tick → colored bar → course name (right-aligned) → % label
@@ -267,12 +267,12 @@ Intro text template: *"Based on your Personality trait, the institutions below h
 
 **Two rendering modes depending on `school_stream_id`:**
 
-#### Mode A — Specific Stream (school_stream_id is set)
+#### Mode A - Specific Stream (school_stream_id is set)
 Colleges are grouped by `department_name` from the DB result (the SQL already applies per-department limits and backfill logic). For each group:
 - **Subheader row** (merged across all 6 columns): department name; dark navy `#2c2a7d` background, white Sora Semibold 8pt
 - Numbered data rows (S.No resets to 1 per department)
 
-#### Mode B — All Streams (school_stream_id is null)
+#### Mode B - All Streams (school_stream_id is null)
 Colleges grouped by stream ID (1–6) in fixed order. Each stream group gets:
 - Subheader row with label like "PCMB Institutions", "PCB Institutions", etc.
 - **Limit per group** based on number of non-empty groups:
@@ -325,7 +325,7 @@ All sections listed as `[SHARED]` in Section 3 are documented in detail in the *
 
 HSC shares all content variation logic with SSLC. The only HSC-specific variations are:
 
-### 7.1 Table of Contents (HSC variant — 18 items)
+### 7.1 Table of Contents (HSC variant - 18 items)
 ```
 1.  About the Origin BI Self-Discovery Report
 2.  Benefits of Understanding Your Ideal Learning and Growth Paths
@@ -355,7 +355,7 @@ Differences from SSLC TOC:
 - Item 16 in SSLC ("Future Pathways: Stream Selection") is replaced
 
 ### 7.2 Stream Content Pages
-SSLC renders all 6 stream content pages; HSC renders only the enrolled stream. The **content of each stream page is identical** — only the selection differs.
+SSLC renders all 6 stream content pages; HSC renders only the enrolled stream. The **content of each stream page is identical** - only the selection differs.
 
 ### 7.3 Course Bar Chart Mode
 - **SSLC:** 3-column quadrant mode (compact, 6 courses/department max, illustrative colors based on top agile dimension stream)
@@ -366,7 +366,7 @@ Based on primary DISC trait (D/I/S/C), different NIRF ranking parameters are emp
 
 ---
 
-## 8. Technical Reference — HSC-specific Logic
+## 8. Technical Reference - HSC-specific Logic
 
 ### 8.1 Stream Branching
 
@@ -408,7 +408,7 @@ async generateHSCSections(): Promise<void> {
 | `generateCourseCompatibility()` | `getCompatibilityMatrixDetails()` | `traitCode` (e.g. `"SD"`), `school_stream_id` (1–6) |
 | `generateReachInstitutions()` | `getTopCollegesForStudent()` | `traitCode`, `school_stream_id` |
 
-Both calls are wrapped in try/catch — if DB is unavailable the section is silently skipped and a warning is logged.
+Both calls are wrapped in try/catch - if DB is unavailable the section is silently skipped and a warning is logged.
 
 ### 8.3 Deduplication Logic for Reach Institutions
 
@@ -480,7 +480,7 @@ Development Zones
 
 ---
 
-## Appendix A — DISC Content Quick Reference
+## Appendix A - DISC Content Quick Reference
 
 > All detailed DISC-typed content is documented in **SSLC_Report_Documentation.md §6**. Both reports use identical content for shared sections.
 

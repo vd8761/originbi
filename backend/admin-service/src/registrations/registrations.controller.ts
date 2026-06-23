@@ -150,7 +150,7 @@ export class RegistrationsController {
   }
 
   /**
-   * Public endpoint — check if a student has AI Counsellor access by email.
+   * Public endpoint - check if a student has AI Counsellor access by email.
    * Used as fallback when student-service is unreachable.
    */
   @Post('counsellor-access')

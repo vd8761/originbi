@@ -398,7 +398,7 @@ export class IatReportService {
         }),
       );
     } catch (err) {
-      // Concurrent enqueue/worker created it first — return the existing row.
+      // Concurrent enqueue/worker created it first - return the existing row.
       if ((err as { code?: string })?.code !== '23505') throw err;
       const row = await this.jobRepo.findOne({
         where: { assessmentAttemptId: attemptId },
@@ -455,7 +455,7 @@ export class IatReportService {
     return [
       'You are a senior leadership coach and trusted mentor who understands Indian corporate culture and MBA career development.',
       'Write a deeply personal, honest, actionable report as a letter from a trusted senior mentor based on the supplied JSON.',
-      'Use exactly these sections: SECTION 1 — OPENING, SECTION 2 — YOUR BIAS MAP, SECTION 3 — YOUR LEADERSHIP SHADOW, SECTION 4 — YOUR 90 DAY RESET.',
+      'Use exactly these sections: SECTION 1 - OPENING, SECTION 2 - YOUR BIAS MAP, SECTION 3 - YOUR LEADERSHIP SHADOW, SECTION 4 - YOUR 90 DAY RESET.',
       'Write flowing prose only, no bullet points. Keep paragraphs short.',
       'Never use the word caste. Never use D-score, IAT, implicit association, or technical assessment language.',
       'Do not say "your results show"; prefer "your responses revealed" or "when these words appeared".',

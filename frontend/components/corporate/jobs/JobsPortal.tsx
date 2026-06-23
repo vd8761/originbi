@@ -1066,7 +1066,7 @@ export default function JobsPortal() {
     }, []);
 
     const handleJobAction = useCallback((jobId: string, action: string) => {
-        // TODO: Handle each action — navigate, delete confirmation, etc.
+        // TODO: Handle each action - navigate, delete confirmation, etc.
         switch (action) {
             case "view":
                 setSelectedJobId(jobId);

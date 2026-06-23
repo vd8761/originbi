@@ -1,5 +1,5 @@
 /**
- * Auth Helpers — Centralized authentication utility for all frontend components.
+ * Auth Helpers - Centralized authentication utility for all frontend components.
  *
  * Provides consistent auth header generation for API calls.
  * Uses sessionStorage (tab-scoped) to prevent cross-tab identity leaks
@@ -34,7 +34,7 @@ export function snapshotUserToSession(): void {
 }
 
 /**
- * Get the stored user — prefers tab-scoped sessionStorage, falls back to localStorage.
+ * Get the stored user - prefers tab-scoped sessionStorage, falls back to localStorage.
  */
 export function getStoredUser(): StoredUser {
     try {
@@ -57,7 +57,7 @@ export function getStoredUser(): StoredUser {
             };
         }
     } catch {
-        // Silently fail — return default
+        // Silently fail - return default
     }
     return { ...DEFAULT_USER };
 }

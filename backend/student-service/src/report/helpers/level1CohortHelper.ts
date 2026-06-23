@@ -36,7 +36,7 @@ function toNum(v: unknown): number {
 
 /**
  * Fetches every student in a group/department who has a COMPLETED assessment
- * attempt carrying DISC scores (the Level-1 attempt). One row per student —
+ * attempt carrying DISC scores (the Level-1 attempt). One row per student -
  * their latest such attempt. When `deptDegreeId` is provided, the cohort is
  * scoped to that department.
  */
@@ -110,7 +110,7 @@ export async function fetchLevel1Cohort(
 
     students.sort((a, b) => a.fullName.localeCompare(b.fullName));
 
-    // Flag duplicate names within the cohort — only those get a mobile line.
+    // Flag duplicate names within the cohort - only those get a mobile line.
     const counts = new Map<string, number>();
     students.forEach((s) => {
       const k = s.fullName.toLowerCase();

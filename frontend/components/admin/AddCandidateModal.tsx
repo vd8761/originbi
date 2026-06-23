@@ -118,7 +118,7 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({
                 {pendingCandidate.fullName || "(no name)"}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {pendingCandidate.email || "—"}
+                {pendingCandidate.email || "-"}
                 {pendingCandidate.mobileNumber
                   ? ` · ${pendingCandidate.countryCode || ""} ${pendingCandidate.mobileNumber}`
                   : ""}
@@ -164,7 +164,7 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               Showing admin-registered users for this program who aren&apos;t in any
               group yet. Adding a user re-links their existing assessment into this
-              group — no new exam is created.
+              group - no new exam is created.
             </p>
 
             <input
@@ -195,7 +195,7 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({
                         {c.fullName || "(no name)"}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {c.email || "—"}
+                        {c.email || "-"}
                         {c.mobileNumber
                           ? ` · ${c.countryCode || ""} ${c.mobileNumber}`
                           : ""}

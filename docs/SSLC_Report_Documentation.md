@@ -1,4 +1,4 @@
-# SSLC School Report — Complete Documentation
+# SSLC School Report - Complete Documentation
 
 > **Report Category:** School Level → SSLC (Class 10, `school_level_id === 1`)
 > **Source file:** `backend/student-service/src/report/reports/school/SchoolReport.ts`
@@ -11,7 +11,7 @@
 1. [Overview](#1-overview)
 2. [Input Data Model](#2-input-data-model)
 3. [Report Section Map (SSLC)](#3-report-section-map-sslc)
-4. [Content Generation — Section-by-Section](#4-content-generation--section-by-section)
+4. [Content Generation - Section-by-Section](#4-content-generation--section-by-section)
    - 4.1 Cover Page
    - 4.2 Table of Contents
    - 4.3 Introductory Pages
@@ -54,7 +54,7 @@
    - 6.4 Stress Type Variations
    - 6.5 Agile Pattern Variations
    - 6.6 Career Alignment Confidence Levels
-7. [Technical Reference — Visual Renderers](#7-technical-reference--visual-renderers)
+7. [Technical Reference - Visual Renderers](#7-technical-reference--visual-renderers)
 
 ---
 
@@ -120,7 +120,7 @@ The SSLC report generates sections in the following fixed order:
 20. Growth Areas [DISC-typed]
 21. Agile Compatibility Index (ACI Tables)
 22. Behavioral Charts Intro + Understanding Graphs [DISC-typed]
-23. Mapping Strengths to Career Goals [Blended DISC-typed — 12 combos]
+23. Mapping Strengths to Career Goals [Blended DISC-typed - 12 combos]
 24. ── SSLC BRANCH BEGINS ──
 25. Where You Fit Best (stream recommendation card)
 26. Compatible Courses (bar chart by department)
@@ -139,7 +139,7 @@ The SSLC report generates sections in the following fixed order:
 
 ---
 
-## 4. Content Generation — Section-by-Section
+## 4. Content Generation - Section-by-Section
 
 ### 4.1 Cover Page
 **Method:** `generateCoverPage()`
@@ -154,7 +154,7 @@ The SSLC report generates sections in the following fixed order:
   - If the name exceeds 300px width, it splits at the space into two lines
   - The last line is always bottom-aligned at a fixed `footerY + 20`
 
-**Variations:** None — purely data-driven.
+**Variations:** None - purely data-driven.
 
 ---
 
@@ -193,16 +193,16 @@ The SSLC report generates sections in the following fixed order:
 **Method:** `generateIntroductoryPages()`
 
 **What it generates:** Static text content from `SCHOOL_CONTENT`:
-- H1: *"About the Origin BI Self-Discovery Report"* — explains the DISC framework
-- H2: *"Purpose of the Report"* — 4-item bulleted list
-- H2: *"Why the Origin BI Self Discovery Assessment Matters"* — paragraph + 3-item list
-- H2: *"What You Gain"* — numbered 4-item list + closing paragraph
-- H1: *"Benefits of Identifying Strategic Business Enhancement Paths"* — 2 paragraphs
-- H2: *"Why Identifying the Right Career Matters"* — 2 paragraphs
-- H2: *"How This Report Helps You"* — intro + 3-item list + outro paragraph
-- H2: *"An Important Note"* — disclaimer that the report is a starting point
+- H1: *"About the Origin BI Self-Discovery Report"* - explains the DISC framework
+- H2: *"Purpose of the Report"* - 4-item bulleted list
+- H2: *"Why the Origin BI Self Discovery Assessment Matters"* - paragraph + 3-item list
+- H2: *"What You Gain"* - numbered 4-item list + closing paragraph
+- H1: *"Benefits of Identifying Strategic Business Enhancement Paths"* - 2 paragraphs
+- H2: *"Why Identifying the Right Career Matters"* - 2 paragraphs
+- H2: *"How This Report Helps You"* - intro + 3-item list + outro paragraph
+- H2: *"An Important Note"* - disclaimer that the report is a starting point
 
-**Variations:** None — this section is fully static.
+**Variations:** None - this section is fully static.
 
 ---
 
@@ -216,7 +216,7 @@ The SSLC report generates sections in the following fixed order:
 #### H1: "General Characteristics for [Student Name]"
 Two paragraphs from `SCHOOL_DYNAMIC_CONTENT[primaryType].general_characteristics_1` and `_2`.
 
-**4 variations — one per primary DISC type:**
+**4 variations - one per primary DISC type:**
 
 | Type | Opening Framing |
 |---|---|
@@ -237,9 +237,9 @@ Behavior branches on `ci_patterns.discType`:
 | `balanced` | Low stddev (<8) or gap <5, no dominant | Renders "Versatile Adaptive Profile" with a text variation |
 
 Each archetype card shows:
-- ⚡ **Superpower** — the trait's core behavioral strength
-- ⚠ **Risk Area** — likely blind spots
-- 🌐 **Environment** — best working/study context
+- ⚡ **Superpower** - the trait's core behavioral strength
+- ⚠ **Risk Area** - likely blind spots
+- 🌐 **Environment** - best working/study context
 
 Text variations (`ci_tv()`) are picked by `textVariant = (D + I + S + C) % 3`, cycling 3 possible strings per key.
 
@@ -264,7 +264,7 @@ Two paragraphs per DISC type from `understanding_yourself_1` and `_2`.
 | S | 25 | 35 | 85 | 40 |
 | C | 20 | 25 | 40 | 90 |
 
-> These fixed bars represent what a "typical" person of that type looks like — not the student's actual raw scores.
+> These fixed bars represent what a "typical" person of that type looks like - not the student's actual raw scores.
 
 ---
 
@@ -272,13 +272,13 @@ Two paragraphs per DISC type from `understanding_yourself_1` and `_2`.
 **Part of `generatePersonalizedInsights()`**
 
 #### H1: "Motivations and Needs – Your Personalized Insights"
-- Intro paragraph with `$full_name` replaced — 4 DISC variations
-- H3: "What Drives [Student Name]" — 2 paragraphs per DISC type
-- H3: "Your Unique Needs" — 2 paragraphs per DISC type
+- Intro paragraph with `$full_name` replaced - 4 DISC variations
+- H3: "What Drives [Student Name]" - 2 paragraphs per DISC type
+- H3: "Your Unique Needs" - 2 paragraphs per DISC type
 - H2: "Communication Tips for Connecting with [Student Name]"
-- H3: "How Others Can Best Communicate..." — descriptive paragraph
+- H3: "How Others Can Best Communicate..." - descriptive paragraph
 - Numbered DO's list (5 items per DISC type)
-- H3: "What Others Should Avoid" — descriptive paragraph
+- H3: "What Others Should Avoid" - descriptive paragraph
 - Numbered DON'T list (5 items per DISC type)
 
 **Per-type communication items:**
@@ -314,7 +314,7 @@ Two paragraphs per DISC type from `understanding_yourself_1` and `_2`.
 **H1: "Agile Compatibility Index (ACI)"**
 - Description paragraph from `DISCLAIMER.aci_description` (static)
 - Personalized description from `ACI[traitCombo].agile_desc_1` (12 trait-combo variations)
-- H2: "Personalized Insight" — from `ACI[traitCombo].personalized_insight`
+- H2: "Personalized Insight" - from `ACI[traitCombo].personalized_insight`
 
 **H2: "Agile Value-Wise Breakdown Table"**
 
@@ -343,7 +343,7 @@ Summary table: Total Score / 125, Level, Compatibility Tag, Interpretation
 
 3-column table: Agile Value | Behavioural Reflection | Suggested Micro-Habit
 
-**H2: "Reflection Summary"** — paragraph text from `ACI[traitCombo].reflection_summary`
+**H2: "Reflection Summary"** - paragraph text from `ACI[traitCombo].reflection_summary`
 
 > **Variation count:** 12 (one per DISC two-letter combination: DI, DS, DC, ID, IS, IC, SD, SI, SC, CD, CI, CS). Entire ACI block is personalized differently for each.
 
@@ -354,9 +354,9 @@ Summary table: Total Score / 125, Level, Compatibility Tag, Interpretation
 
 After ACI:
 - H1: "Your Personalized Behavioral Charts"
-- H3: "What makes you Exceptional" — `behavioral_snapshot_intro` (DISC-typed)
-- H3: "Understanding the Graphs" — 2-item list (Adapted Style Graph I / Natural Style Graph II) — DISC-typed
-- H3: "Key Insights" — 3-item list — DISC-typed
+- H3: "What makes you Exceptional" - `behavioral_snapshot_intro` (DISC-typed)
+- H3: "Understanding the Graphs" - 2-item list (Adapted Style Graph I / Natural Style Graph II) - DISC-typed
+- H3: "Key Insights" - 3-item list - DISC-typed
 
 ---
 
@@ -364,7 +364,7 @@ After ACI:
 **Method:** `generateNatureGraphSection()`
 
 **What it generates:**
-1. H2: "Nature Style Graph" — full-width image `behavioural-charts.png` (static educational chart)
+1. H2: "Nature Style Graph" - full-width image `behavioural-charts.png` (static educational chart)
 2. H2: "Nature and Adapted Style" → `drawSideBySideBarCharts()`
    - **Left bars (Nature):** Same fixed illustrative values as section 4.5
    - **Right bars (Adapted):** Student's **actual** scores: `score_D`, `score_I`, `score_S`, `score_C`
@@ -380,8 +380,8 @@ The layout adapts: if less than 92% of page height is available → scale to 0.8
 ### 4.10 Future Industry Glimpse / Career Popularity
 Embedded in `generateNatureGraphSection()` as `PagedImage()` calls.
 
-- `future-industries-nopage.jpg` — static full-width image showing 2035 industry landscape
-- `career-popularity-nopage.jpg` — static full-width career popularity chart
+- `future-industries-nopage.jpg` - static full-width image showing 2035 industry landscape
+- `career-popularity-nopage.jpg` - static full-width career popularity chart
 
 Both are rendered with `resizeMode: 'stretch'` and no auto-page-add (they follow naturally in the flow).
 
@@ -422,7 +422,7 @@ The year axis shows: 2025, 2027, 2029, 2031, 2033, 2035. Each row has an open ci
 - Source line (italic): *"Source: World Economic Forum (WEF) Future of Jobs Report 2025."*
 - Footer italic: *"Students should embrace curiosity and futuristic learning to prepare for roles that don't yet exist"*
 
-**Variations:** None — fully static content.
+**Variations:** None - fully static content.
 
 ---
 
@@ -541,15 +541,15 @@ The balance scale renders a fulcrum triangle, horizontal beam, and two horizonta
 
 **What it generates:**
 - H1: "Mapping Your Strengths to Future Academic and Career Goals"
-- H2: `contentBlock.style_name` — personality blend label
+- H2: `contentBlock.style_name` - personality blend label
 - Style description paragraph
 - Element combo visual: two nature element icons + labels centered (e.g., "Earth + Fire")
   - D=Fire, I=Water, S=Earth, C=Air
-- H3: "Suggestions" — academic stream suggestion text
-- H3: "Key Behaviours" — numbered list (5–8 items)
-- H3: "Typical Scenarios" — numbered list (4 items)
-- H2: "Trait Mapping" — 4-column table: Trait Combination | Role Suggestions | Recommended Focus Areas | Stress Areas
-- Response Parameter Table — two 4-column tables: Conflict/Change/Team Dynamics and Communication/Sustainability/Social Responsibility
+- H3: "Suggestions" - academic stream suggestion text
+- H3: "Key Behaviours" - numbered list (5–8 items)
+- H3: "Typical Scenarios" - numbered list (4 items)
+- H2: "Trait Mapping" - 4-column table: Trait Combination | Role Suggestions | Recommended Focus Areas | Stress Areas
+- Response Parameter Table - two 4-column tables: Conflict/Change/Team Dynamics and Communication/Sustainability/Social Responsibility
 
 **12 blended style variations (all possible DISC two-letter combs):**
 
@@ -594,7 +594,7 @@ The balance scale renders a fulcrum triangle, horizontal beam, and two horizonta
 
 **Reasons section:**
 - Bold "Reasons" heading
-- Pill badges from `TRAIT_REASONS[traitCode]` — displayed in a horizontal flowing row, wrapping when needed
+- Pill badges from `TRAIT_REASONS[traitCode]` - displayed in a horizontal flowing row, wrapping when needed
 - Each pill has a green checkmark circle icon + reason text
 
 **Alternative Streams:**
@@ -640,9 +640,9 @@ Fetched asynchronously from database via `getCompatibilityMatrixDetails(traitCod
 
 **What it generates (all static text):**
 - New page; H1: "Future Pathways: Stream Selection"
-- H2: "Choosing Your Stream: The Blueprint to Your Future" — paragraph
-- H2: "It is Not Just About Subjects—It is About Your Identity" — paragraph with inline bullets
-- H2: "Understanding Your Stream Options" — two paragraphs
+- H2: "Choosing Your Stream: The Blueprint to Your Future" - paragraph
+- H2: "It is Not Just About Subjects-It is About Your Identity" - paragraph with inline bullets
+- H2: "Understanding Your Stream Options" - two paragraphs
 
 ---
 
@@ -651,12 +651,12 @@ Fetched asynchronously from database via `getCompatibilityMatrixDetails(traitCod
 
 Generated for ALL 6 streams in order: PCMB → PCB → PCM → PCBZ → Commerce → Humanities
 
-**Per stream — Content page:**
+**Per stream - Content page:**
 - Stream shortName + (full title) as H2 at top with icon image
 - Vibe text paragraph
 - 2×2 card grid (4 field cards, each with icon, field name, vibe description, mapped degrees bulleted list)
 
-**Per stream — Odyssey Roadmap:**
+**Per stream - Odyssey Roadmap:**
 - Winding wave graph (cosine wave) with nodes alternating above/below
 - Nodes are labeled with year/phase, title, subtitle from `STREAM_ODYSSEY_ROADMAP[streamKey].nodes`
 - Each node: green circle, dashed stub line, label above or below alternating
@@ -685,7 +685,7 @@ Generated for ALL 6 streams in order: PCMB → PCB → PCM → PCBZ → Commerce
   - Tick marks divide into 20 segments
   - Score label (e.g., "78 / 100") centered in the filled area
 - Summary line: `"Best-fit direction: X | Secondary direction: Y | Confidence: Z (N% separation)"`
-- Interpretation paragraph — 3 variations:
+- Interpretation paragraph - 3 variations:
 
 | Score | Interpretation |
 |---|---|
@@ -801,10 +801,10 @@ D=`#FFCCCC`, I=`#FFF0CC`, S=`#CCFFE2`, C=`#CCF4FF`
 Static content from `DISCLAIMER_CONTENT`:
 - H1: Disclaimer title
 - Intro paragraph
-- H3: Limitations — bulleted list
-- H3: No Warranties — intro + disclaimer + bulleted list
-- H3: Indemnity — intro + bulleted list + outro
-- H3: No Liability — descriptive paragraph
+- H3: Limitations - bulleted list
+- H3: No Warranties - intro + disclaimer + bulleted list
+- H3: Indemnity - intro + bulleted list + outro
+- H3: No Liability - descriptive paragraph
 - Closing note (grey italic)
 
 ---
@@ -911,25 +911,25 @@ Used in sections: General Characteristics, Understanding Yourself, Strengths, Mo
 **C (Conscientiousness):** Precise, analytical, structured, quality-focused
 
 ### 6.2 Blended Style Variations (12 combinations)
-DI, DS, DC, ID, IS, IC, SD, SI, SC, CD, CI, CS — each has unique style name, description, nature suggestions, key behaviours, typical scenarios, trait mapping, and respond parameter rows.
+DI, DS, DC, ID, IS, IC, SD, SI, SC, CD, CI, CS - each has unique style name, description, nature suggestions, key behaviours, typical scenarios, trait mapping, and respond parameter rows.
 
 ### 6.3 Core Personality Variations (3 types × N archetypes)
-- **dominant (×4):** One archetype per dominant DISC type (D/I/S/C) — title, superpower, risk, environment
+- **dominant (×4):** One archetype per dominant DISC type (D/I/S/C) - title, superpower, risk, environment
 - **dual (×12):** One dual combo description, plus two secondary archetype cards
 - **balanced:** Single "Versatile Adaptive Profile" text (3 text variants)
 
 ### 6.4 Stress Type Variations (4)
-`assertive` / `overthink` / `withdrawal` / `balanced` — each has 3 text variants via `ci_tv()`
+`assertive` / `overthink` / `withdrawal` / `balanced` - each has 3 text variants via `ci_tv()`
 
 ### 6.5 Agile Pattern Variations (6)
-`assertive-risk` / `cautious-respect` / `execution-engine` / `creative-instability` / `steady-execution` / `balanced` — each has 3 text variants via `ci_tv()`
+`assertive-risk` / `cautious-respect` / `execution-engine` / `creative-instability` / `steady-execution` / `balanced` - each has 3 text variants via `ci_tv()`
 
 ### 6.6 Career Alignment Confidence (3)
 `High` (gap ≥ 8) / `Moderate` (gap ≥ 4) / `Exploratory` (gap < 4)
 
 ---
 
-## 7. Technical Reference — Visual Renderers
+## 7. Technical Reference - Visual Renderers
 
 | Method | What It Draws | Key Inputs |
 |---|---|---|

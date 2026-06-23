@@ -74,7 +74,7 @@ export class WhatsAppService {
   ) {}
 
   // =================================================================
-  // Public entry point — called by AffiliatesService after registration
+  // Public entry point - called by AffiliatesService after registration
   // =================================================================
 
   /**

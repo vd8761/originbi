@@ -32,7 +32,7 @@ export interface SurveyAnswersData {
 
 /**
  * Presentational view of a candidate's SURVEY answers (non-scoring).
- * Pure render — parent fetches the data and decides tab enable/disable.
+ * Pure render - parent fetches the data and decides tab enable/disable.
  */
 const SurveyAnswersView: React.FC<{ data: SurveyAnswersData | null; loading?: boolean }> = ({
     data,
@@ -65,7 +65,7 @@ const SurveyAnswersView: React.FC<{ data: SurveyAnswersData | null; loading?: bo
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-3">
                     <span className="inline-flex items-center rounded-full bg-brand-green/10 px-3 py-1 text-xs font-semibold text-brand-green">
-                        Survey Set {data.setNumber ?? "—"}
+                        Survey Set {data.setNumber ?? "-"}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
                         {data.answered} of {data.total} answered
@@ -120,7 +120,7 @@ const SurveyAnswersView: React.FC<{ data: SurveyAnswersData | null; loading?: bo
                             </p>
                         )}
 
-                        {/* Options — selected one highlighted */}
+                        {/* Options - selected one highlighted */}
                         <div className="space-y-2">
                             {a.options.map((o) => (
                                 <div
@@ -131,7 +131,7 @@ const SurveyAnswersView: React.FC<{ data: SurveyAnswersData | null; loading?: bo
                                             : "border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300"
                                     }`}
                                 >
-                                    {/* Radio indicator — survey has no correct answer; this just
+                                    {/* Radio indicator - survey has no correct answer; this just
                                         shows the option the candidate selected. */}
                                     <span
                                         className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 ${

@@ -112,7 +112,7 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
         );
     };
 
-    // First exam window — used as the target for Add Candidate (candidates are
+    // First exam window - used as the target for Add Candidate (candidates are
     // added to a concrete assessment window, not the abstract combined view).
     const firstWindowId: string | number | undefined = data?.assessments?.[0]?.id;
 
@@ -399,7 +399,7 @@ const GroupCombinedPreview: React.FC<GroupCombinedPreviewProps> = ({
 
             {/* Bulk report-type selection popup */}
             {/* Rendered via a portal to document.body so `position: fixed`
-                centres on the viewport — an ancestor's CSS transform would
+                centres on the viewport - an ancestor's CSS transform would
                 otherwise become the containing block and push the modal
                 off-screen, forcing the user to scroll. */}
             {showReportModal && typeof document !== "undefined" && createPortal(

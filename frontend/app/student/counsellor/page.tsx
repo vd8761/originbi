@@ -97,10 +97,10 @@ export default function StudentCounsellorPage() {
                         </div>
                     </main>
                 ) : hasAccess ? (
-                    /* Has access — show the AI Counsellor chat */
+                    /* Has access - show the AI Counsellor chat */
                     <AiCounsellorChat />
                 ) : (
-                    /* No access — show paywall / redirect to dashboard */
+                    /* No access - show paywall / redirect to dashboard */
                     <main className="w-full min-h-[60vh] flex items-center justify-center px-4">
                         <div className="max-w-md w-full text-center">
                             <div className="relative mb-6 inline-block">

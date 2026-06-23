@@ -1,4 +1,4 @@
-# Data Access Scoping Plan — Refined & Production-Ready
+# Data Access Scoping Plan - Refined & Production-Ready
 
 ## Problem Statement
 
@@ -93,7 +93,7 @@ Step 3: Find their test results
 
 ## 2. The Three Access Rules (Refined)
 
-### Rule 1: ADMIN — Full Unrestricted Access
+### Rule 1: ADMIN - Full Unrestricted Access
 
 | Property | Value |
 |----------|-------|
@@ -119,7 +119,7 @@ WHERE r.corporate_account_id = 105 AND r.is_deleted = false;
 
 ---
 
-### Rule 2: CORPORATE — Company-Scoped Access Only
+### Rule 2: CORPORATE - Company-Scoped Access Only
 
 | Property | Value |
 |----------|-------|
@@ -203,7 +203,7 @@ WHERE cs.corporate_account_id = 105;
 
 ---
 
-### Rule 3: STUDENT / INDIVIDUAL — Self-Only Access
+### Rule 3: STUDENT / INDIVIDUAL - Self-Only Access
 
 | Property | Value |
 |----------|-------|
@@ -320,7 +320,7 @@ After verifying the Cognito token, we need a middleware/guard step that:
 | 3 | **Fail closed** | If role is unknown or corporateId is missing → deny access |
 | 4 | **Scope at query level** | Every SQL query must include the role-based WHERE clause |
 | 5 | **Audit everything** | Log who queried what, with what role, and how many records returned |
-| 6 | **Friendly denials** | Students don't get "Access Denied" — they get "Let me show your results instead" |
+| 6 | **Friendly denials** | Students don't get "Access Denied" - they get "Let me show your results instead" |
 | 7 | **No data leakage in errors** | Never expose other user IDs or corporate IDs in error messages |
 
 ---
@@ -335,7 +335,7 @@ Before writing any code, these must be confirmed:
 | 2 | `users.cognito_sub` column exists & populated | ✅ Verified | Column exists in entity |
 | 3 | `registrations.corporate_account_id` links to `corporate_accounts.id` | ✅ Verified | This is the scoping key |
 | 4 | `registrations.user_id` links to `users.id` | ✅ Verified | This is the student scoping key |
-| 5 | Auth middleware enriches `request.user` with DB IDs | ⚠️ GAP | **Must implement** — current guard only puts raw Cognito payload |
+| 5 | Auth middleware enriches `request.user` with DB IDs | ⚠️ GAP | **Must implement** - current guard only puts raw Cognito payload |
 | 6 | `UserContext` interface has `corporateAccountId` field | ✅ Exists | In `user-context.interface.ts` (as `corporateId`) |
 | 7 | Access policies exist for all 3 roles | ✅ Created | In `rag/policies/` directory |
 | 8 | `rag.service.ts` uses policies in `executeQuery()` | ⚠️ PARTIAL | Inline RBAC exists but needs cleanup for parameterized queries |
@@ -402,4 +402,4 @@ Phase 4: Audit & Monitoring
 ---
 
 *Document Created: February 9, 2026*
-*Status: READY — All pre-conditions documented, gaps identified, implementation order defined*
+*Status: READY - All pre-conditions documented, gaps identified, implementation order defined*

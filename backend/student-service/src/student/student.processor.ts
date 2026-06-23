@@ -210,7 +210,7 @@ export class StudentProcessor implements OnModuleInit, OnModuleDestroy {
       const stats = await boss.getQueueStats('assessment-email-queue');
 
       this.logger.log(
-        `Queue stats — queued: ${stats.queuedCount}, active: ${stats.activeCount}, total: ${stats.totalCount}`,
+        `Queue stats - queued: ${stats.queuedCount}, active: ${stats.activeCount}, total: ${stats.totalCount}`,
       );
 
       // If there are queued jobs sitting idle, the normal worker should pick them up.

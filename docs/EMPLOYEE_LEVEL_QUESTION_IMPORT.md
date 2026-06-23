@@ -1,4 +1,4 @@
-# Employee Level Questions — Import Approach (Dev Doc)
+# Employee Level Questions - Import Approach (Dev Doc)
 
 **Status:** design only (not yet implemented)
 **Source file:** `Employee.xlsx` (3 sheets: `Level 1`, `Level 2`, `Level 3`)
@@ -28,7 +28,7 @@ option_a_en..option_d_en,
 option_a_ta..option_d_ta
 ```
 
-**Important — what is NOT in the file:** no DISC trait/`category`, no correct
+**Important - what is NOT in the file:** no DISC trait/`category`, no correct
 answer, no per‑option `disc_factor`, no per‑option `score_value`. These are
 situational‑judgment items; the only behavioural signal is the question‑level
 `metadata.dimension`.
@@ -58,7 +58,7 @@ is_deleted`
 | `Question number` | `external_code` (optional) | for traceability |
 | `context_text_*`, `question_text_*` | same columns | direct |
 | `metadata` cell | `assessment_questions.metadata` | parsed JSON **+ add `"source":"employee_xlsx_v1"`** marker |
-| (none) | `category` | **NULL** — these are not DISC‑trait questions |
+| (none) | `category` | **NULL** - these are not DISC‑trait questions |
 | `option_x_en/ta` | one option row each | `display_order` a=1,b=2,c=3,d=4 |
 | (none) | option `disc_factor` | NULL |
 | (none) | option `score_value` / `is_correct` | `0` / `false` |
@@ -71,7 +71,7 @@ is_deleted`
 
 ## 3. Two separate migrations
 
-### Migration A — deactivate the existing Employee Level‑1 questions
+### Migration A - deactivate the existing Employee Level‑1 questions
 `database/migrations/028_employee_level1_deactivate_old.sql`
 
 ```sql
@@ -88,8 +88,8 @@ The `source <>` guard makes it **safe to re‑run** and guarantees it only
 deactivates the *legacy* rows even if the import already ran. (Order: A then B,
 but the guard makes ordering forgiving.)
 
-### Migration B — import the new questions + options
-`database/migrations/029_employee_level_questions_import.sql` — **auto‑generated**
+### Migration B - import the new questions + options
+`database/migrations/029_employee_level_questions_import.sql` - **auto‑generated**
 by a Python script (see §4). Structure mirrors the existing
 `018_mba_college_level1_questions.sql`:
 
@@ -104,7 +104,7 @@ by a Python script (see §4). Structure mirrors the existing
 
 ---
 
-## 4. The generator script (Python — efficient & repeatable)
+## 4. The generator script (Python - efficient & repeatable)
 
 `database/scripts/generate_employee_questions_sql.py`, modelled on the existing
 `generate_mba_questions_sql.py`.
@@ -115,7 +115,7 @@ by a Python script (see §4). Structure mirrors the existing
 3. For each data row: read set/question numbers, the 4 EN + 4 TA texts, parse the
    `metadata` JSON (fallback `{}`), inject `source` + `board` into it.
 4. Emit one CTE insert block per question (SQL‑escape via doubling `'`; keep
-   Tamil UTF‑8 — write the file with `encoding='utf-8'`).
+   Tamil UTF‑8 - write the file with `encoding='utf-8'`).
 5. Write `029_employee_level_questions_import.sql`.
 
 **Why a generator, not raw SQL by hand:** 240 questions × bilingual × 4 options
@@ -126,7 +126,7 @@ command; the marker keeps it idempotent.
 then apply migrations via the existing runner (`database/tools/run-migrations.ts`).
 
 > Alternative: the script could `INSERT` straight into Postgres via `psycopg2`.
-> Generating a checked‑in `.sql` migration is preferred here — it matches repo
+> Generating a checked‑in `.sql` migration is preferred here - it matches repo
 > convention, is reviewable, and replays through the normal migration path.
 
 ---
@@ -149,11 +149,11 @@ then apply migrations via the existing runner (`database/tools/run-migrations.ts
 2. **Scoring/report.** The file has no per‑option score or correct answer, so
    `score_value=0 / is_correct=false`. How should the Employee Level‑1 result be
    scored/reported (presumably off `metadata.dimension`)? This is **out of scope
-   for the import** but blocks meaningful reports — needs its own spec.
+   for the import** but blocks meaningful reports - needs its own spec.
 3. **Open (survey) questions.** Exam = “40 main + 10 open”. The `10` is the
-   admin `open_question_distribution` setting (currently defaults to 20) — set it
+   admin `open_question_distribution` setting (currently defaults to 20) - set it
    to 10 for the Employee program flow; not part of this import.
-4. **`category` left NULL** for these questions — confirm nothing downstream
+4. **`category` left NULL** for these questions - confirm nothing downstream
    requires a non‑null `category` for Employee L1 (the DISC `GROUP BY category`
    scoring path does, which is why item 2 matters).
 ```

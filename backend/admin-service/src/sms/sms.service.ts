@@ -13,12 +13,12 @@ export type SmsTemplate =
 /**
  * SMS dispatcher for student-facing notifications (SMPP HTTP gateway).
  *
- * Message bodies are HARDCODED here by design — only the DLT template IDs,
+ * Message bodies are HARDCODED here by design - only the DLT template IDs,
  * sender ID, and auth key live in `originbi_settings` (category `sms`).
  *
  * Each template has an independent toggle (`sms.send_*`). Callers can ask
  * this service to send unconditionally via `send()`, or guard on the toggle
- * with `isEnabled()` first — the typical fallback flow does the latter.
+ * with `isEnabled()` first - the typical fallback flow does the latter.
  */
 @Injectable()
 export class SmsService {

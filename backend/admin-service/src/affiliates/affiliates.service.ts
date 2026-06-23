@@ -698,7 +698,7 @@ export class AffiliatesService {
   }
 
   // ---------------------------------------------------------
-  // Preview Settlement — shows which transactions will be settled
+  // Preview Settlement - shows which transactions will be settled
   // ---------------------------------------------------------
   async previewSettlement(affiliateId: number, amount: number) {
     const affiliate = await this.affiliateRepo.findOne({
@@ -920,8 +920,8 @@ export class AffiliatesService {
         settledDown,
         registrationAmount: Number(t.registrationAmount) || 0,
         commissionPercentage: Number(t.commissionPercentage) || 0,
-        schoolLevel: reg?.schoolLevel || '—',
-        schoolStream: reg?.schoolStream || '—',
+        schoolLevel: reg?.schoolLevel || '-',
+        schoolStream: reg?.schoolStream || '-',
         paymentStatus: reg?.paymentStatus || 'N/A',
       };
     });
@@ -941,7 +941,7 @@ export class AffiliatesService {
     // Map frontend filter values to settlement_status
     if (status !== undefined && status !== '' && status !== 'all') {
       if (status === 'pending') {
-        // pending = status 0 or 1 — need two where clauses ORed
+        // pending = status 0 or 1 - need two where clauses ORed
         where.push({ ...baseWhere, settlementStatus: 0 });
         where.push({ ...baseWhere, settlementStatus: 1 });
       } else if (status === 'converted') {
@@ -1006,9 +1006,9 @@ export class AffiliatesService {
         email: reg?.user?.email || 'N/A',
         registeredOn: t.createdAt,
         studentBoard:
-          reg?.metadata?.board || reg?.metadata?.studentBoard || '—',
-        schoolLevel: reg?.schoolLevel || '—',
-        schoolStream: reg?.schoolStream || '—',
+          reg?.metadata?.board || reg?.metadata?.studentBoard || '-',
+        schoolLevel: reg?.schoolLevel || '-',
+        schoolStream: reg?.schoolStream || '-',
         commissionPercentage: Number(t.commissionPercentage) || 0,
         totalEarnedCommission: Number(t.earnedCommissionAmount) || 0,
         status: t.settlementStatus === 2 ? 'converted' : 'pending',
@@ -1116,7 +1116,7 @@ export class AffiliatesService {
       return {
         id: t.id,
         date: t.createdAt,
-        description: `Commission — ${studentName}`,
+        description: `Commission - ${studentName}`,
         paymentMode: 'Referral Commission',
         amount: Number(t.earnedCommissionAmount) || 0,
         registrationAmount: Number(t.registrationAmount) || 0,

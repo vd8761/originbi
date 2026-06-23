@@ -5,7 +5,7 @@
 --   iat.module_sets:
 --     [ { "id": "<uuid>", "name": "Core Bias", "moduleIds": [1,2,3] } ]
 --
--- Routing (which scope gets which set) is NOT a separate setting — it is
+-- Routing (which scope gets which set) is NOT a separate setting - it is
 -- merged into the Level-3 scope rules (levels.level3_scope_rules), where each
 -- rule carries an optional "moduleSetId". The same rule that decides WHO gets
 -- Level 3 also decides WHICH module set they receive.

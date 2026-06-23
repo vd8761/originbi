@@ -131,7 +131,7 @@ const AiCounsellorCard: React.FC = () => {
         );
     }
 
-    // ── LOCKED: No Access — Show Purchase CTA ──
+    // ── LOCKED: No Access - Show Purchase CTA ──
     return (
         <div className="dashboard-glass-card h-full flex flex-col relative overflow-hidden group">
             {/* Decorative gradient overlay */}
@@ -185,7 +185,7 @@ const AiCounsellorCard: React.FC = () => {
                             <svg className="w-4 h-4 lg:w-[0.83vw] lg:h-[0.83vw]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
-                            Unlock AI Counsellor — ₹350
+                            Unlock AI Counsellor - ₹350
                         </>
                     )}
                 </button>

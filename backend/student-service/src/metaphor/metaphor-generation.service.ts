@@ -7,7 +7,7 @@ import {
 } from '@originbi/shared-entities';
 
 /**
- * Minimal attempt shape needed for generation — structural so any service's
+ * Minimal attempt shape needed for generation - structural so any service's
  * AssessmentAttempt entity (shared or local) can be passed.
  */
 export interface MetaphorAttemptCtx {
@@ -23,7 +23,7 @@ export interface MetaphorAttemptCtx {
  * Generates the candidate's Level 3 (Metaphor) questions for an attempt.
  *
  * Isolation: this is ONLY invoked when the attempt's level is Metaphor. If the
- * metaphor bank is empty it **skips silently** (like Level 2) — it never blocks
+ * metaphor bank is empty it **skips silently** (like Level 2) - it never blocks
  * the main registration / Level 1 flow.
  */
 @Injectable()
@@ -40,7 +40,7 @@ export class MetaphorGenerationService {
     });
     if (existingCount > 0) {
       this.logger.log(
-        `[Metaphor] Attempt ${attempt.id} already has ${existingCount} questions — skipping duplicate generation.`,
+        `[Metaphor] Attempt ${attempt.id} already has ${existingCount} questions - skipping duplicate generation.`,
       );
       return;
     }
@@ -80,9 +80,9 @@ export class MetaphorGenerationService {
 
     if (sets.length === 0) {
       this.logger.warn(
-        `[Metaphor] No active metaphor questions — skipping generation for attempt ${attempt.id}.`,
+        `[Metaphor] No active metaphor questions - skipping generation for attempt ${attempt.id}.`,
       );
-      return; // skip silently — never blocks the main flow
+      return; // skip silently - never blocks the main flow
     }
 
     let questions: MetaphorQuestion[];

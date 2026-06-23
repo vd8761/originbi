@@ -12,8 +12,8 @@ interface AssessmentResultPreviewProps {
  *
  * The full report experience (DISC / ACI / IAT Gen / Metaphor tabs, survey
  * answers, short & Level 1 report downloads, send email) lives in the admin
- * component. Corporate reuses it verbatim — only adding the page padding the
- * corporate layout expects — so the two panels never drift apart again. The
+ * component. Corporate reuses it verbatim - only adding the page padding the
+ * corporate layout expects - so the two panels never drift apart again. The
  * underlying report endpoints are shared and already accept the corporate
  * token (corporate already calls /admin/assessments/* for session + levels).
  */

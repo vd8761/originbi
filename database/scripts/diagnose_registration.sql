@@ -52,4 +52,4 @@ JOIN u ON a.user_id = u.id
 JOIN assessment_levels l ON a.assessment_level_id = l.id
 ORDER BY a.id DESC;
 -- A Level 1 attempt should have mcq_answers > 0. A Level 3 (Metaphor) attempt
--- should have metaphor_answers > 0 (and mcq_answers = 0 — that's expected).
+-- should have metaphor_answers > 0 (and mcq_answers = 0 - that's expected).

@@ -21,7 +21,7 @@ interface Msg91Response {
 }
 
 /**
- * Generic MSG91 WhatsApp template dispatcher — student-service copy.
+ * Generic MSG91 WhatsApp template dispatcher - student-service copy.
  * Mirrors admin-service/WhatsappTemplatesService; duplicated so student-service
  * can send without cross-service HTTP hops.
  */

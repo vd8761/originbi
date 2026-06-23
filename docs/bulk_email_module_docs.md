@@ -1,6 +1,6 @@
-# Bulk Email Reporting — Module Documentation
+# Bulk Email Reporting - Module Documentation
 
-> **Module:** Admin Panel — Bulk Email  
+> **Module:** Admin Panel - Bulk Email  
 > **Scope:** Admin Service · Student Service · Frontend (Admin UI)  
 > **Status:** Implemented ✅
 
@@ -33,7 +33,7 @@ flowchart LR
 
 ## 3. Backend
 
-### 3.1 Admin Service — Assessment Sessions API
+### 3.1 Admin Service - Assessment Sessions API
 
 **File:** [backend/admin-service/src/assessment/assessment.service.ts](file:///d:/Folders/TouchMark/originbi/backend/admin-service/src/assessment/assessment.service.ts)  
 **File:** [backend/admin-service/src/assessment/assessment.controller.ts](file:///d:/Folders/TouchMark/originbi/backend/admin-service/src/assessment/assessment.controller.ts)
@@ -81,7 +81,7 @@ The result is merged back into each session object as `emailSent` and `emailSent
 
 ---
 
-### 3.2 Student Service — Bulk Enqueue API
+### 3.2 Student Service - Bulk Enqueue API
 
 **File:** [backend/student-service/src/student/student.controller.ts](file:///d:/Folders/TouchMark/originbi/backend/student-service/src/student/student.controller.ts)
 
@@ -183,7 +183,7 @@ interface BulkEmailTabProps {
 }
 ```
 
-> **Note:** `page` and `entriesPerPage` are lifted to the parent ([RegistrationManagement](file:///d:/Folders/TouchMark/originbi/frontend/components/admin/RegistrationManagement.tsx#40-1036)) so pagination renders in the shared top tab bar — consistent with all other admin tabs.
+> **Note:** `page` and `entriesPerPage` are lifted to the parent ([RegistrationManagement](file:///d:/Folders/TouchMark/originbi/frontend/components/admin/RegistrationManagement.tsx#40-1036)) so pagination renders in the shared top tab bar - consistent with all other admin tabs.
 
 #### Internal State
 
@@ -213,19 +213,19 @@ interface BulkEmailTabProps {
 [Search Input ............. ] [ Date Range ▾ ] [ All Mail Status ▾ ]
 ```
 
-Pagination is **not** in this row — it's in the parent's shared tab header bar.
+Pagination is **not** in this row - it's in the parent's shared tab header bar.
 
 #### Email Status Badge Logic
 
 | `emailSent` | `emailSentTo` matches user email? | Badge | Sent To column |
 |---|---|---|---|
-| `false` / `null` | — | `Not Sent` (gray) | `-` |
+| `false` / `null` | - | `Not Sent` (gray) | `-` |
 | `true` | ✅ Yes | `Sent` (green) | user's email |
 | `true` | ❌ No | `Sent (3rd party)` (amber) | third-party email |
 
 ---
 
-### 4.3 RegistrationManagement — Container Integration
+### 4.3 RegistrationManagement - Container Integration
 
 **File:** [frontend/components/admin/RegistrationManagement.tsx](file:///d:/Folders/TouchMark/originbi/frontend/components/admin/RegistrationManagement.tsx)
 

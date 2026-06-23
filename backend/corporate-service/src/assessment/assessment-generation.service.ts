@@ -87,7 +87,7 @@ export class AssessmentGenerationService {
     const openQuestions = await this.selectOpenQuestions(manager);
 
     // 3. Build the final order: all main questions, with the open/survey
-    // questions SCATTERED at random positions among them (no fixed ratio —
+    // questions SCATTERED at random positions among them (no fixed ratio -
     // they "appear anywhere in the exam").
     const answersToInsert: Partial<AssessmentAnswer>[] = [];
     let seq = 1;

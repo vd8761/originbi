@@ -288,7 +288,7 @@ export class IatService {
   async finishAttempt(attemptId: number) {
     // Serialize finish for this attempt on a dedicated connection. Concurrent
     // finishes (self-heal + normal flow, or StrictMode double-fires) would
-    // otherwise each run the one-time side effects below — unlocking the next
+    // otherwise each run the one-time side effects below - unlocking the next
     // level twice (no unique guard) and racing the report-job insert. The
     // session-level advisory lock makes the whole sequence run exactly once.
     const runner = this.dataSource.createQueryRunner();
@@ -308,7 +308,7 @@ export class IatService {
     const attempt = await this.assertIatAttempt(attemptId);
 
     // Idempotent re-finish: if a prior call already completed this attempt, the
-    // level-unlock / session-completion side effects already ran — just make
+    // level-unlock / session-completion side effects already ran - just make
     // sure a report is queued and return.
     if (attempt.status === 'COMPLETED') {
       await this.enqueueReport(attempt.id);
@@ -502,8 +502,8 @@ export class IatService {
 
       // Play order = the order returned by filterModulesForRegistration (set
       // selection order first, then global modules). Assign moduleOrder by
-      // position so the routing/set order — not the iat_modules.module_order
-      // column — drives the sequence shown to the candidate.
+      // position so the routing/set order - not the iat_modules.module_order
+      // column - drives the sequence shown to the candidate.
       let order = 0;
       for (const module of modules) {
         order += 1;
@@ -617,7 +617,7 @@ export class IatService {
     // combined tests/practice in the second half run longer, matching standard
     // IAT block sizing. Each count is a multiple of its pool size so the E/I
     // split stays balanced.
-    // Part 1 — attribute practice (incompatible-half arrangement): attr B / attr A
+    // Part 1 - attribute practice (incompatible-half arrangement): attr B / attr A
     addStimuli(
       1,
       'PRACTICE_ATTRIBUTE',
@@ -627,7 +627,7 @@ export class IatService {
       this.title(attrA),
       20,
     );
-    // Part 2 — target practice: target A / target B
+    // Part 2 - target practice: target A / target B
     addStimuli(
       2,
       'PRACTICE_TARGET',
@@ -637,7 +637,7 @@ export class IatService {
       this.title(targetB),
       20,
     );
-    // Part 3 — combined practice (incompatible pairing): A+attrB / B+attrA
+    // Part 3 - combined practice (incompatible pairing): A+attrB / B+attrA
     addStimuli(
       3,
       'PRACTICE_COMBINED',
@@ -647,7 +647,7 @@ export class IatService {
       this.labelForKeys([targetB, attrA]),
       20,
     );
-    // Part 4 — incompatible test (scored): A+attrB / B+attrA
+    // Part 4 - incompatible test (scored): A+attrB / B+attrA
     addStimuli(
       4,
       'INCOMPATIBLE',
@@ -657,7 +657,7 @@ export class IatService {
       this.labelForKeys([targetB, attrA]),
       40,
     );
-    // Part 5 — attribute practice (compatible-half arrangement): attr A / attr B
+    // Part 5 - attribute practice (compatible-half arrangement): attr A / attr B
     addStimuli(
       5,
       'PRACTICE_ATTRIBUTE',
@@ -667,7 +667,7 @@ export class IatService {
       this.title(attrB),
       30,
     );
-    // Part 6 — combined practice (compatible pairing): A+attrA / B+attrB
+    // Part 6 - combined practice (compatible pairing): A+attrA / B+attrB
     addStimuli(
       6,
       'PRACTICE_COMBINED',
@@ -677,7 +677,7 @@ export class IatService {
       this.labelForKeys([targetB, attrB]),
       40,
     );
-    // Part 7 — compatible test (scored): A+attrA / B+attrB
+    // Part 7 - compatible test (scored): A+attrA / B+attrB
     addStimuli(
       7,
       'COMPATIBLE',
@@ -789,7 +789,7 @@ export class IatService {
     if (!currentLevel) return;
     // Attempts for every enabled level are pre-created at registration, so the
     // "next level" is simply the next existing attempt in this session ordered
-    // by level number. We only unlock what already exists — disabled levels
+    // by level number. We only unlock what already exists - disabled levels
     // have no attempt and are skipped automatically.
     const nextAttempt = await this.attemptRepo
       .createQueryBuilder('attempt')

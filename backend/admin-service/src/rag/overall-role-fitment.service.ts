@@ -191,7 +191,7 @@ export class OverallRoleFitmentService {
       conditions.push(`r.school_level = $${params.length}`);
     }
 
-    // ── School stream (PCMB / PCB / PCM / PCBZ / SCIENCE / COMMERCE / HUMANITIES) — only for HSC ──
+    // ── School stream (PCMB / PCB / PCM / PCBZ / SCIENCE / COMMERCE / HUMANITIES) - only for HSC ──
     if (input.schoolStream) {
       const streamVal = input.schoolStream.toUpperCase();
       if (streamVal === 'SCIENCE') {

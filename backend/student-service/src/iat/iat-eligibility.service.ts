@@ -88,7 +88,7 @@ export class IatEligibilityService {
 
   /**
    * Filters IAT modules for a registration using the Level-3 scope rules
-   * (`levels.level3_scope_rules`) — the SAME rules that decide who receives
+   * (`levels.level3_scope_rules`) - the SAME rules that decide who receives
    * Level 3 also carry an optional `moduleSetId` (from `iat.module_sets`) that
    * routes which module set the scope gets.
    *

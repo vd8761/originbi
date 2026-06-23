@@ -23,7 +23,7 @@ import { invokeWithFallback } from './utils/llm-fallback';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║              🤖 AGENTIC RAG ORCHESTRATOR v2.0 — ADVANCED                 ║
+ * ║              🤖 AGENTIC RAG ORCHESTRATOR v2.0 - ADVANCED                 ║
  * ║       LLM Planner → Tool Selection → Parallel Execution → Synthesis     ║
  * ║       + ReAct Self-Reflection · Adaptive Chaining · Complexity Scoring  ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
@@ -80,7 +80,7 @@ export class AgentOrchestratorService {
   private synthesizerFallbackLlm: ChatGroq | null = null;
   private reflectorFallbackLlm: ChatGroq | null = null;
 
-  // Telemetry buffer — last N executions for observability
+  // Telemetry buffer - last N executions for observability
   private readonly telemetryBuffer: Array<{
     question: string;
     tools: ToolTelemetry[];
@@ -226,7 +226,7 @@ export class AgentOrchestratorService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MAIN ENTRY POINT — Called by RagService.query()
+  // MAIN ENTRY POINT - Called by RagService.query()
   // ═══════════════════════════════════════════════════════════════════════════
   async agentQuery(
     question: string,
@@ -245,14 +245,14 @@ export class AgentOrchestratorService {
       const complexity = this.analyzeQueryComplexity(question);
       this.logger.log(`📊 Complexity: ${complexity.score}/10 (data=${complexity.needsData} analysis=${complexity.needsAnalysis} person=${complexity.needsPersonLookup} multiPart=${complexity.isMultiPart})`);
 
-      // ── STEP 1: PLAN — LLM decides which tools to use ──
+      // ── STEP 1: PLAN - LLM decides which tools to use ──
       const planStart = Date.now();
       const plan = await this.plan(question, user, conversationHistory, complexity);
       const planningTimeMs = Date.now() - planStart;
       this.logger.log(`📋 Plan: ${plan.steps.map(s => s.tool).join(' + ')} (${planningTimeMs}ms)`);
       this.logger.log(`💭 Reasoning: ${plan.reasoning}`);
 
-      // ── STEP 2: EXECUTE — Run selected tools ──
+      // ── STEP 2: EXECUTE - Run selected tools ──
       const execStart = Date.now();
       let results = await this.execute(plan, question, user, conversationId, conversationHistory);
       const executionTimeMs = Date.now() - execStart;
@@ -299,7 +299,7 @@ export class AgentOrchestratorService {
         });
       }
 
-      // ── STEP 2.5: ADAPTIVE CHAINING — Auto-supplement low-confidence results ──
+      // ── STEP 2.5: ADAPTIVE CHAINING - Auto-supplement low-confidence results ──
       const primaryResult = results.find(r => r.toolName !== 'conversation_context');
       let chainedTools: string[] = [];
       if (primaryResult && primaryResult.confidence < 0.5 && primaryResult.toolName === 'text_to_sql') {
@@ -334,10 +334,10 @@ export class AgentOrchestratorService {
         }
       }
 
-      // ── STEP 3: SYNTHESIZE — Combine results ──
+      // ── STEP 3: SYNTHESIZE - Combine results ──
       let answer = await this.synthesize(question, plan, results, user);
 
-      // ── STEP 4: ReAct SELF-REFLECTION — Validate answer quality ──
+      // ── STEP 4: ReAct SELF-REFLECTION - Validate answer quality ──
       let reflectionApplied = false;
       if (complexity.score >= 8 && answer.length > 140 && results.length > 1) {
         const reflection = await this.reflectOnAnswer(question, answer, results);
@@ -380,7 +380,7 @@ export class AgentOrchestratorService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // STEP 1: PLANNER — LLM selects tools based on the question
+  // STEP 1: PLANNER - LLM selects tools based on the question
   // ═══════════════════════════════════════════════════════════════════════════
   private async plan(
     question: string,
@@ -450,7 +450,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       const plan = this.parsePlannerOutput(rawOutput, question);
       return this.optimizePlanForComplexity(plan, question, complexity);
     } catch (error) {
-      this.logger.warn(`Planner LLM failed: ${error.message} — using fallback plan`);
+      this.logger.warn(`Planner LLM failed: ${error.message} - using fallback plan`);
       const fallbackPlan = this.getFallbackPlan(question, user);
       return this.optimizePlanForComplexity(fallbackPlan, question, complexity);
     }
@@ -461,7 +461,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
    */
   private parsePlannerOutput(rawOutput: string, question: string): ExecutionPlan {
     try {
-      // Clean the output — remove code fences if present
+      // Clean the output - remove code fences if present
       let cleaned = rawOutput
         .replace(/^```(?:json)?\s*/i, '')
         .replace(/\s*```$/i, '')
@@ -528,7 +528,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         requiresSynthesis: parsed.requiresSynthesis === true && validSteps.length > 1,
       };
     } catch (parseError) {
-      this.logger.warn(`Plan parse error: ${parseError.message} — raw: ${rawOutput.slice(0, 200)}`);
+      this.logger.warn(`Plan parse error: ${parseError.message} - raw: ${rawOutput.slice(0, 200)}`);
       const recovered = this.recoverPlanFromMalformedOutput(rawOutput, question);
       if (recovered) {
         this.logger.log(`🛠️ Recovered plan from malformed output: ${recovered.steps.map(s => s.tool).join(' + ')}`);
@@ -662,7 +662,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
   }
 
   /**
-   * Fallback plan when the Planner LLM fails — uses keyword heuristics
+   * Fallback plan when the Planner LLM fails - uses keyword heuristics
    */
   private getFallbackPlan(question: string, _user: UserContext): ExecutionPlan {
     const q = question.toLowerCase();
@@ -727,13 +727,13 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     // Default: try text_to_sql first (it's the most versatile)
     return {
       steps: [{ tool: 'text_to_sql', params: { question }, reason: 'Default tool' }],
-      reasoning: 'No specific pattern matched — using text_to_sql as default',
+      reasoning: 'No specific pattern matched - using text_to_sql as default',
       requiresSynthesis: false,
     };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // STEP 2: EXECUTOR — Run selected tools (parallel where possible)
+  // STEP 2: EXECUTOR - Run selected tools (parallel where possible)
   // ═══════════════════════════════════════════════════════════════════════════
   private async execute(
     plan: ExecutionPlan,
@@ -1147,7 +1147,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
               : attemptCount === 1
                 ? ' (1 assessment)'
                 : ' (no assessments)';
-            return `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score ?? 'N/A'}` : 'Not assessed'}${attemptLabel}`;
+            return `${i + 1}. **${r.full_name}** - ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score ?? 'N/A'}` : 'Not assessed'}${attemptLabel}`;
           })
           .join('\n');
 
@@ -1171,8 +1171,8 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
       const person = top;
       const hasAssessment = person.assessment_status === 'COMPLETED';
       const summary = hasAssessment
-        ? `Found **${person.full_name}** — ${person.personality_style || 'Personality not assessed'}, Score: ${person.total_score || 'N/A'}`
-        : `Found **${person.full_name}** — Assessment not yet completed.`;
+        ? `Found **${person.full_name}** - ${person.personality_style || 'Personality not assessed'}, Score: ${person.total_score || 'N/A'}`
+        : `Found **${person.full_name}** - Assessment not yet completed.`;
 
       // If multiple matches, include disambiguation info
       const allMatches = results.length > 1
@@ -1183,7 +1183,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
               : attemptCount === 1
                 ? ' (1 assessment)'
                 : ' (no assessments)';
-            return `${i + 1}. **${r.full_name}** — ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score}` : 'Not assessed'}${attemptLabel}`;
+            return `${i + 1}. **${r.full_name}** - ${r.assessment_status === 'COMPLETED' ? `Score: ${r.total_score}` : 'Not assessed'}${attemptLabel}`;
           }).join('\n')
         : null;
 
@@ -1274,7 +1274,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
           toolName: 'career_report',
           success: false,
           data: null,
-          summary: `Cannot generate career report for **${person.full_name}** — their assessment is not yet completed.`,
+          summary: `Cannot generate career report for **${person.full_name}** - their assessment is not yet completed.`,
           confidence: 0.5,
         };
       }
@@ -1284,7 +1284,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
         name: person.full_name || name,
         currentRole:
           regMetadata.currentRole ||
-          (person.program_name ? `Student — ${person.program_name}` : 'Student'),
+          (person.program_name ? `Student - ${person.program_name}` : 'Student'),
         currentJobDescription:
           regMetadata.roleDescription ||
           regMetadata.currentJobDescription ||
@@ -1427,7 +1427,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // STEP 3: SYNTHESIZER — Combine results from multiple tools
+  // STEP 3: SYNTHESIZER - Combine results from multiple tools
   // ═══════════════════════════════════════════════════════════════════════════
   private async synthesize(
     question: string,
@@ -1439,7 +1439,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
     const successfulResults = results.filter(r => r.success && r.toolName !== 'conversation_context');
 
     if (successfulResults.length === 0) {
-      // All tools failed — return the best failure message
+      // All tools failed - return the best failure message
       const bestFailure = results.reduce((best, curr) =>
         curr.confidence > best.confidence ? curr : best,
         results[0],
@@ -1523,7 +1523,7 @@ Set requiresSynthesis=true ONLY when using 2+ tools that produce different types
 
     const roleRules = isStudent
       ? `STUDENT RULES:
-- Answer what was asked — nothing more, nothing less.
+- Answer what was asked - nothing more, nothing less.
 - Simple factual questions → 1-2 sentences. Complex guidance → structured sections.
 - Use encouraging, supportive tone. Bold key terms.
 - Skip salary/company comparisons unless explicitly asked.
@@ -1554,14 +1554,14 @@ ${roleRules}
 
 FORMATTING RULES:
 1) Use ONLY facts from tool outputs. NEVER fabricate data, names, or numbers.
-2) Start with a direct answer in the first line — no preamble like "Based on the data...".
+2) Start with a direct answer in the first line - no preamble like "Based on the data...".
 3) Use markdown formatting:
    - **Bold** for key numbers, names, and metrics
    - Tables (| col | col |) for multi-row data
    - Bullet points for lists of 3+ items
    - Numbered lists for step-by-step guidance
 4) For multi-part questions, address each part with a clear section header.
-5) Keep wording tight — no repetition, no filler phrases.
+5) Keep wording tight - no repetition, no filler phrases.
 6) If tools returned no data, say specifically what wasn't found and suggest 1 alternative query.
 7) If tools conflict, note briefly and use the highest-confidence result.
 8) Structure complex responses as:
@@ -1593,7 +1593,7 @@ FINAL RESPONSE:`;
       });
       return response.content.toString().trim();
     } catch (error) {
-      this.logger.warn(`Synthesis LLM failed: ${error.message} — concatenating tool outputs`);
+      this.logger.warn(`Synthesis LLM failed: ${error.message} - concatenating tool outputs`);
       // Fallback: just concatenate the best answers
       return results
         .filter(r => r.summary)
@@ -1740,7 +1740,7 @@ FINAL RESPONSE:`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // QUERY COMPLEXITY ANALYZER — Scores question difficulty (1-10)
+  // QUERY COMPLEXITY ANALYZER - Scores question difficulty (1-10)
   // ═══════════════════════════════════════════════════════════════════════════
   private analyzeQueryComplexity(question: string): ComplexityAssessment {
     const q = question.toLowerCase();
@@ -1771,7 +1771,7 @@ FINAL RESPONSE:`;
       score += 1;
     }
 
-    // Multi-part detection — "and", "also", "then", multiple question marks
+    // Multi-part detection - "and", "also", "then", multiple question marks
     if (/\band\b.*\b(also|then|additionally)\b/i.test(q) || (q.match(/\?/g) || []).length > 1) {
       isMultiPart = true;
       score += 2;
@@ -1800,7 +1800,7 @@ FINAL RESPONSE:`;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ReAct SELF-REFLECTION — Evaluates answer quality and suggests improvements
+  // ReAct SELF-REFLECTION - Evaluates answer quality and suggests improvements
   // ═══════════════════════════════════════════════════════════════════════════
   private async reflectOnAnswer(
     question: string,
@@ -1873,7 +1873,7 @@ IMPORTANT: Set needsImprovement=false for MOST responses. Only set true if there
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // TELEMETRY — Circular buffer for execution observability
+  // TELEMETRY - Circular buffer for execution observability
   // ═══════════════════════════════════════════════════════════════════════════
   private recordTelemetry(question: string, tools: ToolTelemetry[], totalMs: number): void {
     this.telemetryBuffer.push({

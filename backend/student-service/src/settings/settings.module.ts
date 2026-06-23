@@ -5,7 +5,7 @@ import { SettingsService } from './settings.service';
 
 /**
  * Read-only SettingsModule for student-service.
- * No controller — only provides SettingsService for DI.
+ * No controller - only provides SettingsService for DI.
  */
 @Module({
   imports: [TypeOrmModule.forFeature([OriginbiSetting])],

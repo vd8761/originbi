@@ -11,7 +11,7 @@ export type SmsTemplate =
   | 'report_sent_notification';
 
 /**
- * SMS dispatcher — student-service copy.
+ * SMS dispatcher - student-service copy.
  * Mirrors admin-service/SmsService so student-service can send directly.
  * Message bodies are hardcoded; template IDs and credentials come from
  * `originbi_settings` (category `sms`).

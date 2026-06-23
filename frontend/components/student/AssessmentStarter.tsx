@@ -75,7 +75,7 @@ const SuccessModal: React.FC<{
   onDashboard: () => void;
   showDashboard?: boolean;
   /** True only when this was the LAST mandatory level. Drives the "report by
-   *  email" copy — otherwise we tell the student they still have more to do. */
+   *  email" copy - otherwise we tell the student they still have more to do. */
   isFinal?: boolean;
 }> = ({ onBack, onDashboard, showDashboard = false, isFinal = false }) => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
@@ -100,7 +100,7 @@ const SuccessModal: React.FC<{
       <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm leading-relaxed">
         {isFinal
           ? "You've successfully completed all assessments. Your report is being processed and will be shared to your registered mail ID."
-          : "Great work — your responses have been saved. Head back to the assessments screen to continue with the next level."}
+          : "Great work - your responses have been saved. Head back to the assessments screen to continue with the next level."}
       </p>
 
       <div className="flex flex-col gap-3 w-full">
