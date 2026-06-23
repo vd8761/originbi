@@ -193,8 +193,6 @@ export class CareerFitmentReport extends BaseReport {
       let program = 'School Students';
       if (profile.currentRole && profile.currentRole.includes('-')) {
         program = profile.currentRole.split('-')[1].trim();
-      } else if (profile.currentRole && profile.currentRole.includes('-')) {
-        program = profile.currentRole.split('-')[1].trim();
       } else if (profile.programName) {
         program = profile.programName;
       }
