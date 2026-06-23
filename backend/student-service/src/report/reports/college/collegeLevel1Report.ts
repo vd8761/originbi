@@ -9,7 +9,6 @@ import * as zlib from 'zlib';
 
 const WATERMARK_BG = 'public/assets/images/Watermark_Background.jpg';
 
-
 /** Full-form names for the four behavioural dimensions (no letter codes). */
 const DIMENSION_NAMES: Record<string, string> = {
   D: 'Dominance',

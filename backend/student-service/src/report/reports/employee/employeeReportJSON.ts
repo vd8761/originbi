@@ -365,7 +365,8 @@ export async function buildEmployeeReportJSON(
   // ── 3. Blended Style ── (headline is pure-capable: engine's resolved code)
   const headlineTrait = resolveHeadlineFromReportData(data);
   const blendedContent =
-    BLENDED_STYLE_MAPPING[headlineTrait] || BLENDED_STYLE_MAPPING[dominantTrait];
+    BLENDED_STYLE_MAPPING[headlineTrait] ||
+    BLENDED_STYLE_MAPPING[dominantTrait];
 
   // ── Build the JSON response ──
   const response = {

@@ -476,15 +476,13 @@ export class CorporateDashboardService {
     );
 
     const normalizeColor = (raw: string | null): string =>
-      raw &&
-      !raw.startsWith('#') &&
-      !raw.startsWith('rgb') &&
-      raw.includes(',')
+      raw && !raw.startsWith('#') && !raw.startsWith('rgb') && raw.includes(',')
         ? `rgb(${raw})`
         : raw || '#1ED36A';
 
     const total = (rows || []).reduce(
-      (sum: number, row: any) => sum + parseInt((row.count as string) || '0', 10),
+      (sum: number, row: any) =>
+        sum + parseInt((row.count as string) || '0', 10),
       0,
     );
 
@@ -554,10 +552,7 @@ export class CorporateDashboardService {
     );
 
     const normalizeColor = (raw: string | null): string =>
-      raw &&
-      !raw.startsWith('#') &&
-      !raw.startsWith('rgb') &&
-      raw.includes(',')
+      raw && !raw.startsWith('#') && !raw.startsWith('rgb') && raw.includes(',')
         ? `rgb(${raw})`
         : raw || '#1ED36A';
 
@@ -729,7 +724,9 @@ export class CorporateDashboardService {
             'Few natural connectors — team energy may need a boost.',
           );
         if (b.key === 'steady')
-          watchouts.push('Few steady supporters — risk of burnout under pressure.');
+          watchouts.push(
+            'Few steady supporters — risk of burnout under pressure.',
+          );
         if (b.key === 'careful')
           watchouts.push(
             'Few careful thinkers — be cautious with detail-heavy roles.',
@@ -743,13 +740,15 @@ export class CorporateDashboardService {
     let reliabilityNote = 'Treat these patterns with caution.';
     if (reliablePct >= 80) {
       reliabilityTone = 'good';
-      reliabilityNote = 'We trust this picture — most answers were given honestly.';
+      reliabilityNote =
+        'We trust this picture — most answers were given honestly.';
     } else if (reliablePct >= 50) {
       reliabilityTone = 'mixed';
       reliabilityNote = 'Mostly reliable — a few responses look rushed.';
     } else if (total > 0) {
       reliabilityTone = 'weak';
-      reliabilityNote = 'Many responses look rushed — read this picture loosely.';
+      reliabilityNote =
+        'Many responses look rushed — read this picture loosely.';
     }
 
     return {
@@ -833,7 +832,12 @@ export class CorporateDashboardService {
       code: string;
       label: string;
       moduleOrder: number;
-      distribution: { none: number; slight: number; moderate: number; strong: number };
+      distribution: {
+        none: number;
+        slight: number;
+        moderate: number;
+        strong: number;
+      };
       total: number;
       wordCounts: Record<string, number>;
       reliableCount: number;
@@ -850,7 +854,12 @@ export class CorporateDashboardService {
       const v = (raw || code || '').trim();
       if (!v) return 'Hidden association';
       // Keep DB-provided display_name; only strip very technical suffixes.
-      return v.replace(/\s*IAT\s*$/i, '').replace(/^IAT\s*[-:]?\s*/i, '').trim() || v;
+      return (
+        v
+          .replace(/\s*IAT\s*$/i, '')
+          .replace(/^IAT\s*[-:]?\s*/i, '')
+          .trim() || v
+      );
     };
 
     for (const row of rows || []) {
@@ -944,9 +953,7 @@ export class CorporateDashboardService {
         ];
 
         // Verdict: pick the dominant level
-        const dominant = [...distribution].sort(
-          (a, b) => b.count - a.count,
-        )[0];
+        const dominant = [...distribution].sort((a, b) => b.count - a.count)[0];
         let verdict = `Not much signal on “${t.label}” yet.`;
         if (t.total > 0) {
           if (dominant.key === 'none') {
@@ -966,9 +973,7 @@ export class CorporateDashboardService {
           .map(([word, count]) => ({ word, count }));
 
         const reliablePct =
-          t.total > 0
-            ? Math.round((t.reliableCount / t.total) * 100)
-            : 0;
+          t.total > 0 ? Math.round((t.reliableCount / t.total) * 100) : 0;
 
         return {
           code: t.code,
@@ -1017,7 +1022,8 @@ export class CorporateDashboardService {
       reliabilityNote = 'Mostly reliable — a few responses look noisy.';
     } else if (totalCandidates > 0) {
       reliabilityTone = 'weak';
-      reliabilityNote = 'Many responses look noisy — read this picture loosely.';
+      reliabilityNote =
+        'Many responses look noisy — read this picture loosely.';
     }
 
     return {
@@ -2651,7 +2657,9 @@ export class CorporateDashboardService {
     const PRIORITY: Record<string, number> = { C: 0, D: 1, I: 2, S: 3 };
     const ranked = ['D', 'I', 'S', 'C']
       .map((f) => ({ f, v: scores[f] }))
-      .sort((a, b) => (a.v !== b.v ? b.v - a.v : PRIORITY[a.f] - PRIORITY[b.f]));
+      .sort((a, b) =>
+        a.v !== b.v ? b.v - a.v : PRIORITY[a.f] - PRIORITY[b.f],
+      );
     const blendCode = ranked[0].f + ranked[1].f;
 
     try {
