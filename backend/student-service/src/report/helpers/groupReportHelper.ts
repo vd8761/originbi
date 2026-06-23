@@ -23,7 +23,7 @@ import { ReportVariant } from './reportFactory';
  *
  * It NEVER touches the exam-submission flow. The number uses the same
  * `OBI-G{group}-{MM/YY}-{code}-{seq}` convention as the exam-engine, and the
- * insert is idempotent — when the session later completes the exam-engine finds
+ * insert is idempotent - when the session later completes the exam-engine finds
  * this row and backfills the ACI/Level-3/4 score snapshot onto it.
  *
  * @returns the report number, or null when one can't be determined (e.g. no
@@ -56,7 +56,7 @@ export async function ensureReportNumber(
     const groupId: number | null = sess.rows[0].group_id ?? null;
     const programCode: string = sess.rows[0].program_code || '';
 
-    // 3. Require a completed Level 1 (DISC) attempt — its data seeds the row.
+    // 3. Require a completed Level 1 (DISC) attempt - its data seeds the row.
     const att = await client.query(
       `SELECT aa.dominant_trait_id, aa.sincerity_index, aa.metadata
          FROM assessment_attempts aa
@@ -96,7 +96,7 @@ export async function ensureReportNumber(
     const sincerity = att.rows[0].sincerity_index ?? 0;
 
     // 4. Mint + insert idempotently. A unique-number race (another session in
-    //    the same prefix minting at once) can't corrupt anything — we roll back
+    //    the same prefix minting at once) can't corrupt anything - we roll back
     //    and re-read; the row is created by whoever wins, else at completion.
     try {
       await client.query('BEGIN');
@@ -131,7 +131,7 @@ export async function ensureReportNumber(
       );
     }
 
-    // 5. Conflict / concurrent creation — re-read whatever is now there.
+    // 5. Conflict / concurrent creation - re-read whatever is now there.
     const reselect = await client.query(
       `SELECT report_number FROM assessment_reports WHERE assessment_session_id = $1 LIMIT 1`,
       [sessionId],
@@ -161,7 +161,7 @@ export async function fetchGroupAssessmentData(
       }`,
     );
 
-    // Optional program filter — used by the combined "By Group" report so the
+    // Optional program filter - used by the combined "By Group" report so the
     // report stays scoped to one (group, program) cohort.
     const params: (string | number)[] = [groupId];
     let programFilter = '';
@@ -174,8 +174,8 @@ export async function fetchGroupAssessmentData(
       programFilter = ` AND s.program_id = $${params.length}`;
     }
 
-    // DISTINCT ON (user) keeps exactly one row per student — their latest
-    // completed session — so a student who sat in multiple exam windows of the
+    // DISTINCT ON (user) keeps exactly one row per student - their latest
+    // completed session - so a student who sat in multiple exam windows of the
     // same group is counted once in the combined report. (No-op for single
     // windows, where a user has only one session.)
     const sessionsQuery = `
@@ -331,10 +331,12 @@ async function processSessionRows(
     // 2. For each session, fetch attempts (DISC + Agile usually)
     // We need COMPLETED attempts
     const attemptsQuery = `
-            SELECT status, metadata
-            FROM assessment_attempts
-            WHERE assessment_session_id = $1
-            AND status = 'COMPLETED'
+            SELECT aa.status, aa.metadata, aa.dominant_trait_id,
+                   pt.code AS dominant_trait_code
+            FROM assessment_attempts aa
+            LEFT JOIN personality_traits pt ON pt.id = aa.dominant_trait_id
+            WHERE aa.assessment_session_id = $1
+            AND aa.status = 'COMPLETED'
             `;
     const attemptsResult = await client.query(attemptsQuery, [
       session.session_id,
@@ -354,11 +356,15 @@ async function processSessionRows(
     // Merge Metadata
     let discData: any = null;
     let agileData: any = null;
+    // The engine's resolved headline code (pure-capable) lives on the DISC
+    // (Level 1) attempt via dominant_trait_id -> personality_traits.code.
+    let discTraitCode: string | null = null;
 
     for (const row of attemptsResult.rows) {
       const meta = row.metadata;
       if (meta.disc_scores) {
         discData = meta;
+        discTraitCode = row.dominant_trait_code ?? null;
       } else if (meta.agile_scores) {
         agileData = meta;
       }
@@ -398,7 +404,7 @@ async function processSessionRows(
       { ANSWER_TYPE: 'C', COUNT: discData.disc_scores.C || 0 },
     ];
 
-    // Agile Scores mapping (null when level1-only variant — not required for that report)
+    // Agile Scores mapping (null when level1-only variant - not required for that report)
     const transformedAgile: AgileScore = agileData
       ? {
           focus: agileData.agile_scores.Focus || 0,
@@ -471,6 +477,7 @@ async function processSessionRows(
       program_type: programId,
       agile_scores: [transformedAgile],
       report_password: session.report_password,
+      dominant_trait_code: discTraitCode ?? undefined,
     };
 
     // --- PROGRAM LOGIC ---

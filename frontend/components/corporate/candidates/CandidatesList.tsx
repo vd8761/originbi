@@ -708,7 +708,7 @@ export default function CandidatesList() {
                 </div>
             </div>
 
-            {/* Content Box — search + filters + table + progress bar all inside */}
+            {/* Content Box - search + filters + table + progress bar all inside */}
             <div className="rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-[#FFFFFF14] overflow-visible">
 
                 {/* Filters Bar */}
@@ -894,7 +894,7 @@ export default function CandidatesList() {
                                     <td className="px-4 sm:px-5 py-5 whitespace-nowrap text-[#19211C] dark:text-white/90 font-normal text-[17px] leading-[22px]">
                                         {candidate.trait}
                                     </td>
-                                    {/* Applied Jobs — click opens Applied Jobs tab */}
+                                    {/* Applied Jobs - click opens Applied Jobs tab */}
                                     <td className="px-4 sm:px-5 py-5">
                                         <button
                                             onClick={() => openCandidate(candidate.id, "applied_jobs")}

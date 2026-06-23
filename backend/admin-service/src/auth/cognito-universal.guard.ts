@@ -24,7 +24,7 @@ import { UserEnrichmentService } from './user-enrichment.service';
  *   Path 3: Existing request.user from middleware      → enriched
  *   Path 4: Anonymous STUDENT (most restricted)        → fallback
  *
- * Unlike CognitoAdminGuard, this guard never rejects based on role —
+ * Unlike CognitoAdminGuard, this guard never rejects based on role -
  * role-based restrictions are handled downstream by AccessPolicy.
  */
 @Injectable()
@@ -58,9 +58,9 @@ export class CognitoUniversalGuard implements CanActivate {
         } catch (err) {
           const msg = err?.message || 'UNKNOWN_AUTH_ERROR';
           if (msg === 'EXPIRED_COGNITO_TOKEN') {
-            this.logger.debug('Cognito token expired — falling through');
+            this.logger.debug('Cognito token expired - falling through');
           } else {
-            this.logger.warn(`Cognito token failed: ${msg} — falling through`);
+            this.logger.warn(`Cognito token failed: ${msg} - falling through`);
           }
         }
       }
@@ -95,7 +95,7 @@ export class CognitoUniversalGuard implements CanActivate {
       return true;
     }
 
-    // ─── Path 4: No authentication — anonymous with most restricted access ───
+    // ─── Path 4: No authentication - anonymous with most restricted access ───
     request.user = this.userEnrichment.getAnonymousContext();
     this.logger.debug(
       'Auth[Anonymous]: No credentials found → anonymous STUDENT context',

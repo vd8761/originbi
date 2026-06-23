@@ -20,7 +20,7 @@ applyTo: "backend/admin-service/src/rag/**"
 
 ---
 
-## Step 1 — Classify the Failure Type
+## Step 1 - Classify the Failure Type
 
 Before making any change, identify WHICH layer is failing.
 
@@ -38,7 +38,7 @@ Run the question mentally or with logging through each stage:
 
 ---
 
-## Step 2 — Evaluate the LLM Provider
+## Step 2 - Evaluate the LLM Provider
 
 ### Decision: Is the current model good enough?
 
@@ -47,10 +47,10 @@ Check `text-to-sql.service.ts` and `rag.service.ts` for `model:` field.
 **Current**: `llama-3.3-70b-versatile` via Groq (free tier, 14 RPM limit)
 
 **Upgrade path by priority:**
-1. **Claude 3.5 Haiku** (Anthropic) — Best at structured system prompts, Text-to-SQL, following complex rules. Cheapest Anthropic model. Use `@anthropic-ai/sdk`.
-2. **GPT-4o-mini** (OpenAI) — Excellent at multi-join SQL, reliable JSON output. Use `@langchain/openai`.
-3. **Gemini 1.5 Flash** (Google) — Already using Gemini for embeddings; easy integration. 1M context window.
-4. **Groq llama-3.3-70b** — Keep for fast/cheap tasks; move complex SQL to a stronger model.
+1. **Claude 3.5 Haiku** (Anthropic) - Best at structured system prompts, Text-to-SQL, following complex rules. Cheapest Anthropic model. Use `@anthropic-ai/sdk`.
+2. **GPT-4o-mini** (OpenAI) - Excellent at multi-join SQL, reliable JSON output. Use `@langchain/openai`.
+3. **Gemini 1.5 Flash** (Google) - Already using Gemini for embeddings; easy integration. 1M context window.
+4. **Groq llama-3.3-70b** - Keep for fast/cheap tasks; move complex SQL to a stronger model.
 
 **Implementation pattern** (dual-model strategy):
 ```typescript
@@ -68,7 +68,7 @@ private getStrongLlm(): ChatAnthropic { model: 'claude-haiku-3-5' }
 
 ---
 
-## Step 3 — Fix SQL Generation Quality
+## Step 3 - Fix SQL Generation Quality
 
 ### Check: Is the schema context complete and accurate?
 
@@ -99,7 +99,7 @@ SQL: SELECT r.full_name, aa.total_score FROM registrations r
 
 ---
 
-## Step 4 — Fix RBAC and Schema Filtering
+## Step 4 - Fix RBAC and Schema Filtering
 
 ### Check: Does the SQL validator inject the right WHERE clauses?
 
@@ -122,7 +122,7 @@ SELECT ... FROM scoped_registrations ...
 
 ---
 
-## Step 5 — Fix Retrieval Quality
+## Step 5 - Fix Retrieval Quality
 
 ### Current state
 - Single-pass cosine similarity via pgvector
@@ -170,7 +170,7 @@ const results = await vectorStore.similaritySearch(hydeEmbedding);
 
 ---
 
-## Step 6 — Add Query Decomposition for Complex Questions
+## Step 6 - Add Query Decomposition for Complex Questions
 
 ### When to apply
 Questions with AND/OR compound conditions, multiple entities, or implicit multi-step reasoning.
@@ -199,7 +199,7 @@ async function decomposedQuery(userQuestion: string) {
 
 ---
 
-## Step 7 — Add Self-Evaluation (Corrective RAG)
+## Step 7 - Add Self-Evaluation (Corrective RAG)
 
 After generating an answer, ask the LLM to grade it before returning:
 

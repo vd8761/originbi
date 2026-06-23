@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║                    AGENTIC RAG — TOOL REGISTRY                           ║
+ * ║                    AGENTIC RAG - TOOL REGISTRY                           ║
  * ║     Defines the available tools that the Planner Agent can select from   ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  Each tool wraps an existing service and exposes it in a standardized    ║
@@ -131,7 +131,7 @@ export const TOOL_DEFINITIONS = [
   },
   {
     name: 'knowledge_ai',
-    description: `Answer career guidance, technology, skill, and general knowledge questions using the AI brain. This tool does NOT query the database — it uses the LLM's training knowledge. Best for advisory content, career paths, skill recommendations, technology explanations, and industry insights.`,
+    description: `Answer career guidance, technology, skill, and general knowledge questions using the AI brain. This tool does NOT query the database - it uses the LLM's training knowledge. Best for advisory content, career paths, skill recommendations, technology explanations, and industry insights.`,
     whenToUse: [
       'User asks career advice: "how to become a data scientist", "skills for web developer"',
       'User asks about technologies, tools, frameworks, or programming concepts',

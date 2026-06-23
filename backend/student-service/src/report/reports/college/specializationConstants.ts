@@ -1,5 +1,5 @@
 /**
- * Specialization & Trait Mapping content — ported from the standalone
+ * Specialization & Trait Mapping content - ported from the standalone
  * placement-cell "Specialization Report" (specialization-report/src/constants.ts
  * and discProfile.ts).
  *
@@ -13,6 +13,8 @@
  * Used by the College Level 1 short report (page 2) to show the student's
  * specialization fit alongside their behavioural archetype.
  */
+
+import { resolveDominantFactor } from '../../helpers/discTrait';
 
 export interface SpecEntry {
   /** Human-readable trait name, e.g. "Driver + People Skills". */
@@ -50,7 +52,7 @@ export const FIT_COLUMN_LABELS: Record<FitKey, string> = {
 
 export const SPEC_MAP: Record<string, SpecEntry> = {
   D: {
-    trait: 'Pure Dominance',
+    trait: 'Bold Driver',
     finance: 1,
     hr: 4,
     marketing: 2,
@@ -71,7 +73,7 @@ export const SPEC_MAP: Record<string, SpecEntry> = {
     ],
   },
   I: {
-    trait: 'Pure Influence',
+    trait: 'Inspiring Motivator',
     finance: 4,
     hr: 2,
     marketing: 1,
@@ -92,7 +94,7 @@ export const SPEC_MAP: Record<string, SpecEntry> = {
     ],
   },
   S: {
-    trait: 'Pure Steadiness',
+    trait: 'Steadfast Anchor',
     finance: 5,
     hr: 1,
     marketing: 3,
@@ -113,7 +115,7 @@ export const SPEC_MAP: Record<string, SpecEntry> = {
     ],
   },
   C: {
-    trait: 'Pure Conscientiousness',
+    trait: 'Precise Perfectionist',
     finance: 2,
     hr: 5,
     marketing: 4,
@@ -442,44 +444,24 @@ export const ELECTIVES: ReadonlyArray<{
  * single-trait code (D/I/S/C override).
  */
 export const HIGH_FACTOR_TEXT: Record<'D' | 'I' | 'S' | 'C', string> = {
-  D: 'Pure Dominance (D): Demonstrates strong decisive output, assertive execution, and thrives in high-stakes environments.',
-  I: 'Pure Influence (I): Communicates with persuasive energy, builds rapport quickly, and excels at mobilising people around ideas.',
-  S: 'Pure Steadiness (S): Brings dependable, consistent delivery, a calm collaborative temperament, and sustained reliability.',
-  C: 'Pure Conscientiousness (C): High-precision structural tracking, analytical rigour, and sharp detail orientation.',
+  D: 'Bold Driver: Demonstrates strong decisive output, assertive execution, and thrives in high-stakes environments.',
+  I: 'Inspiring Motivator: Communicates with persuasive energy, builds rapport quickly, and excels at mobilising people around ideas.',
+  S: 'Steadfast Anchor: Brings dependable, consistent delivery, a calm collaborative temperament, and sustained reliability.',
+  C: 'Precise Perfectionist: High-precision structural tracking, analytical rigour, and sharp detail orientation.',
 };
 
 export type DiscScores = { D: number; I: number; S: number; C: number };
 
-/** Deterministic priority used as a tie-breaker (matches the originBI report). */
-const PRIORITY: Array<keyof DiscScores> = ['C', 'D', 'I', 'S'];
-
 /**
- * Returns the resolved DISC profile code (faithful port of the placement-cell
- * override hierarchy):
- *   - a single letter ('D' | 'I' | 'S' | 'C') when a high-factor override fires
- *   - otherwise the top two traits concatenated, e.g. 'CD'.
+ * Returns the resolved DISC profile code (single letter for a Pure Trait, else
+ * the top-two blend). Delegates to the single source of truth
+ * (`discTrait.resolveDominantFactor`, the TS mirror of the exam engine's
+ * `ResolveDominantFactor`), so the placement report's pure-trait threshold is the
+ * dynamic "50% of the candidate's own total" rule used everywhere else - never a
+ * hardcoded cutoff. (Previously this hardcoded `top.score >= 20`.)
  */
 export function calculateDiscProfile(scores: DiscScores): string {
-  const sorted = (Object.keys(scores) as Array<keyof DiscScores>)
-    .map((k) => ({ factor: k, score: scores[k] }))
-    .sort((a, b) => {
-      const diff = b.score - a.score;
-      if (diff !== 0) return diff;
-      return PRIORITY.indexOf(a.factor) - PRIORITY.indexOf(b.factor);
-    });
-
-  const [top, ...rest] = sorted;
-
-  // 1. High-factor absolute override threshold.
-  if (top.score >= 20) return top.factor;
-
-  // 2. High-factor relative division rule: top/2 strictly greater than every
-  //    other dimension.
-  const halfTop = top.score / 2;
-  if (rest.every((r) => halfTop > r.score)) return top.factor;
-
-  // 3. Standard dual-trait profile: top two traits combined.
-  return `${top.factor}${rest[0].factor}`;
+  return resolveDominantFactor(scores);
 }
 
 /** True when the resolved code is a single-trait (high-factor) override. */

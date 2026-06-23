@@ -14,7 +14,7 @@
 --   template_id_report_sent     -> report delivered SMS
 -- ============================================================
 
--- 1. SMS gateway auth key (sensitive field — hidden in UI with eye icon)
+-- 1. SMS gateway auth key (sensitive field - hidden in UI with eye icon)
 -- Removed
 
 -- 2. SMS sender ID

@@ -682,7 +682,7 @@ export class CorporateRegistrationsService {
     });
   }
 
-  /** Terminal session statuses — a user with only these can receive a new exam. */
+  /** Terminal session statuses - a user with only these can receive a new exam. */
   private static readonly TERMINAL_SESSION_STATUSES = [
     'COMPLETED',
     'EXPIRED',

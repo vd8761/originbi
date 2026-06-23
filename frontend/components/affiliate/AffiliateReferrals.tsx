@@ -328,7 +328,7 @@ Scan the QR code in the image or register here: ${link}`;
         a.click();
     };
 
-    // Main share function — generates card, then shares via the chosen platform
+    // Main share function - generates card, then shares via the chosen platform
     const shareVia = async (
         platform: 'native' | 'whatsapp' | 'email' | 'linkedin' | 'telegram',
         targetLink: string = referralLink,
@@ -350,7 +350,7 @@ Scan the QR code in the image or register here: ${link}`;
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     // Send image + text as one single message
                     await navigator.share({
-                        title: 'What Next After +2? — OriginBI',
+                        title: 'What Next After +2? - OriginBI',
                         text: getShareText('plain', targetLink),
                         files: [file],
                     });
@@ -361,7 +361,7 @@ Scan the QR code in the image or register here: ${link}`;
             if (navigator.share) {
                 try {
                     await navigator.share({
-                        title: 'What Next After +2? — OriginBI',
+                        title: 'What Next After +2? - OriginBI',
                         text: getShareText('plain', targetLink),
                         url: targetLink,
                     });
@@ -377,7 +377,7 @@ Scan the QR code in the image or register here: ${link}`;
         if (platform === 'whatsapp') {
             window.open(`https://wa.me/?text=${encodeURIComponent(getShareText('whatsapp', targetLink))}`, '_blank');
         } else if (platform === 'email') {
-            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? — Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email', targetLink))}`;
+            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? - Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email', targetLink))}`;
         } else if (platform === 'linkedin') {
             window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(targetLink)}`, '_blank');
         } else if (platform === 'telegram') {
@@ -531,7 +531,7 @@ Scan the QR code in the image or register here: ${link}`;
                                     <td className="py-3.5 px-4 font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.schoolStream}</td>
                                     <td className="py-3.5 px-4 text-center font-medium text-[clamp(14px,1.1vw,17px)] text-[#19211C] dark:text-white leading-none">{row.commissionPercentage}%</td>
                                     <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">
-                                        {row.totalEarnedCommission > 0 ? `₹${row.totalEarnedCommission.toLocaleString('en-IN')}` : '—'}
+                                        {row.totalEarnedCommission > 0 ? `₹${row.totalEarnedCommission.toLocaleString('en-IN')}` : '-'}
                                     </td>
                                 </tr>
                             ))}

@@ -31,6 +31,6 @@ INSERT INTO originbi_settings (category, setting_key, value_type, value_json, la
 VALUES ('assessment', 'open_question_distribution', 'json',
         '[{"questionType":null,"count":20,"selection":"random"}]'::jsonb,
         'Open Question Distribution (Level 1)',
-        'How the non-DISC open questions are picked per Level-1 assessment. A list of groups: questionType (open_questions.question_type to draw from; null = any), count (how many to pick — this is the configurable count that appears in the exam), selection ("random" = shuffled, "set_sequential" = fixed order for linked survey sets). Picked questions are interleaved 2 main : 1 open. Example 10 + 10: [{"questionType":"OPEN","count":10,"selection":"random"},{"questionType":"SURVEY","count":10,"selection":"set_sequential"}].',
+        'How the non-DISC open questions are picked per Level-1 assessment. A list of groups: questionType (open_questions.question_type to draw from; null = any), count (how many to pick - this is the configurable count that appears in the exam), selection ("random" = shuffled, "set_sequential" = fixed order for linked survey sets). Picked questions are interleaved 2 main : 1 open. Example 10 + 10: [{"questionType":"OPEN","count":10,"selection":"random"},{"questionType":"SURVEY","count":10,"selection":"set_sequential"}].',
         10)
 ON CONFLICT (category, setting_key) DO NOTHING;

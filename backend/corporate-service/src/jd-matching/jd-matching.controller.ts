@@ -73,7 +73,7 @@ export class JDMatchingController {
 
   /**
    * POST /jd-matching/chat
-   * Chat-style JD matching — accepts natural language messages
+   * Chat-style JD matching - accepts natural language messages
    * Returns formatted markdown response for chat display
    */
   @Post('chat')

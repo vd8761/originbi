@@ -9,7 +9,7 @@ const fmt = (totalSeconds: number) => {
 
 /**
  * Self-contained elapsed-time pill. It owns its own 1s interval and local state
- * so ticking only re-renders THIS leaf — not the whole exam tree (which would
+ * so ticking only re-renders THIS leaf - not the whole exam tree (which would
  * otherwise force the stimulus/cards to repaint every second).
  */
 export function ElapsedClock({ startMs }: { startMs: number }) {

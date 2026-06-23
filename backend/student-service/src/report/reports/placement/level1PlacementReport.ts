@@ -4,7 +4,7 @@
  * Group-level placement-style PDF built from the Level-1 DISC cohort. Ported
  * directly from the standalone `specialization-report/` service (verified
  * on KIOT MBA + KIOT CSE cohorts), adapted to the originBI backend asset
- * layout. Self-contained PDF generator — does not extend BaseReport because
+ * layout. Self-contained PDF generator - does not extend BaseReport because
  * the report mixes portrait (cover, summary) and landscape (master grid)
  * pages, whereas BaseReport's pageAdded listener assumes a single layout.
  */
@@ -414,7 +414,7 @@ export class Level1PlacementReport {
       case 'code':
         return row.code;
       case 'trait':
-        return spec?.trait ?? '—';
+        return spec?.trait ?? '-';
       case 'roles':
         return (spec?.roles ?? []).slice(0, ROLES_TO_SHOW).join('  ·  ');
       default:
@@ -422,7 +422,7 @@ export class Level1PlacementReport {
           ? String(
               (spec as unknown as Record<string, number | string>)[col.key],
             )
-          : '—';
+          : '-';
     }
   }
 

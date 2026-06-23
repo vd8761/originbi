@@ -40,7 +40,43 @@ export class CorporateDashboardController {
     if (!email) {
       throw new BadRequestException('Email is required');
     }
-    return this.dashboardService.getPersonalityOverview(email, startDate, endDate);
+    return this.dashboardService.getPersonalityOverview(
+      email,
+      startDate,
+      endDate,
+    );
+  }
+
+  @Get('behavioural-cohort')
+  getBehaviouralCohort(
+    @Query('email') email: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+    return this.dashboardService.getBehaviouralCohort(
+      email,
+      startDate,
+      endDate,
+    );
+  }
+
+  @Get('inner-patterns-cohort')
+  getInnerPatternsCohort(
+    @Query('email') email: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    if (!email) {
+      throw new BadRequestException('Email is required');
+    }
+    return this.dashboardService.getInnerPatternsCohort(
+      email,
+      startDate,
+      endDate,
+    );
   }
 
   @Post('forgot-password/initiate')

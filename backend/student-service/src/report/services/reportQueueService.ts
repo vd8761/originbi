@@ -124,7 +124,7 @@ export const reportQueueService = {
       // ── Level 1 Placement Report ─────────────────────────────────────────
       // Group-level specialization & trait mapping report driven by raw DISC
       // Level-1 scores. Doesn't use getPlacementDetails (which is shaped for
-      // the standard/MBA placement handbooks) — it pulls raw cohort data via
+      // the standard/MBA placement handbooks) - it pulls raw cohort data via
       // fetchLevel1Cohort.
       if (reportTypeOverride === 'level1') {
         logger.info(`[JOB:${jobId}] Generating Level 1 Placement Report...`);

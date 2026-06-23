@@ -737,12 +737,10 @@ export class CxoReport extends BaseReport {
    * - Renders "Nature Style - Word Sketch".
    */
   private generateBusinessVisionSection(): void {
-    const [t1, t2] = this.getTopTwoTraits(
-      this.data.most_answered_answer_type,
-      this.data,
-    );
-    const primaryType = t1 as 'D' | 'I' | 'S' | 'C';
-    const dominantTrait = t1 + t2;
+    // Headline trait is pure-capable (engine's resolved code; pure -> single
+    // letter). The respond table / career sections still use the top-two blend.
+    const dominantTrait = this.resolveHeadlineTrait(this.data);
+    const primaryType = dominantTrait[0] as 'D' | 'I' | 'S' | 'C';
 
     const contentBlock = BLENDED_STYLE_MAPPING[dominantTrait];
     if (!contentBlock) return;

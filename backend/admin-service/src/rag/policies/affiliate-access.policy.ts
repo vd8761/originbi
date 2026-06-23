@@ -4,7 +4,7 @@ import { UserContext } from '../../common/interfaces/user-context.interface';
 /**
  * Affiliate Access Policy
  * Restricts data access to only the affiliate's own referral data, commissions, and payments.
- * Affiliates cannot see other users' assessment data — only their referral business data.
+ * Affiliates cannot see other users' assessment data - only their referral business data.
  */
 export class AffiliateAccessPolicy implements IAccessPolicy {
     private user: UserContext;
@@ -21,7 +21,7 @@ export class AffiliateAccessPolicy implements IAccessPolicy {
     }
 
     /**
-     * Affiliate filter — restricts to their own affiliate_account_id
+     * Affiliate filter - restricts to their own affiliate_account_id
      */
     getFilter(tableAlias: string = 'a'): string {
         return `${tableAlias}.affiliate_account_id = ${this.affiliateId}`;

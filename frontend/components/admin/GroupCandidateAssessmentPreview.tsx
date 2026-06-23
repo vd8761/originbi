@@ -187,11 +187,11 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const programId = session?.programId ? Number(session.programId) : null;
     const programCode = (session?.program as any)?.code || (session?.groupAssessment?.program as any)?.code || null;
     const isShortReportAvailable = programCode === 'SCHOOL_STUDENT' || programCode === 'COLLEGE_STUDENT' || programId === 1 || programId === 2;
-    // Level 1 Behavioural (DISC-only) short report — College only.
+    // Level 1 Behavioural (DISC-only) short report - College only.
     const isLevel1ReportAvailable = programCode === 'COLLEGE_STUDENT' || programId === 2;
 
     // Level 1 (DISC / Behavioural Insight) completion. The Level 1 report only
-    // needs Level 1 data, so it can be downloaded as soon as Level 1 is done —
+    // needs Level 1 data, so it can be downloaded as soon as Level 1 is done -
     // the full & short reports still require every assigned level to finish.
     const level1Level = levels.find((l: any) =>
         Number(l.levelNumber ?? l.level_number ?? 0) === 1 ||
@@ -207,7 +207,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
     const canDownloadLevel1 = isLevel1ReportAvailable && isLevel1Completed;
     const canOpenDownloadMenu = isSessionComplete || canDownloadLevel1;
     // The Employee report renders DISC-only when ACI is absent, so it can be
-    // downloaded as soon as Level 1 is done — the ACI sections fill in once
+    // downloaded as soon as Level 1 is done - the ACI sections fill in once
     // that level completes. Other non-College programs still require full
     // completion before their report is downloadable.
     const isEmployeeProgram = programCode === 'EMPLOYEE' || programId === 3;
@@ -305,7 +305,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
     // Only show tabs for levels this candidate actually has an attempt for.
     // Levels are now enabled per registration, and legacy sessions may lack a
-    // dedicated IAT attempt (IAT used to be the Level-2 variant) — rendering a
+    // dedicated IAT attempt (IAT used to be the Level-2 variant) - rendering a
     // tab for a level with no attempt previously duplicated the IAT report.
     const levelHasAttempt = (lvl: any) =>
         Boolean(session?.attempts?.find((a: any) => {
@@ -313,7 +313,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
             return aId === String(lvl?.id) || alId === String(lvl?.id);
         }));
-    // Always drive the level tabs off the candidate's ACTUAL attempts — never
+    // Always drive the level tabs off the candidate's ACTUAL attempts - never
     // the global level list. A candidate who wasn't scheduled for a level
     // (e.g. ACI / Level 2) has no attempt for it, so its tab must not appear.
     const visibleLevels = levels.filter(levelHasAttempt);
@@ -371,7 +371,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         return jobStatus ? 'Scheduled' : '--';
     };
 
-    // Compact stats bar for the IATGen & Metaphor tabs — only the timing /
+    // Compact stats bar for the IATGen & Metaphor tabs - only the timing /
     // status fields relevant to those AI reports (no Maximum Score, Sincerity,
     // or Trait Code), plus any report-specific extras.
     const renderStatsBar = (
@@ -902,7 +902,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         totalScore: '106 / 125',
         level: 'Agile Naturalist',
         tag: 'Embodies agility instinctively; thrives in collaboration and adapts with ease.',
-        interpretation: 'You combine discipline with flexibility — upholding standards while remaining open to change.'
+        interpretation: 'You combine discipline with flexibility - upholding standards while remaining open to change.'
     };
     const _discCompatibilityData = {
         totalScore: '100 / 125',
@@ -926,7 +926,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         const kind = String(
             lvlAttempt?.metadata?.assessment_kind || lvlAttempt?.metadata?.assessmentKind || ''
         ).toUpperCase();
-        // Only the Level-2 attempt's OWN metadata counts — not the global
+        // Only the Level-2 attempt's OWN metadata counts - not the global
         // iatData, which now refers to the dedicated IAT level.
         return kind === 'IAT_GEN' ? 'IATGen' : lvl?.name;
     };
@@ -959,7 +959,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             l.name === 'IAT Gen'
         );
         const iatLevelAttempt = getAttemptForLevel(iatLevel);
-        // Require a real attempt on the dedicated IAT level — not the global
+        // Require a real attempt on the dedicated IAT level - not the global
         // iatData, which for legacy sessions resolves to the Level-2 IAT and
         // would double-render the section.
         const hasDedicatedIat = Boolean(iatLevel && iatLevelAttempt);
@@ -1070,7 +1070,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                             </div>
                         );
                     })}
-                    {/* Survey is no longer a separate tab — its responses are
+                    {/* Survey is no longer a separate tab - its responses are
                         shown inside the Behavioral Insight tab below. */}
                 </div>
 
@@ -1308,7 +1308,7 @@ const getAciData = (attempt: any) => {
             if (totalScoreVal >= 100) {
                 compatibility.level = 'Agile Naturalist';
                 compatibility.tag = 'Embodies agility instinctively; thrives in collaboration and adapts with ease.';
-                compatibility.interpretation = 'You live the Agile mindset naturally — showing balance between speed, empathy, and integrity.';
+                compatibility.interpretation = 'You live the Agile mindset naturally - showing balance between speed, empathy, and integrity.';
             } else if (totalScoreVal >= 75) {
                 compatibility.level = 'Agile Adaptive';
                 compatibility.tag = 'Shows strong energy, adaptability, and creative courage with growing consistency.';

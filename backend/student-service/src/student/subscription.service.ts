@@ -338,7 +338,7 @@ export class SubscriptionService {
         return;
       }
 
-      // 5. Report is ready — send Team Notification now
+      // 5. Report is ready - send Team Notification now
       const forwardEmailsStr =
         this.configService.get<string>('DEBRIEF_FORWARD_EMAILS') ||
         'info@originbi.com,vikashuvi07@gmail.com';
@@ -472,7 +472,7 @@ export class SubscriptionService {
             order: { createdAt: 'DESC' },
           });
         } catch (subErr: unknown) {
-          // student_subscriptions table may not exist yet — that's fine for admin-toggled access
+          // student_subscriptions table may not exist yet - that's fine for admin-toggled access
           this.logger.warn(
             `Subscription table query failed (may not exist yet): ${getErrorMessage(subErr)}`,
           );
@@ -529,7 +529,7 @@ export class SubscriptionService {
           };
         }
 
-        // Admin-toggled access (no subscription record) — grant access
+        // Admin-toggled access (no subscription record) - grant access
         return {
           hasAiCounsellor: true,
           plan: { planType: 'ai_counsellor', status: 'active' },

@@ -7,10 +7,10 @@ Usage:
 
 Sheet columns: set number, question number, context_text_en, context_text_ta,
 question_text_en, question_text_ta, image_desc_en, image_desc_ta, metadata.
-(No image URL column — image_url is left NULL; Aarya provides URLs later.)
+(No image URL column - image_url is left NULL; Aarya provides URLs later.)
 
 Idempotent via metadata->>'source' = 'metaphor_v1'. Open/global bank (no program scope).
-Never touches a DB — only writes a .sql file.
+Never touches a DB - only writes a .sql file.
 """
 import sys
 import json

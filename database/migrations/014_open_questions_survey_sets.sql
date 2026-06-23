@@ -31,6 +31,6 @@ CREATE INDEX IF NOT EXISTS idx_open_questions_type_set
 -- set, then `count` random questions from that set.
 UPDATE originbi_settings
 SET value_json = '[{"questionType":"SURVEY","count":10,"selection":"set_random"}]'::jsonb,
-    description = 'How the open (SURVEY) questions are picked per assessment. A list of groups: questionType (open_questions.question_type), count (how many appear in the exam — configurable), selection ("random" = N random of the type; "set_random" = pick ONE random set then N random within it; "set_sequential" = one set in fixed order). Picked questions are scattered among the main questions.',
+    description = 'How the open (SURVEY) questions are picked per assessment. A list of groups: questionType (open_questions.question_type), count (how many appear in the exam - configurable), selection ("random" = N random of the type; "set_random" = pick ONE random set then N random within it; "set_sequential" = one set in fixed order). Picked questions are scattered among the main questions.',
     updated_at = NOW()
 WHERE category = 'assessment' AND setting_key = 'open_question_distribution';

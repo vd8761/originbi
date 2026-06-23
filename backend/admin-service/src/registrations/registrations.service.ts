@@ -74,7 +74,7 @@ export class RegistrationsService {
 
   /**
    * Resolve the assessment levels a registration should receive, in order.
-   * Replaces the old `find({ where: { isMandatory: true }})` lookups — the
+   * Replaces the old `find({ where: { isMandatory: true }})` lookups - the
    * decision now comes from the admin-configurable `levels.*` settings via
    * LevelEligibilityService (enable flag + program/department/board scope).
    */
@@ -527,7 +527,7 @@ export class RegistrationsService {
               throw err;
             }
           }
-          // Metaphor — gated; skips silently if no bank. NON-FATAL: a metaphor
+          // Metaphor - gated; skips silently if no bank. NON-FATAL: a metaphor
           // failure must never roll back the core registration (Level 1).
           // Matched by pattern_type so it is robust to the level number.
           else if (this.isMetaphorLevel(level)) {
@@ -546,7 +546,7 @@ export class RegistrationsService {
         registration.status = 'COMPLETED';
         await manager.save(registration);
 
-        // H. Send Email (Best Effort — check global toggle + per-request flag)
+        // H. Send Email (Best Effort - check global toggle + per-request flag)
         if (dto.sendEmail && dto.password) {
           try {
             const sendEnabled = await this.settingsService.getValue<boolean>(
@@ -748,7 +748,7 @@ export class RegistrationsService {
             throw err;
           }
         }
-        // Metaphor — gated + NON-FATAL (see create()). Matched by pattern_type.
+        // Metaphor - gated + NON-FATAL (see create()). Matched by pattern_type.
         else if (this.isMetaphorLevel(level)) {
           try {
             await this.metaphorGenService.generate(attempt, manager);

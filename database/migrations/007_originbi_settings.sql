@@ -56,11 +56,11 @@ CREATE INDEX IF NOT EXISTS idx_originbi_settings_category
 -- 4. Seed Data: Email Settings
 -- ============================================================
 
--- 4a. From Address (static / readonly — must be verified in AWS SES)
+-- 4a. From Address (static / readonly - must be verified in AWS SES)
 INSERT INTO originbi_settings (category, setting_key, value_type, value_string, label, description, is_readonly, display_order)
 VALUES ('email', 'from_address', 'string', 'no-reply@originbi.com',
         'From Email Address',
-        'The sender email address used for all outgoing emails. Must be verified in AWS SES — cannot be changed from the UI.',
+        'The sender email address used for all outgoing emails. Must be verified in AWS SES - cannot be changed from the UI.',
         true, 1)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
@@ -72,7 +72,7 @@ VALUES ('email', 'from_name', 'string', 'Origin BI Mind Works',
         2)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
--- 4c. CC Addresses (JSON array — 0 to n recipients)
+-- 4c. CC Addresses (JSON array - 0 to n recipients)
 INSERT INTO originbi_settings (category, setting_key, value_type, value_json, label, description, display_order)
 VALUES ('email', 'cc_addresses', 'json', '["sriharan.me@gmail.com"]'::jsonb,
         'CC Email Addresses',

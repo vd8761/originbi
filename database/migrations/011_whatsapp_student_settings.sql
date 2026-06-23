@@ -14,7 +14,7 @@ INSERT INTO originbi_settings (category, setting_key, value_type, value_string, 
 VALUES ('whatsapp', 'student_template_image_url', 'string',
         'https://originbi.com/assets/images/originbi-pad.jpg',
         'Student WhatsApp Header Image',
-        'Image used as the header (header_1) for all student-facing WhatsApp templates — assessment instructions, expiry reminder, completion, and report-sent notifications.',
+        'Image used as the header (header_1) for all student-facing WhatsApp templates - assessment instructions, expiry reminder, completion, and report-sent notifications.',
         1)
 ON CONFLICT (category, setting_key) DO NOTHING;
 

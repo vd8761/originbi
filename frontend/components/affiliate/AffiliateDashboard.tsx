@@ -434,7 +434,7 @@ Scan the QR code in the image or register here: ${link}`;
         a.click();
     };
 
-    // Main share function — generates card, then shares via the chosen platform
+    // Main share function - generates card, then shares via the chosen platform
     const shareVia = async (
         platform: 'native' | 'whatsapp' | 'email' | 'linkedin' | 'telegram',
         targetLink: string = referralLink,
@@ -456,7 +456,7 @@ Scan the QR code in the image or register here: ${link}`;
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     // Send image + text as one single message
                     await navigator.share({
-                        title: 'What Next After +2? — OriginBI',
+                        title: 'What Next After +2? - OriginBI',
                         text: getShareText('plain', targetLink),
                         files: [file],
                     });
@@ -467,7 +467,7 @@ Scan the QR code in the image or register here: ${link}`;
             if (navigator.share) {
                 try {
                     await navigator.share({
-                        title: 'What Next After +2? — OriginBI',
+                        title: 'What Next After +2? - OriginBI',
                         text: getShareText('plain', targetLink),
                         url: targetLink,
                     });
@@ -485,7 +485,7 @@ Scan the QR code in the image or register here: ${link}`;
         if (platform === 'whatsapp') {
             window.open(`https://wa.me/?text=${encodeURIComponent(getShareText('whatsapp', targetLink))}`, '_blank');
         } else if (platform === 'email') {
-            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? — Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email', targetLink))}`;
+            window.location.href = `mailto:?subject=${encodeURIComponent('🎯 What Next After +2? - Discover your future with OriginBI')}&body=${encodeURIComponent(getShareText('email', targetLink))}`;
         } else if (platform === 'linkedin') {
             window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(targetLink)}`, '_blank');
         } else if (platform === 'telegram') {
@@ -602,7 +602,7 @@ Scan the QR code in the image or register here: ${link}`;
 
                 {/* Share Buttons - Each generates card + downloads + opens platform */}
                 <div className="space-y-3">
-                    {/* Native Share (Mobile) — sends image + text together */}
+                    {/* Native Share (Mobile) - sends image + text together */}
                     <button
                         onClick={() => requestDestination('share-native')}
                         disabled={isGenerating}
@@ -771,7 +771,7 @@ const ReferralsTable = ({ data }: { data: Referral[] }) => {
                                     </span>
                                 </td>
                                 <td className="py-3.5 pl-4 pr-6 text-right font-semibold text-[clamp(14px,1.1vw,17px)] text-[#1ED36A] leading-none">
-                                    {row.commission > 0 ? `₹${row.commission.toLocaleString('en-IN')}` : '—'}
+                                    {row.commission > 0 ? `₹${row.commission.toLocaleString('en-IN')}` : '-'}
                                 </td>
                             </tr>
                         ))}

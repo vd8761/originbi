@@ -58,7 +58,7 @@ interface QueryResult {
 // Complete Database Schema
 const COMPLETE_SCHEMA = `
 ═══════════════════════════════════════════════════════════════════════════════
-ORIGINBI DATABASE SCHEMA — COMPLETE REFERENCE
+ORIGINBI DATABASE SCHEMA - COMPLETE REFERENCE
 ═══════════════════════════════════════════════════════════════════════════════
 
 TABLE: users
@@ -68,7 +68,7 @@ Relationships: users.id → registrations.user_id, users.id → corporate_accoun
 
 TABLE: registrations
 Columns: id, user_id, full_name, country_code, mobile_number, gender(MALE/FEMALE/OTHER), registration_source(SELF/ADMIN/CORPORATE/RESELLER), created_by_user_id, corporate_account_id, reseller_account_id, group_id, school_level, school_stream, student_board, department_degree_id, program_id, assessment_session_id, payment_required, payment_provider, payment_reference, payment_amount, payment_status(NOT_REQUIRED/PENDING/PAID/FAILED/REFUNDED), payment_created_at, paid_at, status(INCOMPLETE/COMPLETED/CANCELLED), metadata(jsonb), has_ai_counsellor, is_deleted, created_at, updated_at
-Notes: Candidates/students. ALWAYS use full_name for person searches. Email is NOT in this table — join users for email. "resource" / "employee" = registration (corporate candidate).
+Notes: Candidates/students. ALWAYS use full_name for person searches. Email is NOT in this table - join users for email. "resource" / "employee" = registration (corporate candidate).
 Relationships: registrations.user_id → users.id, registrations.corporate_account_id → corporate_accounts.id, registrations.group_id → groups.id, registrations.program_id → programs.id
 
 TABLE: assessment_attempts
@@ -268,11 +268,11 @@ export class RagService {
       const existingCols = new Set(result.map((r: any) => r.column_name));
       this.hasSincerityColumns = existingCols.has('sincerity_class') && existingCols.has('sincerity_index');
       if (!this.hasSincerityColumns) {
-        this.logger.warn('⚠️ sincerity_class/sincerity_index columns not found in assessment_attempts — queries will omit them');
+        this.logger.warn('⚠️ sincerity_class/sincerity_index columns not found in assessment_attempts - queries will omit them');
       }
       this.safeColumnsChecked = true;
     } catch (e) {
-      this.logger.warn(`Column safety check failed: ${e.message} — assuming columns exist`);
+      this.logger.warn(`Column safety check failed: ${e.message} - assuming columns exist`);
       this.safeColumnsChecked = true;
     }
   }
@@ -714,7 +714,7 @@ export class RagService {
     return null;
   }
 
-  /** Sanitize error messages — never expose raw SQL/DB internals to users */
+  /** Sanitize error messages - never expose raw SQL/DB internals to users */
   private sanitizeErrorForUser(error: any): string {
     const msg = error?.message || 'An unexpected error occurred';
     // Strip SQL internals
@@ -961,7 +961,7 @@ export class RagService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SMART QUERY NORMALIZATION — Auto-correct typos, map synonyms, clean input
+  // SMART QUERY NORMALIZATION - Auto-correct typos, map synonyms, clean input
   // ═══════════════════════════════════════════════════════════════════════════
   private normalizeQuery(question: string): string {
     let q = question.trim();
@@ -1167,7 +1167,7 @@ export class RagService {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // AI COUNSELLOR MODE — Premium career counselling for students
+    // AI COUNSELLOR MODE - Premium career counselling for students
     // Bypasses normal intent classification and routes directly to
     // the advanced counsellor prompt engine.
     // ═══════════════════════════════════════════════════════════════
@@ -1213,7 +1213,7 @@ export class RagService {
         /\b(user|users|candidate|candidates|resource|resources|employee|employees|staff|member|members|result|results|score|scores|assessment|assessments|company|companies|corporate|group|groups|batch|batches|role|roles|job|position|jd|description)\b/i.test(normalizedCounsellorQ);
 
       if (!isCounsellorDataRequest) {
-        this.logger.log('🎓 AI Counsellor mode activated — premium career guidance');
+        this.logger.log('🎓 AI Counsellor mode activated - premium career guidance');
         try {
           const userId = user?.id || 0;
           const userEmail = user?.email || user?.sub || '';
@@ -1257,7 +1257,7 @@ export class RagService {
         }
       }
 
-      this.logger.log('🎓 Counsellor data request detected — routing to standard data query pipeline');
+      this.logger.log('🎓 Counsellor data request detected - routing to standard data query pipeline');
     }
 
     this.logger.log(`\n${'═'.repeat(70)}`);
@@ -1637,7 +1637,7 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // SEMANTIC CACHE — Check if a similar question was answered recently
+      // SEMANTIC CACHE - Check if a similar question was answered recently
       // ═══════════════════════════════════════════════════════════════
       const userRole = (user?.role || 'STUDENT').toUpperCase();
       const bypassResponseCache = this.shouldBypassResponseCache(question);
@@ -1652,7 +1652,7 @@ export class RagService {
             affiliateId: user?.affiliateId,
           });
           if (cached) {
-            this.logger.log(`⚡ Cache HIT — returning cached response (similarity ≥ 0.92)`);
+            this.logger.log(`⚡ Cache HIT - returning cached response (similarity ≥ 0.92)`);
             return {
               answer: cached.answer,
               searchType: cached.searchType || 'cached',
@@ -1790,7 +1790,7 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 🤖 AGENTIC RAG — LLM-based tool selection (v3.0)
+      // 🤖 AGENTIC RAG - LLM-based tool selection (v3.0)
       // The agent dynamically selects 1-3 tools, runs them in parallel,
       // and synthesizes a unified response. Falls back to legacy intent
       // routing if the agent fails.
@@ -1819,7 +1819,7 @@ export class RagService {
             confidence: 0.75,
           };
         } catch (strictDbError) {
-          this.logger.warn(`Strict DB route failed: ${strictDbError.message} — continuing with agentic routing`);
+          this.logger.warn(`Strict DB route failed: ${strictDbError.message} - continuing with agentic routing`);
         }
       }
 
@@ -1901,17 +1901,17 @@ export class RagService {
         }
 
         if (agentResult && this.shouldPromptClarification(resolvedQuestion, agentResult.confidence)) {
-          this.logger.log(`🧭 Agentic RAG moderate confidence (${agentResult.confidence}) — asking clarification`);
+          this.logger.log(`🧭 Agentic RAG moderate confidence (${agentResult.confidence}) - asking clarification`);
           return this.buildClarificationResult(resolvedQuestion);
         }
 
-        this.logger.log(`🔄 Agentic RAG low confidence (${agentResult?.confidence}) — falling back to legacy routing`);
+        this.logger.log(`🔄 Agentic RAG low confidence (${agentResult?.confidence}) - falling back to legacy routing`);
       } catch (agentError) {
-        this.logger.warn(`🔄 Agentic RAG failed: ${agentError.message} — falling back to legacy routing`);
+        this.logger.warn(`🔄 Agentic RAG failed: ${agentError.message} - falling back to legacy routing`);
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // LEGACY FALLBACK — Original intent-based routing (v2.0)
+      // LEGACY FALLBACK - Original intent-based routing (v2.0)
       // Used when Agentic RAG fails or returns low confidence
       // ═══════════════════════════════════════════════════════════════
       const interpretation = await this.understandQuery(resolvedQuestion, userRole, routingHistory);
@@ -2028,7 +2028,7 @@ export class RagService {
         // Batch/group/program queries should NEVER go through person lookup
         const batchProgramGuardPattern = /\b(batch|group|program|summarize|summary|strengths|risks|principal\s+version)\b/i;
         if (companyGuardPattern.test(resolvedQuestion)) {
-          this.logger.log(`🏢 Company guard: "${interpretation.searchTerm}" query mentions company keywords — redirecting to corporate_details`);
+          this.logger.log(`🏢 Company guard: "${interpretation.searchTerm}" query mentions company keywords - redirecting to corporate_details`);
           interpretation.intent = 'corporate_details';
           interpretation.table = 'corporate_accounts';
           // Extract actual company name (remove articles)
@@ -2103,7 +2103,7 @@ export class RagService {
           .catch(() => []);
         if (careerRagChunks.length > 0) {
           this.logger.log(`📚 Career guidance enriched with ${careerRagChunks.length} semantic chunks`);
-          const ragCtx = `\n\n— RELEVANT KNOWLEDGE BASE —\n${careerRagChunks.map((d: any, i: number) => `[${i + 1}] ${d.content}`).join('\n---\n')}`;
+          const ragCtx = `\n\n- RELEVANT KNOWLEDGE BASE -\n${careerRagChunks.map((d: any, i: number) => `[${i + 1}] ${d.content}`).join('\n---\n')}`;
           const answer = await this.oriIntelligence.answerAnyQuestion(resolvedQuestion, userProfile, ragCtx, userRole);
           return { answer, searchType: 'career_guidance_semantic', confidence: 0.95 };
         }
@@ -2126,7 +2126,7 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 🧠 INTELLIGENT ROUTING (v3.0 — intent-driven, no keyword hijacking)
+      // 🧠 INTELLIGENT ROUTING (v3.0 - intent-driven, no keyword hijacking)
       //
       // The intent classification (fastLocalMatch + LLM understandQuery)
       // already handles routing to general_knowledge / career_guidance.
@@ -2208,7 +2208,7 @@ export class RagService {
             const scopeMsg = guardRole === 'CORPORATE' ? ' within your organization' : '';
             this.logger.warn(`⚠️ Person guard: "${personNameToCheck}" not found${scopeMsg}`);
 
-            // NO LLM FALLBACK — never use general/web knowledge for person queries.
+            // NO LLM FALLBACK - never use general/web knowledge for person queries.
             // This prevents the LLM from fabricating data about people.
             return {
               answer: BI_PERSONA.errors.notFound(personNameToCheck),
@@ -2220,12 +2220,12 @@ export class RagService {
           // If ILIKE fallback was used, verify we have an exact word-token match
           // to prevent "jai" → "JAISHREE" style substring mismatches
           if (usedILIKEFallback && !this.hasExactTokenMatch(personNameToCheck, personCheck)) {
-            this.logger.log(`⚠️ Person guard: ILIKE matched but no exact token for "${personNameToCheck}" — showing disambiguation`);
+            this.logger.log(`⚠️ Person guard: ILIKE matched but no exact token for "${personNameToCheck}" - showing disambiguation`);
             return this.buildFuzzyDisambiguation(personNameToCheck, personCheck, 'disambiguation');
           }
 
           // Person found but user asked general_knowledge → redirect to person_lookup or career_report
-          this.logger.log(`✅ Person guard: "${personNameToCheck}" found in DB — redirecting to person_lookup`);
+          this.logger.log(`✅ Person guard: "${personNameToCheck}" found in DB - redirecting to person_lookup`);
           const matchedName = personCheck[0].full_name;
           const hasAssessment = parseInt(personCheck[0].completed_count) > 0;
 
@@ -2244,7 +2244,7 @@ export class RagService {
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // TEXT-TO-SQL ENGINE — "JARVIS MODE"
+      // TEXT-TO-SQL ENGINE - "JARVIS MODE"
       // Routes data_query intent (or any unrecognized data question)
       // through the dynamic SQL generation engine for maximum flexibility.
       // Can answer ANY question about the database data without templates.
@@ -2278,8 +2278,8 @@ export class RagService {
               sources: { rows: tsResult.rowCount },
             };
           }
-          // Low confidence — return a clear DB-only response, NEVER fallback to LLM general knowledge
-          this.logger.log('🔄 Text-to-SQL low confidence — returning DB-only response');
+          // Low confidence - return a clear DB-only response, NEVER fallback to LLM general knowledge
+          this.logger.log('🔄 Text-to-SQL low confidence - returning DB-only response');
           const fallbackRole = (user?.role || 'STUDENT').toUpperCase();
           return {
             answer: `${this.getRoleScopedNoDataMessage('data_query', fallbackRole, question)}\n\nTry asking:\n- **"list users"**\n- **"list candidates"**\n- **"show top performers"**`,
@@ -2300,7 +2300,7 @@ export class RagService {
         this.logger.log('🧠 Intent: general_knowledge → checking if data question first');
 
         // ═══════════════════════════════════════════════════════════════
-        // PLATFORM DATA GUARD — Prevent LLM from answering platform
+        // PLATFORM DATA GUARD - Prevent LLM from answering platform
         // data questions (companies, candidates, scores, etc.) using
         // general/web knowledge. Force these through the DB pipeline.
         // ═══════════════════════════════════════════════════════════════
@@ -2308,7 +2308,7 @@ export class RagService {
         const isPlatformDataQuery = platformDataPattern.test(resolvedQuestion);
 
         if (isPlatformDataQuery) {
-          this.logger.log('🛡️ DATA GUARD: Platform entity detected in general_knowledge query — forcing DB route');
+          this.logger.log('🛡️ DATA GUARD: Platform entity detected in general_knowledge query - forcing DB route');
           try {
             const tsResult = await this.textToSqlService.answerQuestion(
               resolvedQuestion, user as UserContext, conversationHistory,
@@ -2356,7 +2356,7 @@ export class RagService {
               };
             }
           } catch (tsErr) {
-            this.logger.warn(`Text-to-SQL reroute failed: ${tsErr.message} — falling through to LLM`);
+            this.logger.warn(`Text-to-SQL reroute failed: ${tsErr.message} - falling through to LLM`);
           }
           // If Text-to-SQL had low confidence or failed, fall through to LLM
         }
@@ -2365,7 +2365,7 @@ export class RagService {
         const userRole = user?.role || 'STUDENT';
 
         // ═══════════════════════════════════════════════════════════════
-        // CORPORATE DOMAIN GUARD — Corporate users should ONLY get
+        // CORPORATE DOMAIN GUARD - Corporate users should ONLY get
         // answers about career, talent, HR, business, and their platform
         // data. Block random general knowledge like "what is dusk".
         // ═══════════════════════════════════════════════════════════════
@@ -2379,7 +2379,7 @@ export class RagService {
           if (!isCareerDomainQuery && !isFollowUpQuery) {
             this.logger.log(`🚫 CORPORATE DOMAIN GUARD: Blocking non-domain query: "${resolvedQuestion}"`);
             return {
-              answer: `I'm designed to help with career intelligence, talent analytics, and workforce management for your organization.\n\nTry asking about:\n- **Your candidates/employees** — "list my employees", "show top performers"\n- **Career insights** — "skills for data analyst", "career path for CFO"\n- **Assessments** — "show test results", "best candidate for [role]"\n- **Reports** — "generate career report for [name]"`,
+              answer: `I'm designed to help with career intelligence, talent analytics, and workforce management for your organization.\n\nTry asking about:\n- **Your candidates/employees** - "list my employees", "show top performers"\n- **Career insights** - "skills for data analyst", "career path for CFO"\n- **Assessments** - "show test results", "best candidate for [role]"\n- **Reports** - "generate career report for [name]"`,
               searchType: 'domain_guard',
               confidence: 0.95,
             };
@@ -2399,17 +2399,17 @@ export class RagService {
           : `[User Role: ${userRole}] ${roleContext}`;
 
         // ═══════════════════════════════════════════════════════════════
-        // ANTI-FABRICATION GUARD — If conversation mentions candidates/
+        // ANTI-FABRICATION GUARD - If conversation mentions candidates/
         // people/names and user asks about their details (education,
         // scores, qualifications), NEVER let LLM answer. Force DB route
-        // or return "data not available" — prevents hallucinated data.
+        // or return "data not available" - prevents hallucinated data.
         // ═══════════════════════════════════════════════════════════════
         const askingAboutPeopleData = /\b(education|qualification|degree|score|marks|result|assessment|email|phone|contact|address|experience|department|designation|salary|gender|age)\b/i.test(resolvedQuestion);
         const conversationMentionsPeople = conversationHistory && /\b(candidates?|employees?|resources?|people|names?|male|female|persons?|staff)\b/i.test(conversationHistory);
         const isFollowUpAboutPeople = /\b(their|them|those|these|his|her|list|show)\b/i.test(resolvedQuestion) && conversationMentionsPeople;
 
         if ((askingAboutPeopleData && conversationMentionsPeople) || (askingAboutPeopleData && isFollowUpAboutPeople)) {
-          this.logger.log('🛡️ ANTI-FABRICATION GUARD: User asking about candidate details — routing to DB, not LLM');
+          this.logger.log('🛡️ ANTI-FABRICATION GUARD: User asking about candidate details - routing to DB, not LLM');
           try {
             const tsResult = await this.textToSqlService.answerQuestion(
               resolvedQuestion, user as UserContext, conversationHistory,
@@ -2455,7 +2455,7 @@ export class RagService {
           .catch(() => []);
         const compactKnowledge = this.buildCompactKnowledgeContext(genKnowledgeChunks);
         const genRagContext = compactKnowledge
-          ? `${enrichedHistory}\n\n— RELEVANT PLATFORM KNOWLEDGE (use if applicable) —\n${compactKnowledge}`
+          ? `${enrichedHistory}\n\n- RELEVANT PLATFORM KNOWLEDGE (use if applicable) -\n${compactKnowledge}`
           : enrichedHistory;
         if (genKnowledgeChunks.length > 0) {
           this.logger.log(`📚 General knowledge enriched with ${genKnowledgeChunks.length} semantic chunks`);
@@ -2476,7 +2476,7 @@ export class RagService {
       // If user id is 0 AND no email is available, they are truly anonymous.
       // Users with email from Cognito can still use email-based DB lookups.
       if ((!user || (user.id === 0 && !user.email && !user.sub)) && (user?.role === 'STUDENT' || !user?.role)) {
-        this.logger.log('🔒 RBAC: Anonymous user detected — prompting to log in');
+        this.logger.log('🔒 RBAC: Anonymous user detected - prompting to log in');
         return {
           answer: 'Welcome to Ask BI. To access your personalized data and results, please log in first. If you have any general career questions, feel free to ask.',
           searchType: 'auth_required',
@@ -2582,7 +2582,7 @@ export class RagService {
         const scopeMsg = curRole === 'CORPORATE' ? ' in your organization' : '';
 
         // ═══════════════════════════════════════════════════════════
-        // DB-BOUND INTENTS: Return clear "no data" — NEVER use LLM
+        // DB-BOUND INTENTS: Return clear "no data" - NEVER use LLM
         // This prevents generic web-like responses for DB queries
         // ═══════════════════════════════════════════════════════════
         const dbBoundIntents = [
@@ -2625,7 +2625,7 @@ export class RagService {
         const platformEntityCheck = /\b(companies|corporates?|company|candidates?|students?|users?|employees?|resources?|assessments?|scores?|results?|affiliates?|registrations?)\b/i;
         const candidateDataCheck = /\b(education|qualification|degree|department|designation|salary|gender|age|email|mobile|phone|contact|address|experience|marks|board|stream)\b/i;
         if (platformEntityCheck.test(question) || (candidateDataCheck.test(question) && conversationHistory && /\b(candidate|employee|resource|people|person|staff|male|female)\b/i.test(conversationHistory))) {
-          // Platform data question — return DB-only message, don't use LLM
+          // Platform data question - return DB-only message, don't use LLM
           return {
             answer: this.getRoleScopedNoDataMessage('data_query', curRole, question),
             searchType: 'data_guard_no_results',
@@ -2660,7 +2660,7 @@ export class RagService {
       // This catches edge cases the intent classifier missed
       // ═══════════════════════════════════════════════════════════
       try {
-        this.logger.log('🔄 Standard pipeline failed — trying Text-to-SQL fallback...');
+        this.logger.log('🔄 Standard pipeline failed - trying Text-to-SQL fallback...');
         const tsResult = await this.textToSqlService.answerQuestion(
           question, user as UserContext, '',
         );
@@ -2685,7 +2685,7 @@ export class RagService {
 
       if (!isDataRelatedQuery) {
         try {
-          this.logger.log('🧠 Non-data query — trying LLM general knowledge fallback...');
+          this.logger.log('🧠 Non-data query - trying LLM general knowledge fallback...');
           const userId = user?.id || 0;
           const userEmail = user?.email || '';
           const userProfile = await this.oriIntelligence.getUserProfile(userId, userEmail);
@@ -2715,7 +2715,7 @@ export class RagService {
       const suggestion = roleSuggestions[userRole] || roleSuggestions.STUDENT;
 
       return {
-        answer: `I couldn't process that request right now. ${suggestion}\n\nYou can also ask me general questions about careers, technologies, skills, or interview preparation — I'm happy to help!`,
+        answer: `I couldn't process that request right now. ${suggestion}\n\nYou can also ask me general questions about careers, technologies, skills, or interview preparation - I'm happy to help!`,
         searchType: 'error',
         confidence: 0,
       };
@@ -2773,7 +2773,7 @@ Please tell me the target role first, for example:
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // BATCH / GROUP / PROGRAM HANDLER — dedicated handler for group analytics
+  // BATCH / GROUP / PROGRAM HANDLER - dedicated handler for group analytics
   // Generates targeted SQL directly without relying on generic text-to-sql
   // ═══════════════════════════════════════════════════════════════════════════
   private async handleBatchGroupQuery(
@@ -2786,7 +2786,7 @@ Please tell me the target role first, for example:
 
     // ── Extract group/batch/program name ──
     let searchName: string | null = null;
-    // 1) Parenthesized name: (KIOTstudents) or (KIOTstudents  — handle missing close paren
+    // 1) Parenthesized name: (KIOTstudents) or (KIOTstudents  - handle missing close paren
     const parenMatch = question.match(/\(([^)]+)\)?/);
     if (parenMatch) searchName = parenMatch[1].trim();
     // 2) After "batch" / "group": summarize batch KIOTstudents
@@ -2818,7 +2818,7 @@ Please tell me the target role first, for example:
       const fullProgMatch = question.match(/["']?([A-Z][A-Za-z\s]+Program)["']?/i);
       if (fullProgMatch) searchName = fullProgMatch[1].trim();
     }
-    // 6) "[name] count" or "[name] total" — e.g. "kiot aids count", "kiot it total"
+    // 6) "[name] count" or "[name] total" - e.g. "kiot aids count", "kiot it total"
     if (!searchName) {
       const countMatch = question.match(/^(.+?)\s+(?:count|total)\s*$/i);
       if (countMatch) {
@@ -2834,7 +2834,7 @@ Please tell me the target role first, for example:
     // ── Determine if this is about a program or a group/batch ──
     const isProgramQuery = /\bprogram\b/i.test(q) || /\b(principal|version|disc\s+naming)\b/i.test(q);
     const isListQuery = /\b(list|show|all|get|display)\b/i.test(q) && !searchName;
-    // Count-only query (no full summary needed) — e.g. "kiot aids count"
+    // Count-only query (no full summary needed) - e.g. "kiot aids count"
     const isCountOnlyQuery = /\b(count|total)\s*$/i.test(q) && !/\b(summarize|summary|overview|analyze|report|stats|performance|strengths|risks|readiness)\b/i.test(q);
 
     try {
@@ -2987,7 +2987,7 @@ Please tell me the target role first, for example:
         if (notStarted > 0 || readinessRate < 50) {
           response += `### ⚠️ Risks\n`;
           if (notStarted > 0) response += `- **${notStarted}** candidates have not started their assessment yet\n`;
-          if (readinessRate < 50) response += `- Readiness rate is below 50% — consider follow-up\n`;
+          if (readinessRate < 50) response += `- Readiness rate is below 50% - consider follow-up\n`;
           response += '\n';
         }
 
@@ -3027,7 +3027,7 @@ Please tell me the target role first, for example:
             }
           }
         } else {
-          // No name — summarize all groups
+          // No name - summarize all groups
           const allParams: any[] = [];
           let allRbac = '';
           if (userRole === 'CORPORATE' && corporateId) {
@@ -3144,7 +3144,7 @@ Please tell me the target role first, for example:
           summary += `### 🎯 Readiness Levels\n`;
           if (readinessRate >= 80) summary += `- 🟢 **High Readiness** (${readinessRate}% completion rate)\n`;
           else if (readinessRate >= 50) summary += `- 🟡 **Moderate Readiness** (${readinessRate}% completion rate)\n`;
-          else summary += `- 🔴 **Low Readiness** (${readinessRate}% completion rate) — immediate attention needed\n`;
+          else summary += `- 🔴 **Low Readiness** (${readinessRate}% completion rate) - immediate attention needed\n`;
           summary += '\n';
 
           // Risks
@@ -3152,7 +3152,7 @@ Please tell me the target role first, for example:
           if (notStarted > 0) risks.push(`**${notStarted}** candidates have not started their assessment`);
           if (readinessRate < 50) risks.push(`Readiness rate is critically low at ${readinessRate}%`);
           if (totalCand === 0) risks.push('No candidates registered in this batch');
-          if (s.lowest_score && parseFloat(s.lowest_score) < 30) risks.push(`Lowest score is ${s.lowest_score} — some candidates may need support`);
+          if (s.lowest_score && parseFloat(s.lowest_score) < 30) risks.push(`Lowest score is ${s.lowest_score} - some candidates may need support`);
           if (risks.length > 0) {
             summary += `### ⚠️ Risks\n`;
             for (const risk of risks) summary += `- ${risk}\n`;
@@ -3163,7 +3163,7 @@ Please tell me the target role first, for example:
           if (programs.length > 0) {
             summary += `### 📚 Assigned Programs\n`;
             for (const p of programs) {
-              summary += `- **${p.program_name}** — ${p.total_candidates || 0} candidates, status: ${p.status || 'N/A'}\n`;
+              summary += `- **${p.program_name}** - ${p.total_candidates || 0} candidates, status: ${p.status || 'N/A'}\n`;
             }
             summary += '\n';
           }
@@ -3179,7 +3179,7 @@ Please tell me the target role first, for example:
       }
 
       // ═══ FALLBACK: Route to text-to-sql for anything else ═══
-      this.logger.log('📊 Batch/group query — falling back to Text-to-SQL');
+      this.logger.log('📊 Batch/group query - falling back to Text-to-SQL');
       const tsResult = await this.textToSqlService.answerQuestion(
         question, user as any, '',
       );
@@ -3191,7 +3191,7 @@ Please tell me the target role first, for example:
     } catch (error) {
       this.logger.error(`❌ handleBatchGroupQuery failed: ${error.message}`, error.stack);
       return {
-        answer: `I encountered an issue querying batch/group data. Please try rephrasing your question.\n\nExamples:\n- **"list groups"** — see all batches\n- **"summarize batch KIOTstudents"** — get batch summary\n- **"list programs"** — see all programs`,
+        answer: `I encountered an issue querying batch/group data. Please try rephrasing your question.\n\nExamples:\n- **"list groups"** - see all batches\n- **"summarize batch KIOTstudents"** - get batch summary\n- **"list programs"** - see all programs`,
         searchType: 'batch_group_query',
         confidence: 0.4,
       };
@@ -3428,9 +3428,9 @@ Please tell me the target role first, for example:
       }
 
       // If ILIKE fallback was used, verify exact word-token match
-      // Prevents "jai" from auto-matching "JAISHREE M" — shows "did you mean?" instead
+      // Prevents "jai" from auto-matching "JAISHREE M" - shows "did you mean?" instead
       if (usedCareerILIKEFallback && !numberMatch && !this.hasExactTokenMatch(nameSearch, personData)) {
-        this.logger.log(`⚠️ Career report: ILIKE matched but no exact token for "${nameSearch}" — showing fuzzy disambiguation`);
+        this.logger.log(`⚠️ Career report: ILIKE matched but no exact token for "${nameSearch}" - showing fuzzy disambiguation`);
         return this.buildFuzzyDisambiguation(nameSearch, personData, 'career_report');
       }
 
@@ -3511,7 +3511,7 @@ Please tell me the target role first, for example:
       // ── Build smart ProfileInput based on actual student data ──
       const isStudent = person.user_role === 'STUDENT' || !person.company_name; // No corporate / role is STUDENT = student
       const schoolInfo = [person.school_level, person.school_stream, person.student_board].filter(Boolean).join(' / ');
-      const deptInfo = [person.degree_name, person.department_name].filter(Boolean).join(' — ');
+      const deptInfo = [person.degree_name, person.department_name].filter(Boolean).join(' - ');
 
       const storedCurrentRole = String(regMetadata.currentRole || '').trim();
 
@@ -3935,9 +3935,9 @@ ${report.fullReportText}`,
       }
 
       // If ILIKE fallback was used, verify exact word-token match
-      // Prevents "jai" from auto-matching "JAISHREE M" — shows "did you mean?" instead
+      // Prevents "jai" from auto-matching "JAISHREE M" - shows "did you mean?" instead
       if (usedLookupILIKEFallback && targetIndex < 0 && !this.hasExactTokenMatch(cleanSearch, data)) {
-        this.logger.log(`⚠️ Person lookup: ILIKE matched but no exact token for "${cleanSearch}" — showing fuzzy disambiguation`);
+        this.logger.log(`⚠️ Person lookup: ILIKE matched but no exact token for "${cleanSearch}" - showing fuzzy disambiguation`);
         // Deduplicate by full_name for the disambiguation prompt
         const seen = new Set<string>();
         const uniqueForPrompt = data.filter((r: any) => {
@@ -4052,7 +4052,7 @@ ${report.fullReportText}`,
 
         if (!isNaN(scoreNum)) {
           const agile = this.getAgileLevel(scoreNum);
-          response += `• **Assessment 2:** Score **${scoreNum.toFixed(1)}/125** — **${agile.name}**\n`;
+          response += `• **Assessment 2:** Score **${scoreNum.toFixed(1)}/125** - **${agile.name}**\n`;
           response += `  - Interpretation: ${agile.desc}\n`;
         } else {
           response += `• **Assessment 2:** Not available\n`;
@@ -4232,7 +4232,7 @@ ${report.fullReportText}`,
     } else if (/\bhsc\b/.test(q)) {
       filters.schoolLevel = 'HSC';
     } else if (/\bschool\b/.test(q) && !filters.schoolLevel) {
-      // Generic "school students" — include both
+      // Generic "school students" - include both
       // Don't set filter; let it include all school levels
     }
 
@@ -4254,7 +4254,7 @@ ${report.fullReportText}`,
       }
     }
 
-    // ── College / group name — use LLM if regex doesn't capture clean enough ──
+    // ── College / group name - use LLM if regex doesn't capture clean enough ──
     // Try common patterns: "for [college name] students", "[college] college", "group [name]"
     const collegeMatch = q.match(
       /(?:for|from|of|in)\s+([a-z][a-z\s&.]+?)\s*(?:college|university|institute|school|group|students|batch)/i
@@ -4286,7 +4286,7 @@ ${report.fullReportText}`,
     if (filters.gender) titleParts.push(filters.gender);
 
     if (titleParts.length > 0) {
-      filters.title = `Career Fitment Report — ${titleParts.join(' | ')}`;
+      filters.title = `Career Fitment Report - ${titleParts.join(' | ')}`;
     }
 
     this.logger.log(`🔍 Extracted report filters: ${JSON.stringify(filters)}`);
@@ -4681,7 +4681,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
 
       // If ILIKE fallback was used, verify exact word-token match
       if (usedProfileILIKEFallback && !this.hasExactTokenMatch(profileData.name, dbCheck)) {
-        this.logger.log(`⚠️ Chat profile: ILIKE matched but no exact token for "${profileData.name}" — showing fuzzy disambiguation`);
+        this.logger.log(`⚠️ Chat profile: ILIKE matched but no exact token for "${profileData.name}" - showing fuzzy disambiguation`);
         return this.buildFuzzyDisambiguation(profileData.name, dbCheck, 'career_report');
       }
 
@@ -4759,7 +4759,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
         };
       }
 
-      // Encode the profile data as base64 for the URL — merge DB data with provided profile
+      // Encode the profile data as base64 for the URL - merge DB data with provided profile
       // Set as active candidate for context awareness
       this.disambiguationCache.set(this.getDisambiguationKey(user) + ':active', {
         searchTerm: bestMatch.full_name,
@@ -4988,7 +4988,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
 
       if (!jobDescription || jobDescription.length < 20) {
         return {
-          answer: `**JD Candidate Matching**\n\nTo identify the best-suited candidates for a role, please provide a job description.\n\n**Option 1 — Paste a full JD:**\n\`\`\`\nFind candidates for:\nJob Title: Senior Software Engineer\nResponsibilities: Lead backend development...\nRequirements: 5+ years experience, strong leadership...\n\`\`\`\n\n**Option 2 — Describe the role naturally:**\n- "Find candidates suitable for a project manager role requiring leadership, analytical thinking, and team collaboration"\n- "Who is best suited for a customer success manager who needs empathy, communication, and adaptability?"\n- "Match candidates for: Senior Data Analyst — strong analytical skills, attention to detail, works independently"\n\nThe more detail you provide, the more precise the matching will be.`,
+          answer: `**JD Candidate Matching**\n\nTo identify the best-suited candidates for a role, please provide a job description.\n\n**Option 1 - Paste a full JD:**\n\`\`\`\nFind candidates for:\nJob Title: Senior Software Engineer\nResponsibilities: Lead backend development...\nRequirements: 5+ years experience, strong leadership...\n\`\`\`\n\n**Option 2 - Describe the role naturally:**\n- "Find candidates suitable for a project manager role requiring leadership, analytical thinking, and team collaboration"\n- "Who is best suited for a customer success manager who needs empathy, communication, and adaptability?"\n- "Match candidates for: Senior Data Analyst - strong analytical skills, attention to detail, works independently"\n\nThe more detail you provide, the more precise the matching will be.`,
           searchType: 'jd_candidate_match',
           confidence: 0.5,
         };
@@ -5284,7 +5284,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
         (/\breport\b/.test(q) && /\b(for|of|about)\b/.test(q) && !/\b(test|assessment|aptitude|agile|exam)\s+report\b/.test(q))) {
       const name = this.extractName(question);
       if (name) {
-        this.logger.log(`🔄 Domain override: career report keywords detected — routing to career_report for "${name}"`);
+        this.logger.log(`🔄 Domain override: career report keywords detected - routing to career_report for "${name}"`);
         return {
           intent: 'career_report',
           searchTerm: name,
@@ -5380,7 +5380,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
 
       if (allDomainWords) {
         this.logger.warn(
-          `🔄 Domain override: searchTerm "${result.searchTerm}" is all domain words — nullifying and reclassifying`,
+          `🔄 Domain override: searchTerm "${result.searchTerm}" is all domain words - nullifying and reclassifying`,
         );
         result.searchTerm = null;
 
@@ -5615,7 +5615,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
   }
 
   /**
-   * Fast local pattern matching — avoids LLM call for common queries.
+   * Fast local pattern matching - avoids LLM call for common queries.
    * Returns null if no confident match (falls through to LLM).
    */
   private fastLocalMatch(question: string): {
@@ -5654,12 +5654,12 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // PRONOUN-BASED FOLLOW-UPS — "show their list", "list them",
+    // PRONOUN-BASED FOLLOW-UPS - "show their list", "list them",
     // "show them with education", "their list along with qualification"
-    // These refer to previously mentioned candidates — route to data_query
+    // These refer to previously mentioned candidates - route to data_query
     // so the text-to-SQL engine can include requested columns.
     // ═══════════════════════════════════════════════════════════════
-    // Check for data qualifiers (education, score, etc.) — these turn any pronoun follow-up into data_query
+    // Check for data qualifiers (education, score, etc.) - these turn any pronoun follow-up into data_query
     const hasDataQualifier = /\b(education|qualification|score|marks|assessment|personality|department|degree|experience|gender|age|email|mobile|phone|board|stream|level)s?\b/i.test(q);
 
     if (/\b(show|list|get|display)\s+(their|them|those)\s+(list|details?|info|data|names?|education|qualification|score)s?\b/i.test(q) ||
@@ -5693,13 +5693,13 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
     }
 
-    // "list my resource" (even before normalizeQuery — catches if synonym mapping missed)
+    // "list my resource" (even before normalizeQuery - catches if synonym mapping missed)
     if (/\b(list|show|get|display|view)\s+(my|our)\s+(resource|resources|employee|employees|staff|member|members|worker|workers|people|team)\b/.test(q)) {
       return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // FOLLOW-UP & GENDER PATTERNS — prevent "male"/"female" from
+    // FOLLOW-UP & GENDER PATTERNS - prevent "male"/"female" from
     // being treated as person names in follow-up queries
     // ═══════════════════════════════════════════════════════════════
 
@@ -5811,7 +5811,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // JD CANDIDATE MATCHING — detect when user provides a job description
+    // JD CANDIDATE MATCHING - detect when user provides a job description
     // ═══════════════════════════════════════════════════════════════
     if (/\b(find|match|search|identify|list|show|get|who)\b.*\b(candidates?|people|users?|suitable|suited)\b.*\b(for|matching|that\s+match|who\s+fit)\b/i.test(q) ||
       /\b(job\s*description|jd)\s*[:\-]/i.test(q) ||
@@ -5833,7 +5833,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // "[Group name] count" — e.g. "kiot aids count", "kiot it count"
+    // "[Group name] count" - e.g. "kiot aids count", "kiot it count"
     // These lack the word batch/group/program but user wants the count for a specific group.
     // Must come BEFORE the batchGroupProgramGuard block.
     // ═══════════════════════════════════════════════════════════════
@@ -5848,7 +5848,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // BATCH / GROUP / PROGRAM QUERIES — MUST come BEFORE career_report
+    // BATCH / GROUP / PROGRAM QUERIES - MUST come BEFORE career_report
     // because "generate report for School Students Program" contains "generate.*report"
     // which would otherwise be intercepted by the career_report pattern
     // ═══════════════════════════════════════════════════════════════
@@ -5976,7 +5976,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       }
     }
 
-    // "[Name(s)] report" — e.g. "DINESH S J and PRAKASH B report", "dinesh report"
+    // "[Name(s)] report" - e.g. "DINESH S J and PRAKASH B report", "dinesh report"
     if (/\breport\b/i.test(q)) {
       // First try extractName which is smarter about finding actual person names
       const nameFromExtract = this.extractName(question);
@@ -6033,7 +6033,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       return { intent: 'best_performer', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // Count — "how many users/candidates/students/male/female/corporate/admin" / "total candidates" / "total male and female"
+    // Count - "how many users/candidates/students/male/female/corporate/admin" / "total candidates" / "total male and female"
     // GUARD: If asking "how many [people] suit/fit for [role]" → jd_candidate_match, not count
     if (/\b(how\s*many|count|total)\b/i.test(q) && /\b(suits?|fit|suitable|suited|eligible|qualified|ready|right|ideal|match)\b/i.test(q) && /\b(for|to)\s+\w/i.test(q)) {
       return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
@@ -6108,12 +6108,12 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     if (/\blist\s+(?:of\s+)?(?:the\s+)?candidates?\b/.test(q)) {
       return { intent: 'list_candidates', searchTerm: null, table: 'registrations', includePersonality: false };
     }
-    // "candidate(s) for [role]" / "candidate's for [role]" — find matching candidates
+    // "candidate(s) for [role]" / "candidate's for [role]" - find matching candidates
     if (/\bcandidates?(?:'s)?\s+(?:for|fit\s+for|suitable\s+for)\s+/i.test(q)) {
       return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // List users (but NOT if the query has domain words — already handled above)
+    // List users (but NOT if the query has domain words - already handled above)
     if ((/\b(list|show|get)\b.*\busers?\b/.test(q) || /^users?\b/.test(q))) {
       return { intent: 'list_users', searchTerm: null, table: 'users', includePersonality: false };
     }
@@ -6129,7 +6129,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // CORPORATE DETAILS — List/show corporate accounts/companies
+    // CORPORATE DETAILS - List/show corporate accounts/companies
     // ═══════════════════════════════════════════════════════════════
     // "list corporates", "corporate accounts", "show companies", "corporate details"
     if (/\b(list|show|get|display)\s+(all\s+)?(the\s+)?(corporate|company|companies|corporates|corporate\s+account)/i.test(q)) {
@@ -6185,7 +6185,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     if (/\b(our\s+company|our\s+organization|our\s+corporate|company\s+profile|company\s+information)\b/i.test(q)) {
       return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
     }
-    // "how many credits", "credit balance", "available credits" — corporate credit queries
+    // "how many credits", "credit balance", "available credits" - corporate credit queries
     if (/\b(credit|credits)\s*(balance|available|remaining|total|left)?\b/i.test(q) || /\b(available|remaining|total)\s+credits?\b/i.test(q)) {
       return { intent: 'corporate_details', searchTerm: null, table: 'corporate_accounts', includePersonality: false };
     }
@@ -6195,7 +6195,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       return { intent: 'personal_info', searchTerm: null, table: 'none', includePersonality: false };
     }
 
-    // My results / my score / my details — dedicated self_results intent
+    // My results / my score / my details - dedicated self_results intent
     if (/\b(my\s*result|my\s*score|my\s*test|my\s*assessment|my\s*exam|my\s*data|my\s*details?|my\s*report)\b/.test(q)) {
       return { intent: 'self_results', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
@@ -6226,7 +6226,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // DATA_QUERY — Dynamic SQL questions that don't fit fixed intents
+    // DATA_QUERY - Dynamic SQL questions that don't fit fixed intents
     // Complex filters, aggregations, comparisons, date ranges, etc.
     // ═══════════════════════════════════════════════════════════════
 
@@ -6282,7 +6282,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // DATA_QUERY — Additional patterns for real-world user questions
+    // DATA_QUERY - Additional patterns for real-world user questions
     // Covers common ways admins, corporate users, and students ask
     // ═══════════════════════════════════════════════════════════════
 
@@ -6291,7 +6291,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       return { intent: 'data_query', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
 
-    // "list candidates suitable for X / fit for X" — with typo tolerance (already corrected by normalizeQuery)
+    // "list candidates suitable for X / fit for X" - with typo tolerance (already corrected by normalizeQuery)
     if (/\b(suitable|fit|eligible|qualified|ready)\s+(for|to)\s+\w+/i.test(q) && /\b(candidate|student|people|person)/i.test(q)) {
       return { intent: 'jd_candidate_match', searchTerm: null, table: 'assessment_attempts', includePersonality: true };
     }
@@ -6339,7 +6339,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
 
     // ═══════════════════════════════════════════════════════════════
     // GENERAL KNOWLEDGE / EDUCATION / HOW-TO QUESTIONS
-    // These must NEVER hit the database — route to LLM directly
+    // These must NEVER hit the database - route to LLM directly
     // ═══════════════════════════════════════════════════════════════
 
     // "what is X", "what are X", "what does X mean"
@@ -6393,7 +6393,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
     }
 
-    // "ask me about X" — informational request, not a person lookup
+    // "ask me about X" - informational request, not a person lookup
     if (/\b(ask|tell)\s+me\s+about\b/.test(q) &&
       !/\b(my|his|her|their|candidate|user|company|companies|corporate|corporates|organization|\w+'s)\b/.test(q)) {
       return { intent: 'general_knowledge', searchTerm: null, table: 'none', includePersonality: false };
@@ -6409,7 +6409,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       return { intent: 'career_guidance', searchTerm: null, table: 'none', includePersonality: false };
     }
 
-    // No confident match — let LLM handle it
+    // No confident match - let LLM handle it
     return null;
   }
 
@@ -6689,14 +6689,14 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       'architect', 'architects', 'consultant', 'consultants', 'specialist', 'specialists',
       'role', 'position', 'job', 'work', 'tasks', 'skill', 'skills',
       'information', 'info', 'help', 'status', 'count',
-      // Gender terms — NOT person names
+      // Gender terms - NOT person names
       'male', 'female', 'males', 'females', 'boys', 'girls', 'men', 'women',
       'boy', 'girl', 'man', 'woman',
-      // Program / batch / group / report terms — NOT person names
+      // Program / batch / group / report terms - NOT person names
       'program', 'programs', 'batch', 'batches', 'group', 'groups',
       'summary', 'summarize', 'report', 'version', 'principal', 'generate',
       'readiness', 'strengths', 'risks', 'overview', 'students', 'school',
-      // Follow-up / structural words — NOT person names
+      // Follow-up / structural words - NOT person names
       'along', 'with', 'without', 'including', 'education', 'qualification',
       'qualifications', 'experience', 'details', 'detail', 'score', 'scores',
       'path', 'paths', 'career', 'careers',
@@ -6719,7 +6719,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
         name = words.join(' ').trim();
 
         // SAFETY: If the original query contains company/corporate/organization after the extracted name,
-        // this is a company query, NOT a person query — return null
+        // this is a company query, NOT a person query - return null
         if (/\b(company|corporate|organization|business|employer)\b/i.test(question)) {
           return null;
         }
@@ -6895,7 +6895,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     const pronounPatterns = /\b(him|her|his|hers|he|she|that person|that candidate|that student|this person)\b/i;
     if (pronounPatterns.test(q)) return true;
 
-    // "know about/bout" or "want to know about" patterns — but ONLY if followed by a likely person name
+    // "know about/bout" or "want to know about" patterns - but ONLY if followed by a likely person name
     if (/\b(know|tell|learn|inform)\s+(about|bout|regarding)\b/i.test(q)) {
       // Check if what follows is NOT a domain concept
       if (objectText && !objectText.split(/\s+/).every(w => domainTerms.has(w))) {
@@ -7134,7 +7134,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // QUERY EXECUTION WITH RBAC — PARAMETERIZED QUERIES (SQL-injection safe)
+  // QUERY EXECUTION WITH RBAC - PARAMETERIZED QUERIES (SQL-injection safe)
   // ═══════════════════════════════════════════════════════════════════════════
   private async executeQuery(
     interpretation: {
@@ -7287,7 +7287,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       }
 
       case 'self_results': {
-        // Dedicated intent for "my results" / "my score" — always user-scoped
+        // Dedicated intent for "my results" / "my score" - always user-scoped
         // Joins assessment_answers for detailed per-question stats
         const selfSincFields = this.getSinceritySelectFields('assessment_attempts');
         const registrationId = (user as any)?.registrationId;
@@ -7343,7 +7343,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
         }
 
         if (selfFallbackQueries.length === 0) {
-          this.logger.log('⚠️ self_results: No registrationId/userId/email — cannot scope');
+          this.logger.log('⚠️ self_results: No registrationId/userId/email - cannot scope');
           return [];
         }
 
@@ -7365,7 +7365,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       case 'person_lookup': {
         // If person_lookup but no searchTerm, ask for clarification instead of returning broad data
         if (!interpretation.searchTerm) {
-          this.logger.log('⚠️ person_lookup with no searchTerm — returning clarification');
+          this.logger.log('⚠️ person_lookup with no searchTerm - returning clarification');
           return [];
         }
         const searchName = interpretation.searchTerm || '';
@@ -7404,7 +7404,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
           this.logger.warn('⚠️ RBAC: CORPORATE person_lookup requested without resolvable corporateId; returning empty result');
           return [];
         } else {
-          // Students can only see themselves — ignore search term
+          // Students can only see themselves - ignore search term
           sql = `${baseLookupSql} AND registrations.user_id = $1 LIMIT 1`;
           params.push(userId);
         }
@@ -7665,7 +7665,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // CORPORATE DETAILS — List corporate/company accounts
+      // CORPORATE DETAILS - List corporate/company accounts
       // Supports: name search, RBAC scoping, corporateId fallback
       // ═══════════════════════════════════════════════════════════════
       case 'corporate_details': {
@@ -7723,7 +7723,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
                    WHERE ca.id = $1
                    LIMIT 1`;
           } else {
-            this.logger.warn(`⚠️ RBAC: CORPORATE user has no corporateId and fallback failed — showing error`);
+            this.logger.warn(`⚠️ RBAC: CORPORATE user has no corporateId and fallback failed - showing error`);
             return [{ message: 'Unable to determine your corporate account. Please contact support.' }];
           }
         } else {
@@ -7824,7 +7824,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       case 'affiliate_lookup': {
         const searchName = interpretation.searchTerm || '';
         if (!searchName) {
-          this.logger.log('⚠️ affiliate_lookup with no searchTerm — returning empty');
+          this.logger.log('⚠️ affiliate_lookup with no searchTerm - returning empty');
           return [];
         }
         if (userRole === 'ADMIN') {
@@ -7875,7 +7875,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
                  LIMIT ${limit} OFFSET ${offset}`;
           params.push(`%${searchName}%`);
         } else {
-          // No specific affiliate — show all referred students
+          // No specific affiliate - show all referred students
           sql = `SELECT
                    r.full_name as student_name,
                    r.email,
@@ -7896,7 +7896,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
 
       default:
         // For unknown intents, return empty to trigger LLM fallback
-        this.logger.log(`⚠️ Unknown intent "${interpretation.intent}" in executeQuery — returning empty`);
+        this.logger.log(`⚠️ Unknown intent "${interpretation.intent}" in executeQuery - returning empty`);
         return [];
     }
 
@@ -8236,7 +8236,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     if (!isNaN(scoreNum)) {
       const agile = this.getAgileLevel(scoreNum);
       const maxStr = maxScore ? `/${maxScore}` : '/100';
-      response += `• **Assessment 2:** Score **${scoreNum.toFixed(1)}${maxStr}** — **${agile.name}**\n`;
+      response += `• **Assessment 2:** Score **${scoreNum.toFixed(1)}${maxStr}** - **${agile.name}**\n`;
       response += `  - Interpretation: _${agile.desc}_\n`;
     } else {
       response += `• **Assessment 2:** Not available\n`;
@@ -8290,7 +8290,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
         const tq = parseInt(row.total_questions || '0');
         const aq = parseInt(row.answered_questions || '0');
         const answerInfo = tq > 0 ? ` · ${aq}/${tq} answered` : '';
-        response += `  ${i + 1}. ${prog} — Score: ${score}${answerInfo} ${date ? `(${date})` : ''}\n`;
+        response += `  ${i + 1}. ${prog} - Score: ${score}${answerInfo} ${date ? `(${date})` : ''}\n`;
       });
     }
 
@@ -8558,7 +8558,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Format affiliate dashboard — personalized overview card
+   * Format affiliate dashboard - personalized overview card
    */
   private formatAffiliateDashboard(data: any[], isAdmin: boolean): string {
     if (!data.length) return 'No affiliate data found.';
@@ -8700,7 +8700,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
   }
 
   /**
-   * Format affiliate lookup (specific affiliate details — Admin view)
+   * Format affiliate lookup (specific affiliate details - Admin view)
    */
   private formatAffiliateLookup(data: any[]): string {
     if (!data.length) return 'No affiliate found with that name. Try "list affiliates" to see all accounts.';
@@ -8788,7 +8788,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
     // Context-aware suggestions based on search type
     switch (searchType) {
 
-      // ── AI COUNSELLOR MODE — context-driven follow-ups ──
+      // ── AI COUNSELLOR MODE - context-driven follow-ups ──
       case 'ai_counsellor': {
         // Detect what topic was discussed and suggest natural follow-ups
 
@@ -8979,7 +8979,7 @@ ${report.fullReportText}`.replace(/\s*\/rag/g, '/rag').replace(/fitment\s*\)/g, 
       status: 'ok',
       name: 'Ask BI',
       version: '3.0.0-jarvis',
-      description: 'Ask BI — OriginBI Intelligent Assistant (Jarvis Edition)',
+      description: 'Ask BI - OriginBI Intelligent Assistant (Jarvis Edition)',
       features: [
         'corporate_scoped_intelligence',
         'personalized_career_guidance',

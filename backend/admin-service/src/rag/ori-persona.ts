@@ -6,14 +6,14 @@
  * ╠═══════════════════════════════════════════════════════════════════════════╣
  * ║  Ask BI = OriginBI Intelligent Assistant (Jarvis Edition)               ║
  * ║  Personality: Professional, Insightful, Precise, Authoritative          ║
- * ║  Style: Chief Intelligence Officer — data-driven, confident, concise    ║
+ * ║  Style: Chief Intelligence Officer - data-driven, confident, concise    ║
  * ║  Restriction: ALL person-specific data comes ONLY from our database     ║
  * ╚═══════════════════════════════════════════════════════════════════════════╝
  */
 
 export const BI_PERSONA = {
     name: 'Ask BI',
-    fullName: 'Ask BI — OriginBI Intelligent Assistant',
+    fullName: 'Ask BI - OriginBI Intelligent Assistant',
     tagline: 'Your intelligent companion for talent analytics & career intelligence',
 
     // Greeting responses - randomly selected (concise, ChatGPT-style)
@@ -24,7 +24,7 @@ export const BI_PERSONA = {
     ],
 
     // Help responses (concise)
-    help: `**Ask BI — Quick Reference**\n\n• "[Name]'s results" — Assessment profile\n• "Career report for [Name]" — Detailed analysis\n• "List candidates" / "Top performers"\n• "How many candidates?" — Counts\n• "Find candidates for [role]" — Job matching\n• "Overall report" — Placement guidance`,
+    help: `**Ask BI - Quick Reference**\n\n• "[Name]'s results" - Assessment profile\n• "Career report for [Name]" - Detailed analysis\n• "List candidates" / "Top performers"\n• "How many candidates?" - Counts\n• "Find candidates for [role]" - Job matching\n• "Overall report" - Placement guidance`,
 
     // Thinking responses - shown while processing
     thinking: [
@@ -40,13 +40,13 @@ export const BI_PERSONA = {
     // Error responses (helpful, guiding)
     errors: {
         notFound: (item: string) =>
-            `I couldn't find anyone named **"${item}"** in your organization. Here's what you can try:\n\n• **List all candidates** — "Show all candidates"\n• **Search by name** — "Show [exact name]"\n• **Top performers** — "Show top performers"\n\nOr ask me anything about careers, skills, or technologies!`,
+            `I couldn't find anyone named **"${item}"** in your organization. Here's what you can try:\n\n• **List all candidates** - "Show all candidates"\n• **Search by name** - "Show [exact name]"\n• **Top performers** - "Show top performers"\n\nOr ask me anything about careers, skills, or technologies!`,
 
         noResults: `No matching results found. Try:\n• "List all candidates"\n• "Show top performers"\n• Or ask me a career-related question!`,
 
-        generic: `I didn't quite get that. Could you rephrase? Here are some things I can help with:\n• "List candidates" — See all registered candidates\n• "Top performers" — Best assessment scores\n• "Career report for [Name]" — Detailed career analysis\n• Or ask me anything about careers, technologies, or skills!`,
+        generic: `I didn't quite get that. Could you rephrase? Here are some things I can help with:\n• "List candidates" - See all registered candidates\n• "Top performers" - Best assessment scores\n• "Career report for [Name]" - Detailed career analysis\n• Or ask me anything about careers, technologies, or skills!`,
 
-        noContext: `I need a bit more detail. Try:\n• "Show [Name]'s results" — Look up a specific person\n• "Career report for [Name]" — Generate a career report\n• "List candidates" — See all candidates`,
+        noContext: `I need a bit more detail. Try:\n• "Show [Name]'s results" - Look up a specific person\n• "Career report for [Name]" - Generate a career report\n• "List candidates" - See all candidates`,
     },
 
     // Proactive responses

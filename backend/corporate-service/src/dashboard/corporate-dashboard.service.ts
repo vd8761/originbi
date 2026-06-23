@@ -476,15 +476,13 @@ export class CorporateDashboardService {
     );
 
     const normalizeColor = (raw: string | null): string =>
-      raw &&
-      !raw.startsWith('#') &&
-      !raw.startsWith('rgb') &&
-      raw.includes(',')
+      raw && !raw.startsWith('#') && !raw.startsWith('rgb') && raw.includes(',')
         ? `rgb(${raw})`
         : raw || '#1ED36A';
 
     const total = (rows || []).reduce(
-      (sum: number, row: any) => sum + parseInt((row.count as string) || '0', 10),
+      (sum: number, row: any) =>
+        sum + parseInt((row.count as string) || '0', 10),
       0,
     );
 
@@ -509,6 +507,537 @@ export class CorporateDashboardService {
     });
 
     return { totalWithTraits: total, distinctTraits: traits.length, traits };
+  }
+
+  // ========================================================================
+  // Behavioural cohort overview (Level 1 / DISC)
+  //
+  // Builds a plain-language picture of the corporate's whole applicant pool:
+  // four friendly style buckets (Action / People / Steady / Careful), the
+  // character cards already shown today, a reliability banner from sincerity
+  // class counts, and a one-line verdict the page can show at the top.
+  // ========================================================================
+  async getBehaviouralCohort(
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
+    const corpId = await this.getCorporateAccountIdByEmail(email);
+
+    const dateQuery =
+      startDate && endDate
+        ? ` AND aa.created_at >= '${startDate} 00:00:00' AND aa.created_at <= '${endDate} 23:59:59'`
+        : '';
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        pt.id,
+        pt.code,
+        pt.blended_style_name AS trait_name,
+        pt.blended_style_desc AS trait_desc,
+        pt.color_rgb,
+        pt.metadata,
+        aa.sincerity_class AS sincerity_class
+      FROM assessment_attempts aa
+      JOIN registrations r ON aa.registration_id = r.id
+      JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
+      WHERE r.corporate_account_id = $1
+        AND r.is_deleted = false
+        AND r.is_tech_assessment IN (0, 2)
+        AND aa.dominant_trait_id IS NOT NULL
+        ${dateQuery}
+      `,
+      [corpId],
+    );
+
+    const normalizeColor = (raw: string | null): string =>
+      raw && !raw.startsWith('#') && !raw.startsWith('rgb') && raw.includes(',')
+        ? `rgb(${raw})`
+        : raw || '#1ED36A';
+
+    type Bucket = {
+      key: 'action' | 'people' | 'steady' | 'careful';
+      label: string;
+      tagline: string;
+      count: number;
+      percentage: number;
+      color: string;
+    };
+
+    const buckets: Record<Bucket['key'], Bucket> = {
+      action: {
+        key: 'action',
+        label: 'Action Takers',
+        tagline: 'Drive results, comfortable with challenge.',
+        count: 0,
+        percentage: 0,
+        color: '#E74C3C',
+      },
+      people: {
+        key: 'people',
+        label: 'People Connectors',
+        tagline: 'Energise teams, build relationships.',
+        count: 0,
+        percentage: 0,
+        color: '#F1C40F',
+      },
+      steady: {
+        key: 'steady',
+        label: 'Steady Supporters',
+        tagline: 'Dependable, collaborative, calm under pressure.',
+        count: 0,
+        percentage: 0,
+        color: '#2ECC71',
+      },
+      careful: {
+        key: 'careful',
+        label: 'Careful Thinkers',
+        tagline: 'Detail-focused, quality-driven, precise.',
+        count: 0,
+        percentage: 0,
+        color: '#3498DB',
+      },
+    };
+
+    const bucketFor = (code: string | null): Bucket['key'] | null => {
+      const first = (code || '').trim().charAt(0).toUpperCase();
+      if (first === 'D') return 'action';
+      if (first === 'I') return 'people';
+      if (first === 'S') return 'steady';
+      if (first === 'C') return 'careful';
+      return null;
+    };
+
+    const traitTally: Record<
+      string,
+      {
+        id: number;
+        code: string;
+        name: string;
+        description: string | null;
+        colorRgb: string;
+        imageKey: string;
+        characterImage: string;
+        count: number;
+        percentage: number;
+        bucket: Bucket['key'] | null;
+        keyStrengths: any[];
+        roleAlignment: any[];
+        keyBehaviors: any[];
+      }
+    > = {};
+
+    let total = 0;
+    let sincere = 0;
+    let borderline = 0;
+    let notSincere = 0;
+
+    for (const row of rows || []) {
+      total++;
+      const cls = (row.sincerity_class || '').toUpperCase();
+      if (cls === 'SINCERE') sincere++;
+      else if (cls === 'BORDERLINE') borderline++;
+      else if (cls === 'NOT_SINCERE') notSincere++;
+
+      const bKey = bucketFor(row.code);
+      if (bKey) buckets[bKey].count++;
+
+      const traitKey = String(row.id);
+      if (!traitTally[traitKey]) {
+        const meta = row.metadata || {};
+        const traitName = (row.trait_name || '').trim();
+        const imageKey = traitName.replace(/\s+/g, '_');
+        traitTally[traitKey] = {
+          id: Number(row.id),
+          code: row.code,
+          name: traitName,
+          description: row.trait_desc || null,
+          colorRgb: normalizeColor(row.color_rgb),
+          imageKey,
+          characterImage: `/traits/Corporate_${imageKey}.png`,
+          count: 0,
+          percentage: 0,
+          bucket: bKey,
+          keyStrengths: meta.key_strengths || meta.keyStrengths || [],
+          roleAlignment: meta.role_alignment || meta.roleAlignment || [],
+          keyBehaviors: meta.key_behaviors || meta.keyBehaviors || [],
+        };
+      }
+      traitTally[traitKey].count++;
+    }
+
+    const traits = Object.values(traitTally)
+      .map((t) => ({
+        ...t,
+        percentage: total > 0 ? Math.round((t.count / total) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const bucketList = Object.values(buckets).map((b) => ({
+      ...b,
+      percentage: total > 0 ? Math.round((b.count / total) * 100) : 0,
+    }));
+
+    // One-line verdict from the top bucket(s)
+    const topBuckets = [...bucketList]
+      .filter((b) => b.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    let verdict = 'Not enough data yet to summarise this group.';
+    if (topBuckets.length === 1) {
+      verdict = `Almost everyone here is a ${topBuckets[0].label.toLowerCase()}.`;
+    } else if (topBuckets.length >= 2 && total > 0) {
+      const first = topBuckets[0];
+      const second = topBuckets[1];
+      const combined = first.percentage + second.percentage;
+      if (first.percentage >= 60) {
+        verdict = `Mostly ${first.label.toLowerCase()} - this group leans strongly toward ${first.tagline.toLowerCase().replace(/\.$/, '')}.`;
+      } else if (combined >= 60) {
+        verdict = `A mix of ${first.label.toLowerCase()} and ${second.label.toLowerCase()} - your pool is balanced between two energies.`;
+      } else {
+        verdict = `A mixed group - no single style dominates, so expect varied working preferences.`;
+      }
+    }
+
+    // Strengths and watchouts based on bucket share
+    const strengths: string[] = [];
+    const watchouts: string[] = [];
+    const SHARE_HIGH = 25;
+    const SHARE_LOW = 10;
+    bucketList.forEach((b) => {
+      if (b.percentage >= SHARE_HIGH) {
+        if (b.key === 'action')
+          strengths.push('Strong on initiative - this group will move fast.');
+        if (b.key === 'people')
+          strengths.push('Great at collaboration and communication.');
+        if (b.key === 'steady')
+          strengths.push('A dependable, steady presence on teams.');
+        if (b.key === 'careful')
+          strengths.push('Will hold a high bar on accuracy and detail.');
+      }
+      if (b.percentage < SHARE_LOW) {
+        if (b.key === 'action')
+          watchouts.push('Few natural drivers - decision-making could slow.');
+        if (b.key === 'people')
+          watchouts.push(
+            'Few natural connectors - team energy may need a boost.',
+          );
+        if (b.key === 'steady')
+          watchouts.push(
+            'Few steady supporters - risk of burnout under pressure.',
+          );
+        if (b.key === 'careful')
+          watchouts.push(
+            'Few careful thinkers - be cautious with detail-heavy roles.',
+          );
+      }
+    });
+
+    // Reliability banner
+    const reliablePct = total > 0 ? Math.round((sincere / total) * 100) : 0;
+    let reliabilityTone: 'good' | 'mixed' | 'weak' = 'weak';
+    let reliabilityNote = 'Treat these patterns with caution.';
+    if (reliablePct >= 80) {
+      reliabilityTone = 'good';
+      reliabilityNote =
+        'We trust this picture - most answers were given honestly.';
+    } else if (reliablePct >= 50) {
+      reliabilityTone = 'mixed';
+      reliabilityNote = 'Mostly reliable - a few responses look rushed.';
+    } else if (total > 0) {
+      reliabilityTone = 'weak';
+      reliabilityNote =
+        'Many responses look rushed - read this picture loosely.';
+    }
+
+    return {
+      totalAssessed: total,
+      verdict,
+      buckets: bucketList,
+      traits,
+      strengths,
+      watchouts,
+      reliability: {
+        reliable: sincere,
+        borderline,
+        unreliable: notSincere,
+        reliablePercentage: reliablePct,
+        tone: reliabilityTone,
+        note: reliabilityNote,
+      },
+    };
+  }
+
+  // ========================================================================
+  // Inner Patterns cohort overview (Level 3 / IAT Gen)
+  //
+  // For each implicit theme tested, aggregates the cohort's pattern label
+  // (No / Slight / Moderate / Strong leaning), top stumble words, and a
+  // friendly one-line verdict. Avoids all millisecond / D-score language.
+  // ========================================================================
+  async getInnerPatternsCohort(
+    email: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<any> {
+    const corpId = await this.getCorporateAccountIdByEmail(email);
+
+    const dateQuery =
+      startDate && endDate
+        ? ` AND aa.created_at >= '${startDate} 00:00:00' AND aa.created_at <= '${endDate} 23:59:59'`
+        : '';
+
+    // One row per (candidate × module). pattern_label is produced by the
+    // exam engine when the module completes.
+    const rows = await this.dataSource.query(
+      `
+      SELECT
+        iam.module_id,
+        im.code AS module_code,
+        im.display_name AS module_name,
+        im.module_order,
+        iam.assessment_attempt_id,
+        iam.pattern_label,
+        iam.error_rate,
+        iam.slowest_words,
+        iam.error_words
+      FROM iat_attempt_modules iam
+      JOIN iat_modules im ON im.id = iam.module_id
+      JOIN assessment_attempts aa ON aa.id = iam.assessment_attempt_id
+      JOIN registrations r ON r.id = aa.registration_id
+      WHERE r.corporate_account_id = $1
+        AND r.is_deleted = false
+        AND r.is_tech_assessment IN (0, 2)
+        AND iam.status = 'COMPLETED'
+        ${dateQuery}
+      `,
+      [corpId],
+    );
+
+    // Normalise the pattern label coming from the engine. Different rows
+    // historically wrote slightly different strings; map them all into the
+    // four plain buckets we show on the page.
+    const toLevel = (
+      raw: string | null,
+    ): 'none' | 'slight' | 'moderate' | 'strong' => {
+      const v = (raw || '').toUpperCase();
+      if (v.includes('STRONG')) return 'strong';
+      if (v.includes('MODERATE')) return 'moderate';
+      if (v.includes('SLIGHT') || v.includes('WEAK')) return 'slight';
+      return 'none';
+    };
+
+    type ThemeAgg = {
+      code: string;
+      label: string;
+      moduleOrder: number;
+      distribution: {
+        none: number;
+        slight: number;
+        moderate: number;
+        strong: number;
+      };
+      total: number;
+      wordCounts: Record<string, number>;
+      reliableCount: number;
+      unreliableCount: number;
+    };
+
+    const themes: Record<string, ThemeAgg> = {};
+    const candidatesSeen = new Set<number>();
+    let reliableCandidates = 0;
+    const candidateUnreliable: Record<number, number> = {};
+    const candidateModules: Record<number, number> = {};
+
+    const friendlyLabel = (raw: string, code: string): string => {
+      const v = (raw || code || '').trim();
+      if (!v) return 'Hidden association';
+      // Keep DB-provided display_name; only strip very technical suffixes.
+      return (
+        v
+          .replace(/\s*IAT\s*$/i, '')
+          .replace(/^IAT\s*[-:]?\s*/i, '')
+          .trim() || v
+      );
+    };
+
+    for (const row of rows || []) {
+      const code = String(row.module_code || row.module_id);
+      if (!themes[code]) {
+        themes[code] = {
+          code,
+          label: friendlyLabel(row.module_name, row.module_code),
+          moduleOrder: Number(row.module_order || 0),
+          distribution: { none: 0, slight: 0, moderate: 0, strong: 0 },
+          total: 0,
+          wordCounts: {},
+          reliableCount: 0,
+          unreliableCount: 0,
+        };
+      }
+      const t = themes[code];
+      const level = toLevel(row.pattern_label);
+      t.distribution[level]++;
+      t.total++;
+
+      const errRate = Number(row.error_rate ?? 0);
+      const reliable = errRate <= 30;
+      if (reliable) t.reliableCount++;
+      else t.unreliableCount++;
+
+      // Track stumble words (slowest + error words combined)
+      const collect = (arr: any) => {
+        if (Array.isArray(arr)) {
+          for (const w of arr) {
+            const word = String(w || '').trim();
+            if (word && word.length > 1) {
+              t.wordCounts[word] = (t.wordCounts[word] || 0) + 1;
+            }
+          }
+        }
+      };
+      collect(row.slowest_words);
+      collect(row.error_words);
+
+      const candId = Number(row.assessment_attempt_id);
+      candidatesSeen.add(candId);
+      candidateModules[candId] = (candidateModules[candId] || 0) + 1;
+      if (!reliable)
+        candidateUnreliable[candId] = (candidateUnreliable[candId] || 0) + 1;
+    }
+
+    // Candidate is reliable if at most a third of their modules were noisy.
+    for (const candId of candidatesSeen) {
+      const noisy = candidateUnreliable[candId] || 0;
+      const total = candidateModules[candId] || 1;
+      if (noisy / total <= 0.33) reliableCandidates++;
+    }
+
+    const themeCards = Object.values(themes)
+      .sort((a, b) => a.moduleOrder - b.moduleOrder)
+      .map((t) => {
+        const d = t.distribution;
+        const pct = (n: number) =>
+          t.total > 0 ? Math.round((n / t.total) * 100) : 0;
+
+        const distribution = [
+          {
+            key: 'none',
+            label: 'No leaning',
+            count: d.none,
+            percentage: pct(d.none),
+            color: '#2ECC71',
+          },
+          {
+            key: 'slight',
+            label: 'Slight',
+            count: d.slight,
+            percentage: pct(d.slight),
+            color: '#F1C40F',
+          },
+          {
+            key: 'moderate',
+            label: 'Moderate',
+            count: d.moderate,
+            percentage: pct(d.moderate),
+            color: '#E67E22',
+          },
+          {
+            key: 'strong',
+            label: 'Strong',
+            count: d.strong,
+            percentage: pct(d.strong),
+            color: '#E74C3C',
+          },
+        ];
+
+        // Verdict: pick the dominant level
+        const dominant = [...distribution].sort((a, b) => b.count - a.count)[0];
+        let verdict = `Not much signal on “${t.label}” yet.`;
+        if (t.total > 0) {
+          if (dominant.key === 'none') {
+            verdict = `Most people in your group show no hidden lean on “${t.label}” - a balanced picture.`;
+          } else if (dominant.key === 'slight') {
+            verdict = `Most show only a slight hidden lean on “${t.label}”.`;
+          } else if (dominant.key === 'moderate') {
+            verdict = `Most show a moderate hidden lean on “${t.label}” - worth noticing.`;
+          } else if (dominant.key === 'strong') {
+            verdict = `Most show a strong hidden lean on “${t.label}” - pay attention here.`;
+          }
+        }
+
+        const stumbleWords = Object.entries(t.wordCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([word, count]) => ({ word, count }));
+
+        const reliablePct =
+          t.total > 0 ? Math.round((t.reliableCount / t.total) * 100) : 0;
+
+        return {
+          code: t.code,
+          label: t.label,
+          totalResponses: t.total,
+          distribution,
+          dominantLevel: dominant.key,
+          verdict,
+          stumbleWords,
+          reliablePercentage: reliablePct,
+        };
+      });
+
+    const totalCandidates = candidatesSeen.size;
+    const reliablePct =
+      totalCandidates > 0
+        ? Math.round((reliableCandidates / totalCandidates) * 100)
+        : 0;
+
+    let overallVerdict = 'Not enough completed assessments yet to summarise.';
+    if (themeCards.length > 0) {
+      const strongest = [...themeCards].sort((a, b) => {
+        const aScore =
+          a.distribution[2].count * 2 + a.distribution[3].count * 3;
+        const bScore =
+          b.distribution[2].count * 2 + b.distribution[3].count * 3;
+        return bScore - aScore;
+      })[0];
+      const moderatePlus =
+        strongest.distribution[2].count + strongest.distribution[3].count;
+      if (moderatePlus > 0) {
+        overallVerdict = `The strongest hidden pattern in this group shows up on “${strongest.label}”.`;
+      } else {
+        overallVerdict =
+          'This group shows mostly balanced patterns across every theme tested.';
+      }
+    }
+
+    let reliabilityTone: 'good' | 'mixed' | 'weak' = 'weak';
+    let reliabilityNote = 'Treat these patterns with caution.';
+    if (reliablePct >= 80) {
+      reliabilityTone = 'good';
+      reliabilityNote = 'We trust this picture - most responses were clean.';
+    } else if (reliablePct >= 50) {
+      reliabilityTone = 'mixed';
+      reliabilityNote = 'Mostly reliable - a few responses look noisy.';
+    } else if (totalCandidates > 0) {
+      reliabilityTone = 'weak';
+      reliabilityNote =
+        'Many responses look noisy - read this picture loosely.';
+    }
+
+    return {
+      totalCompleted: totalCandidates,
+      verdict: overallVerdict,
+      themes: themeCards,
+      reliability: {
+        reliable: reliableCandidates,
+        unreliable: totalCandidates - reliableCandidates,
+        reliablePercentage: reliablePct,
+        tone: reliabilityTone,
+        note: reliabilityNote,
+      },
+    };
   }
 
   private async getPersonalityDistribution(
@@ -2032,6 +2561,19 @@ export class CorporateDashboardService {
     const traitName = (row.blended_style_name || '').trim();
     const traitImageKey = traitName.replace(/\s+/g, '_');
 
+    // A Pure Trait (single-letter code) has no dedicated artwork/colour yet, so
+    // it borrows the candidate's top-two blend for the image + colour. The name,
+    // code, and DISC scores below stay the Pure Trait's own.
+    let imageKey = traitImageKey;
+    let traitColorRaw: string = row.color_rgb;
+    if (typeof row.trait_code === 'string' && row.trait_code.length === 1) {
+      const fb = await this.resolvePureVisualFallback(discScores);
+      if (fb) {
+        imageKey = fb.imageKey;
+        traitColorRaw = fb.colorRgb || row.color_rgb;
+      }
+    }
+
     const formatReportRef = (ref: string | null) => {
       if (!ref) return 'Nil';
       return ref
@@ -2064,15 +2606,15 @@ export class CorporateDashboardService {
         name: traitName,
         description: row.blended_style_desc,
         colorRgb:
-          row.color_rgb &&
-          !row.color_rgb.startsWith('#') &&
-          !row.color_rgb.startsWith('rgb') &&
-          row.color_rgb.includes(',')
-            ? `rgb(${row.color_rgb})`
-            : (row.color_rgb as string) || '#1ED36A',
-        imageKey: traitImageKey,
-        characterImage: `/traits/Corporate_${traitImageKey}.png`,
-        strengthChartImage: `/charts/${traitImageKey}_Strength_Chart.png`,
+          traitColorRaw &&
+          !traitColorRaw.startsWith('#') &&
+          !traitColorRaw.startsWith('rgb') &&
+          traitColorRaw.includes(',')
+            ? `rgb(${traitColorRaw})`
+            : traitColorRaw || '#1ED36A',
+        imageKey: imageKey,
+        characterImage: `/traits/Corporate_${imageKey}.png`,
+        strengthChartImage: `/charts/${imageKey}_Strength_Chart.png`,
         metadata: traitMeta,
       },
       discScores: {
@@ -2094,5 +2636,45 @@ export class CorporateDashboardService {
       typicalScenarios:
         traitMeta.typical_scenarios || traitMeta.typicalScenarios || [],
     };
+  }
+
+  /**
+   * Visual fallback for a Pure Trait (single-letter code): returns the image key
+   * + colour of the candidate's TOP-TWO DISC blend (two highest factors,
+   * tie-break C>D>I>S - same rule as the report layer's `topTwoBlend`). Pure
+   * traits have no dedicated artwork/colour yet, so they borrow the blend's;
+   * the trait name + score stay the Pure Trait's own. Returns null on failure.
+   */
+  private async resolvePureVisualFallback(
+    discScores: any,
+  ): Promise<{ imageKey: string; colorRgb: string } | null> {
+    const scores: Record<string, number> = {
+      D: Number(discScores?.D ?? discScores?.d) || 0,
+      I: Number(discScores?.I ?? discScores?.i) || 0,
+      S: Number(discScores?.S ?? discScores?.s) || 0,
+      C: Number(discScores?.C ?? discScores?.c) || 0,
+    };
+    const PRIORITY: Record<string, number> = { C: 0, D: 1, I: 2, S: 3 };
+    const ranked = ['D', 'I', 'S', 'C']
+      .map((f) => ({ f, v: scores[f] }))
+      .sort((a, b) =>
+        a.v !== b.v ? b.v - a.v : PRIORITY[a.f] - PRIORITY[b.f],
+      );
+    const blendCode = ranked[0].f + ranked[1].f;
+
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT blended_style_name AS name, color_rgb FROM personality_traits WHERE code = $1 LIMIT 1`,
+        [blendCode],
+      );
+      const r = rows && rows[0];
+      if (!r || !r.name) return null;
+      return {
+        imageKey: String(r.name).trim().replace(/\s+/g, '_'),
+        colorRgb: r.color_rgb,
+      };
+    } catch {
+      return null;
+    }
   }
 }

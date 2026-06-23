@@ -6,7 +6,7 @@ import {
   OriginbiSetting,
 } from '@originbi/shared-entities';
 
-/** Minimal attempt shape (structural — works with any AssessmentAttempt entity). */
+/** Minimal attempt shape (structural - works with any AssessmentAttempt entity). */
 export interface MetaphorAttemptCtx {
   id: number;
   assessmentSessionId?: number | null;
@@ -35,7 +35,7 @@ export class MetaphorGenerationService {
     });
     if (existingCount > 0) {
       this.logger.log(
-        `[Metaphor] Attempt ${attempt.id} already has ${existingCount} questions — skipping duplicate generation.`,
+        `[Metaphor] Attempt ${attempt.id} already has ${existingCount} questions - skipping duplicate generation.`,
       );
       return;
     }
@@ -72,7 +72,7 @@ export class MetaphorGenerationService {
     const sets = setsRaw.map((s) => s.setNumber);
     if (sets.length === 0) {
       this.logger.warn(
-        `[Metaphor] No active metaphor questions — skipping generation for attempt ${attempt.id}.`,
+        `[Metaphor] No active metaphor questions - skipping generation for attempt ${attempt.id}.`,
       );
       return;
     }

@@ -559,6 +559,123 @@ export const CXO_DYNAMIC_CONTENT: Record<string, any> = {
 };
 
 export const BLENDED_STYLE_MAPPING: Record<string, any> = {
+  // ── Pure Traits (a single dominant DISC dimension) ────────────────────────
+  D: {
+    style_name: 'You are Bold Driver',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a decisive, results-driven executive who takes ownership of the toughest mandates and moves the organisation forward with conviction. Your appetite for challenge, speed of decision, and bias for action make you a natural force when the stakes are highest.</p>`,
+    nature_suggestions:
+      'Chief Executive Officer, Managing Director, Turnaround Leader, Chief Growth Officer, Founder',
+    key_behaviours: [
+      'Sets a bold agenda and drives it with relentless focus.',
+      'Makes high-stakes decisions confidently and at pace.',
+      'Takes full ownership of outcomes and accountability.',
+      'Clears obstacles and keeps the organisation in motion.',
+      'Thrives on competition, autonomy, and measurable impact.',
+    ],
+    typical_scenarios: [
+      'Leading a turnaround or aggressive growth mandate.',
+      'Making the final call when the leadership team is divided.',
+      'Entering a new market or launching a flagship initiative.',
+      'Driving the organisation through a high-pressure deadline.',
+    ],
+    trait_combinations: [
+      [
+        'Bold Driver',
+        'Chief Executive Officer, Managing Director, Turnaround Leader, Chief Growth Officer, Founder',
+        'Setting direction, decisive execution, driving results at scale.',
+        'Slow-consensus cultures, heavy process, low-autonomy mandates.',
+        'Detailed compliance reviews and long deliberation cycles.',
+      ],
+    ],
+  },
+
+  I: {
+    style_name: 'You are Inspiring Motivator',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a persuasive, people-centred leader who aligns the organisation through energy, vision, and relationships. You win hearts as well as minds, and you turn strategy into shared momentum across teams and stakeholders.</p>`,
+    nature_suggestions:
+      'Chief Marketing Officer, Chief People Officer, Chief Brand Officer, Chief Communications Officer, Head of Partnerships',
+    key_behaviours: [
+      'Articulates a compelling vision that rallies people.',
+      'Builds trust and influence across stakeholders.',
+      'Energises teams and lifts engagement and morale.',
+      'Adapts quickly to people and changing situations.',
+      'Champions collaboration, recognition, and culture.',
+    ],
+    typical_scenarios: [
+      'Aligning the organisation behind a new strategy or vision.',
+      'Winning over the board, investors, or key partners.',
+      'Representing the company externally as its public face.',
+      'Leading culture and engagement through a major change.',
+    ],
+    trait_combinations: [
+      [
+        'Inspiring Motivator',
+        'Chief Marketing Officer, Chief People Officer, Chief Brand Officer, Chief Communications Officer, Head of Partnerships',
+        'Inspiring alignment, building relationships, driving engagement.',
+        'Detail-heavy, solitary, or rigidly procedural mandates.',
+        'Data reconciliation and long independent analysis.',
+      ],
+    ],
+  },
+
+  S: {
+    style_name: 'You are Steadfast Anchor',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a composed, dependable leader who brings continuity and trust to the organisation. You sustain delivery through change, support your people steadily, and keep the operating rhythm that others rely on.</p>`,
+    nature_suggestions:
+      'Chief Operating Officer, Chief of Staff, Head of Operations, Chief Customer Officer, Head of Service Delivery',
+    key_behaviours: [
+      'Sustains delivery dependably and keeps commitments.',
+      'Supports and steadies teams through pressure and change.',
+      'Maintains a reliable, consistent operating cadence.',
+      'Builds harmony, trust, and long-term cooperation.',
+      'Values stability, fairness, and a measured pace.',
+    ],
+    typical_scenarios: [
+      'Holding operations steady through a demanding programme.',
+      'Guiding the organisation through a difficult transition.',
+      'Sustaining consistent service and delivery quality.',
+      'Mediating across functions to keep leadership aligned.',
+    ],
+    trait_combinations: [
+      [
+        'Steadfast Anchor',
+        'Chief Operating Officer, Chief of Staff, Head of Operations, Chief Customer Officer, Head of Service Delivery',
+        'Reliable delivery, continuity, steady operational leadership.',
+        'Rapid-pivot, confrontational, or constantly-shifting mandates.',
+        'Aggressive turnaround targets and relentless rapid change.',
+      ],
+    ],
+  },
+
+  C: {
+    style_name: 'You are Precise Perfectionist',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are an analytical, quality-driven leader who holds the organisation to a high standard of accuracy, rigour, and sound judgement. You think things through, rely on evidence, and deliver decisions that withstand scrutiny.</p>`,
+    nature_suggestions:
+      'Chief Financial Officer, Chief Risk Officer, Chief Compliance Officer, Chief Technology Officer, Chief Audit Executive',
+    key_behaviours: [
+      'Upholds high standards for accuracy and quality.',
+      'Grounds decisions in facts, data, and clear reasoning.',
+      'Thinks problems through before committing.',
+      'Brings structure, discipline, and governance.',
+      'Ensures rigour, fairness, and consistency.',
+    ],
+    typical_scenarios: [
+      'Safeguarding accuracy on a complex, high-risk decision.',
+      'Designing rigorous governance, controls, or standards.',
+      'Analysing evidence to support a major strategic choice.',
+      'Auditing systems or functions for compliance and risk.',
+    ],
+    trait_combinations: [
+      [
+        'Precise Perfectionist',
+        'Chief Financial Officer, Chief Risk Officer, Chief Compliance Officer, Chief Technology Officer, Chief Audit Executive',
+        'Accuracy, structured analysis, governance, quality assurance.',
+        'Ambiguous, improvised, or fast-and-loose mandates.',
+        'Snap decisions without data and constant context-switching.',
+      ],
+    ],
+  },
+
   DI: {
     style_name: 'You are Charismatic Leader',
     style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a bold and energetic leader who thrives on challenges and excels at inspiring others. Your charisma and drive for results make you a standout in dynamic, high-impact environments.</p>`,

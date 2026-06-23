@@ -1139,16 +1139,20 @@ export class SchoolReport extends BaseReport {
       this.data.most_answered_answer_type,
       this.data,
     );
-    const dominantTrait = primaryType + secondaryType;
+    // Headline archetype is pure-capable (engine's resolved code; pure -> single
+    // letter). The element combo + respond table keep the top-two blend so a
+    // pure student still gets two valid element icons.
+    const headlineTrait = this.resolveHeadlineTrait(this.data);
+    const blendTrait = primaryType + secondaryType;
 
-    const contentBlock = SCHOOL_BLENDED_STYLE_MAPPING[dominantTrait];
+    const contentBlock = SCHOOL_BLENDED_STYLE_MAPPING[headlineTrait];
     if (!contentBlock) return;
 
     this.h1('Mapping Your Strengths to Future Academic and Career Goals');
     this.h2(contentBlock.style_name);
     this.pHtml(contentBlock.style_desc);
 
-    this.renderElementCombo(dominantTrait[0], dominantTrait[1]);
+    this.renderElementCombo(blendTrait[0], blendTrait[1]);
 
     this.h3('Suggestions');
     this.pHtml(contentBlock.nature_suggestions);

@@ -1,5 +1,5 @@
 // ============================================================
-// Level 3 "Metaphor" — frontend API connectors (no UI).
+// Level 3 "Metaphor" - frontend API connectors (no UI).
 // Talks to the student-service `metaphor` module. The exam page
 // design plugs into these functions + the useMetaphorSpeech hook.
 // ============================================================

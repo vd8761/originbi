@@ -528,7 +528,7 @@ export default function SettingsManagement() {
             // Per-level scope rules (category 'levels', key like
             // 'level3_scope_rules'). Reuses the same program/department/board
             // rule editor. For Level 3 (IAT) each rule also picks the IAT
-            // Module Set that scope receives — routing lives here, not in a
+            // Module Set that scope receives - routing lives here, not in a
             // separate setting.
             if (item.category === 'levels' && item.key.endsWith('_scope_rules')) {
                 const value = item.value && typeof item.value === 'object' ? item.value : { rules: [] };
@@ -541,7 +541,7 @@ export default function SettingsManagement() {
                     : undefined;
                 const levelDisabled = enabledItem ? enabledItem.value === false : false;
                 const disabledWarning = levelDisabled
-                    ? `This level is turned off — these rules won't take effect until you enable "${enabledItem!.label || `Level ${levelNumMatch![1]}`}".`
+                    ? `This level is turned off - these rules won't take effect until you enable "${enabledItem!.label || `Level ${levelNumMatch![1]}`}".`
                     : undefined;
                 let moduleSetOptions: SelectOption[] | undefined;
                 if (isLevel3) {
@@ -565,8 +565,8 @@ export default function SettingsManagement() {
                         eyebrow={eyebrow}
                         heading="Who receives this level"
                         helpText={isLevel3
-                            ? "Empty selections match everyone. For each rule, optionally pick an IAT Module Set — candidates matching that rule receive that set's modules (in the set's order). Modules in no routed set are given to everyone. Define sets first in 'IAT Module Sets'."
-                            : "A registration matches when ANY selected condition matches — program, department, department-degree, or board (OR, not AND). Leave all fields empty to apply this level to everyone."}
+                            ? "Empty selections match everyone. For each rule, optionally pick an IAT Module Set - candidates matching that rule receive that set's modules (in the set's order). Modules in no routed set are given to everyone. Define sets first in 'IAT Module Sets'."
+                            : "A registration matches when ANY selected condition matches - program, department, department-degree, or board (OR, not AND). Leave all fields empty to apply this level to everyone."}
                         programOptions={programOptions}
                         departmentOptions={departmentOptions}
                         departmentDegreeOptions={departmentDegreeOptions}
@@ -726,9 +726,9 @@ export default function SettingsManagement() {
                                         const isDimmed = isReportPasswordField && !reportPasswordEnabled;
 
                                         // Wide editors (e.g. the distribution table) render full-width,
-                                        // stacked below the label — not squeezed into the side input column.
+                                        // stacked below the label - not squeezed into the side input column.
                                         // The Claude/Gemini model pickers pair a dropdown with a Refresh
-                                        // button, which gets clipped in the narrow side column — give them
+                                        // button, which gets clipped in the narrow side column - give them
                                         // the full-width treatment too.
                                         const isModelSelect = (item.category === 'metaphor' || item.category === 'iat')
                                             && (item.key === 'claude_report_model' || item.key === 'gemini_model');
@@ -1378,7 +1378,7 @@ function GenerationModeEditor({
 }
 
 // ------------------------------------------------------------------
-// Level 3 metaphor — STT provider editor (object: {provider, params})
+// Level 3 metaphor - STT provider editor (object: {provider, params})
 // ------------------------------------------------------------------
 const STT_PROVIDERS = [
     { value: 'web_speech', label: 'Browser Web Speech (free, Chrome/Edge)' },
@@ -1414,7 +1414,7 @@ function SttProviderEditor({
 }
 
 // ------------------------------------------------------------------
-// Level 3 metaphor — supported languages editor (array of {code,label,native})
+// Level 3 metaphor - supported languages editor (array of {code,label,native})
 // ------------------------------------------------------------------
 function GeminiModelSelect({
     value,
@@ -1678,7 +1678,7 @@ function ScopeRulesEditor({
     onChange,
     eyebrow = 'IAT Gen',
     heading = 'Level 2 replacement routing',
-    helpText = 'A student matches when ANY selected condition matches — program, department, department-degree, or board (OR, not AND). Leave all fields empty to match everyone.',
+    helpText = 'A student matches when ANY selected condition matches - program, department, department-degree, or board (OR, not AND). Leave all fields empty to match everyone.',
     disabledWarning,
 }: {
     value: IatRuleConfig;
@@ -1692,7 +1692,7 @@ function ScopeRulesEditor({
     eyebrow?: string;
     heading?: string;
     helpText?: string;
-    // When set, this level's enable toggle is OFF — the rules won't take effect.
+    // When set, this level's enable toggle is OFF - the rules won't take effect.
     disabledWarning?: string;
 }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -1772,7 +1772,7 @@ function ScopeRulesEditor({
                 <div className="min-h-0 flex-1 overflow-y-auto p-6">
                     {rules.length === 0 ? (
                         <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
-                            No scope rules configured — applies to everyone.
+                            No scope rules configured - applies to everyone.
                         </div>
                     ) : (
                         <div className="space-y-5">
@@ -1879,7 +1879,7 @@ function ScopeRulesEditor({
     );
 }
 
-// Editor for iat.module_sets — named, reusable collections of IAT modules.
+// Editor for iat.module_sets - named, reusable collections of IAT modules.
 // A module belongs to AT MOST ONE set: modules already used by another set are
 // hidden from this set's picker. Module selection happens in a modal.
 function ModuleSetsEditor({
@@ -1952,7 +1952,7 @@ function ModuleSetsEditor({
                 <div className="border-b border-gray-200 px-6 py-4 dark:border-white/10">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-green">Module Set</p>
                     <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                        Select modules — {editingSet.name || 'Untitled set'}
+                        Select modules - {editingSet.name || 'Untitled set'}
                     </h2>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {selectedInEditing.size} selected. Modules already used by another set are not shown.
@@ -1968,7 +1968,7 @@ function ModuleSetsEditor({
                 <div className="min-h-0 flex-1 overflow-y-auto p-4">
                     {availableForEditing.length === 0 ? (
                         <p className="px-2 py-8 text-center text-sm text-gray-400">
-                            {moduleOptions.length === 0 ? 'No IAT modules available.' : 'No modules match — others may be assigned to different sets.'}
+                            {moduleOptions.length === 0 ? 'No IAT modules available.' : 'No modules match - others may be assigned to different sets.'}
                         </p>
                     ) : (
                         <div className="space-y-1">

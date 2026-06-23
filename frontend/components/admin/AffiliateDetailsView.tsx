@@ -486,7 +486,7 @@ const AffiliateDetailsView: React.FC<AffiliateDetailsViewProps> = ({ data, onBac
                                             <td className="py-4 text-sm text-brand-text-light-secondary dark:text-brand-text-secondary align-middle">
                                                 <div className="flex flex-col">
                                                     <span className="font-semibold text-xs text-brand-text-light-primary dark:text-white">{r.studentBoard}</span>
-                                                    <span className="text-[10px] opacity-70">{r.schoolLevel} {r.schoolStream !== '—' ? `• ${r.schoolStream}` : ''}</span>
+                                                    <span className="text-[10px] opacity-70">{r.schoolLevel} {r.schoolStream !== '-' ? `• ${r.schoolStream}` : ''}</span>
                                                 </div>
                                             </td>
                                             <td className="py-4 text-sm text-brand-green font-bold text-right align-middle">

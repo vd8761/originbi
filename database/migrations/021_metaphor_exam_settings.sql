@@ -3,8 +3,8 @@
 --
 -- Adds a new admin-configurable setting that controls HOW metaphor
 -- questions are selected for each candidate:
---   • 'random_single_set' (default) — pick N from one random set
---   • 'random_all_sets'             — pick N from all sets combined
+--   • 'random_single_set' (default) - pick N from one random set
+--   • 'random_all_sets'             - pick N from all sets combined
 --
 -- The existing 'question_count' setting already controls HOW MANY.
 -- ============================================================

@@ -3,7 +3,7 @@
 --
 -- Migration 025 moved the old disabled Level-4 placeholder to
 -- level_number 5 (to free slot 4 for Metaphor), but left its name as
--- "Level 4 (TBD)". That is now misleading — Level 4 is Metaphor. Rename
+-- "Level 4 (TBD)". That is now misleading - Level 4 is Metaphor. Rename
 -- the placeholder to match its actual level number. Cosmetic + idempotent.
 -- ============================================================
 

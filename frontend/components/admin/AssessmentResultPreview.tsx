@@ -193,7 +193,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     const isLevel1ReportAvailable = programCode === 'COLLEGE_STUDENT' || programId === 2;
 
     // Level 1 (DISC / Behavioural Insight) completion. The Level 1 report only
-    // needs Level 1 data, so it can be downloaded as soon as Level 1 is done —
+    // needs Level 1 data, so it can be downloaded as soon as Level 1 is done -
     // the full & short reports still require every assigned level to finish.
     const level1Level = levels.find((l: any) =>
         Number(l.levelNumber ?? l.level_number ?? 0) === 1 ||
@@ -211,7 +211,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     // whole session done; Level 1 needs only Level 1).
     const canOpenDownloadMenu = isSessionComplete || canDownloadLevel1;
     // The Employee report renders DISC-only when ACI is absent, so it can be
-    // downloaded as soon as Level 1 is done — the ACI sections fill in once
+    // downloaded as soon as Level 1 is done - the ACI sections fill in once
     // that level completes. Other non-College programs still require full
     // completion before their report is downloadable.
     const isEmployeeProgram = programCode === 'EMPLOYEE' || programId === 3;
@@ -313,7 +313,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
 
     // Only show tabs for levels this candidate actually has an attempt for.
     // Levels are now enabled per registration, and legacy sessions may lack a
-    // dedicated IAT attempt (IAT used to be the Level-2 variant) — rendering a
+    // dedicated IAT attempt (IAT used to be the Level-2 variant) - rendering a
     // tab for a level with no attempt previously duplicated the IAT report.
     const levelHasAttempt = (lvl: any) =>
         Boolean(session?.attempts?.find((a: any) => {
@@ -321,7 +321,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
             const alId = a.assessmentLevel ? String(a.assessmentLevel.id) : null;
             return aId === String(lvl?.id) || alId === String(lvl?.id);
         }));
-    // Always drive the level tabs off the candidate's ACTUAL attempts — never
+    // Always drive the level tabs off the candidate's ACTUAL attempts - never
     // the global level list. A candidate who wasn't scheduled for a level
     // (e.g. ACI / Level 2) has no attempt for it, so its tab must not appear.
     const visibleLevels = levels.filter(levelHasAttempt);
@@ -439,7 +439,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         return jobStatus ? 'Scheduled' : '--';
     };
 
-    // Compact stats bar for the IAT Gen & Metaphor tabs — only the timing /
+    // Compact stats bar for the IAT Gen & Metaphor tabs - only the timing /
     // status fields that make sense for those reports (no Maximum Score,
     // Sincerity, or Trait Code), plus any report-specific extras.
     const renderReportStatsBar = (
@@ -1127,7 +1127,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
     // IAT Gen is now its own dedicated level (named "IAT Gen"), so each level
     // tab just uses the level's own name. The only special case is LEGACY data
     // where IAT was taken as a Level-2 variant (the Level-2 attempt's own
-    // metadata is IAT_GEN and there is no dedicated IAT level) — relabel that
+    // metadata is IAT_GEN and there is no dedicated IAT level) - relabel that
     // single tab so it doesn't read "ACI" for those old takers.
     const getLevelTabLabel = (lvl: any): string => {
         const lvlNumber = Number(lvl?.levelNumber || lvl?.level_number || 0);
@@ -1139,7 +1139,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         const kind = String(
             lvlAttempt?.metadata?.assessment_kind || lvlAttempt?.metadata?.assessmentKind || ''
         ).toUpperCase();
-        // Only the Level-2 attempt's OWN metadata counts here — not the global
+        // Only the Level-2 attempt's OWN metadata counts here - not the global
         // iatData, which now refers to the dedicated IAT level.
         return kind === 'IAT_GEN' ? 'IATGen' : lvl?.name;
     };
@@ -1173,7 +1173,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
             String(a.assessmentLevelId) === String(iatLevel?.id) ||
             (a.assessmentLevel && String(a.assessmentLevel.id) === String(iatLevel?.id))
         );
-        // Require a real attempt on the dedicated IAT level — not the global
+        // Require a real attempt on the dedicated IAT level - not the global
         // iatData, which for legacy sessions resolves to the Level-2 IAT and
         // would double-render the section.
         const hasDedicatedIat = Boolean(iatLevel && iatLevelAttempt);
@@ -1282,7 +1282,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
                             </div>
                         );
                     })}
-                    {/* Survey is no longer a separate tab — its responses are
+                    {/* Survey is no longer a separate tab - its responses are
                         shown inside the Behavioral Insight tab below. */}
                 </div>
 
@@ -1558,7 +1558,7 @@ const getAciData = (attempt: any) => {
             if (totalScoreVal >= 100) {
                 compatibility.level = 'Agile Naturalist';
                 compatibility.tag = 'Embodies agility instinctively; thrives in collaboration and adapts with ease.';
-                compatibility.interpretation = 'You live the Agile mindset naturally — showing balance between speed, empathy, and integrity.';
+                compatibility.interpretation = 'You live the Agile mindset naturally - showing balance between speed, empathy, and integrity.';
             } else if (totalScoreVal >= 75) {
                 compatibility.level = 'Agile Adaptive';
                 compatibility.tag = 'Shows strong energy, adaptability, and creative courage with growing consistency.';

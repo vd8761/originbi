@@ -37,7 +37,7 @@ export class RenameConversationDto {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   /rag/chat  — Persistent chat history (ChatGPT-style)
+   /rag/chat  - Persistent chat history (ChatGPT-style)
    ════════════════════════════════════════════════════════════════ */
 @Controller('rag/chat')
 @UseGuards(CognitoUniversalGuard)

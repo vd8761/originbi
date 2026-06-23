@@ -2,6 +2,7 @@
 import * as PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveHeadlineFromReportData } from '../helpers/discTrait';
 
 // --- Shared Interfaces ---
 
@@ -246,6 +247,26 @@ export interface RadarChartOptions {
   colorText?: string; // Color of the labels
 }
 
+/** A single slice of a pie / donut chart. */
+export interface PieSlice {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface PieChartOptions {
+  x?: number; // Center X of the pie (defaults to a left-of-center position)
+  y?: number; // Center Y of the pie (defaults to current cursor + radius)
+  radius?: number; // Outer radius (default 70)
+  innerRadiusRatio?: number; // 0 = full pie, >0 = donut hole as a fraction of radius
+  fontSize?: number;
+  colorText?: string;
+  /** Draw a legend (label + count + %) to the right of the pie. Default true. */
+  showLegend?: boolean;
+  /** Minimum slice percentage that still gets an on-slice % label. Default 5. */
+  minLabelPct?: number;
+}
+
 /**
  * BaseReport Class
  * ----------------
@@ -387,6 +408,24 @@ export class BaseReport {
     });
 
     return [traitScores[0].type, traitScores[1].type];
+  }
+
+  /**
+   * Resolves the HEADLINE trait code (pure-capable: may return a single letter).
+   * Single source of truth is the exam engine - prefer the resolved code stored
+   * on the data (`dominant_trait_code`); only fall back to recomputing from raw
+   * DISC scores when that is absent (e.g. an attempt predating the engine change).
+   * Use `discTrait.careerLookupCode` for the trait_id-keyed career/compat lookups.
+   */
+  protected resolveHeadlineTrait(data: {
+    dominant_trait_code?: string;
+    most_answered_answer_type?: { ANSWER_TYPE: string; COUNT: number }[];
+    score_D: number;
+    score_I: number;
+    score_S: number;
+    score_C: number;
+  }): string {
+    return resolveHeadlineFromReportData(data);
   }
 
   /**
@@ -2327,7 +2366,6 @@ export class BaseReport {
     // --- 1. Configuration & Defaults ---
     const {
       x = this.PAGE_WIDTH / 2, // Default to center of page
-      y = this.doc.y + 100, // Default to current Y + padding
       radius = 100, // Requested radius
       maxValue = 10,
       levels = 6,
@@ -2369,6 +2407,17 @@ export class BaseReport {
     // Use the smaller of the requested radius or the safe limit
     const finalRadius = Math.min(radius, safeRadius);
     const labelRadius = finalRadius + 4 * this.MM; // Text sits slightly outside
+
+    // Anchor the vertical centre AFTER the space check + radius calc. A
+    // caller-supplied `y` is honoured only while it keeps the whole chart on
+    // the current page; otherwise (e.g. the ensureSpace above just reset the
+    // cursor to a new page) it is re-anchored below the cursor so the axis
+    // labels never spill onto blank pages.
+    const radarBottomLimit = this.PAGE_HEIGHT - margin;
+    let y = options.y ?? this.doc.y + 100;
+    if (y < this.doc.y || y + labelRadius + fontSize > radarBottomLimit) {
+      y = this.doc.y + finalRadius + 26;
+    }
 
     // --- 3. Draw Grid (Concentric Polygons) ---
     this.doc.lineWidth(0.5).strokeColor(colorGrid);
@@ -2570,6 +2619,191 @@ export class BaseReport {
   }
 
   /**
+   * Draws a pie (or donut) chart with an optional legend to its right.
+   *
+   * Slices are drawn clockwise from 12 o'clock. Slices at or above
+   * `minLabelPct` get a percentage label on the slice; the legend always lists
+   * every slice with its label, raw count, and percentage. Zero-value slices
+   * are skipped in the drawing but still listed in the legend (greyed) so the
+   * full category set stays visible.
+   *
+   * The cursor (`doc.y`) is advanced to just below the taller of the pie and
+   * the legend.
+   */
+  protected drawPieChart(slices: PieSlice[], options: PieChartOptions = {}) {
+    const {
+      radius = 70,
+      innerRadiusRatio = 0.55,
+      fontSize = 9,
+      colorText = '#1B1B27',
+      showLegend = true,
+      minLabelPct = 5,
+    } = options;
+
+    const margin = this._useStdMargins ? this.MARGIN_STD : 15 * this.MM;
+    const total = slices.reduce((sum, s) => sum + (s.value || 0), 0);
+
+    // Reserve vertical space for the whole figure before drawing.
+    const legendRowH = 16;
+    const legendHeight = slices.length * legendRowH;
+    const figureHeight = Math.max(radius * 2, legendHeight) + 12;
+    this.ensureSpace(figureHeight + 10);
+
+    // Measure the legend so the pie + legend can be centered as a single group
+    // (avoids the chart hugging the left margin with empty space on the right).
+    const swatch = 9;
+    const legendGap = 16;
+    let legendBlockW = 0;
+    if (showLegend) {
+      this.doc.font(this.FONT_SEMIBOLD).fontSize(fontSize);
+      let maxText = 0;
+      slices.forEach((s) => {
+        const pct = total > 0 ? Math.round((s.value / total) * 100) : 0;
+        const w = this.doc.widthOfString(`${s.label}  -  ${s.value} (${pct}%)`);
+        if (w > maxText) maxText = w;
+      });
+      legendBlockW = legendGap + swatch + 6 + maxText;
+    }
+    const usableWidth = this.PAGE_WIDTH - 2 * margin;
+    const groupW = 2 * radius + legendBlockW;
+    const startX = margin + Math.max(0, (usableWidth - groupW) / 2);
+
+    const cx = options.x ?? startX + radius;
+    const cy = options.y ?? this.doc.y + radius + 4;
+    const innerR = Math.max(0, radius * innerRadiusRatio);
+
+    if (total <= 0) {
+      // Nothing to chart - draw an empty ring so the layout stays stable.
+      this.doc
+        .lineWidth(1)
+        .strokeColor('#E6E6EF')
+        .circle(cx, cy, radius)
+        .stroke();
+    } else {
+      let startAngle = -Math.PI / 2; // 12 o'clock
+      slices.forEach((s) => {
+        const value = s.value || 0;
+        if (value <= 0) return;
+        const sweep = (value / total) * 2 * Math.PI;
+        const endAngle = startAngle + sweep;
+
+        // Wedge path: center → arc → back to center.
+        this.doc.save();
+        this.doc.path(this.arcWedgePath(cx, cy, radius, startAngle, endAngle));
+        this.doc.fill(s.color);
+        this.doc.restore();
+
+        // On-slice percentage label (only for slices large enough to fit).
+        const pct = (value / total) * 100;
+        if (pct >= minLabelPct) {
+          const mid = startAngle + sweep / 2;
+          const labelR = innerR > 0 ? (radius + innerR) / 2 : radius * 0.62;
+          const lx = cx + labelR * Math.cos(mid);
+          const ly = cy + labelR * Math.sin(mid);
+          this.doc
+            .font(this.FONT_SORA_BOLD)
+            .fontSize(8)
+            .fillColor(this.contrastTextColor(s.color))
+            .text(`${Math.round(pct)}%`, lx - 12, ly - 5, {
+              width: 24,
+              align: 'center',
+            });
+        }
+        startAngle = endAngle;
+      });
+
+      // Donut hole.
+      if (innerR > 0) {
+        this.doc.circle(cx, cy, innerR).fill('#FFFFFF');
+        this.doc
+          .font(this.FONT_SORA_BOLD)
+          .fontSize(15)
+          .fillColor(this.COLOR_DEEP_BLUE)
+          .text(String(total), cx - innerR, cy - 13, {
+            width: innerR * 2,
+            align: 'center',
+          });
+        this.doc
+          .font(this.FONT_SORA_REGULAR)
+          .fontSize(7)
+          .fillColor('#58595b')
+          .text('students', cx - innerR, cy + 4, {
+            width: innerR * 2,
+            align: 'center',
+          });
+      }
+    }
+
+    // --- Legend ---
+    if (showLegend) {
+      const legendX = cx + radius + legendGap;
+      const legendW = this.PAGE_WIDTH - margin - legendX;
+      let ly = cy - legendHeight / 2 + 2;
+      slices.forEach((s) => {
+        const pct = total > 0 ? Math.round((s.value / total) * 100) : 0;
+        const dim = (s.value || 0) <= 0;
+        this.doc
+          .roundedRect(legendX, ly, swatch, swatch, 2)
+          .fill(dim ? '#D9D9E0' : s.color);
+        this.doc
+          .font(this.FONT_SEMIBOLD)
+          .fontSize(fontSize)
+          .fillColor(dim ? '#9A9AA5' : colorText)
+          .text(
+            `${s.label}  -  ${s.value} (${pct}%)`,
+            legendX + swatch + 6,
+            ly - 1,
+            { width: legendW - swatch - 6, ellipsis: true },
+          );
+        ly += legendRowH;
+      });
+    }
+
+    // Advance cursor below the figure.
+    this.doc.y = cy + radius + 10;
+    this.doc.x = this.MARGIN_STD;
+  }
+
+  /**
+   * Builds an SVG-style path string for a pie wedge from `start` to `end`
+   * (radians), used by drawPieChart. Uses line + arc-approximating segments so
+   * it renders identically across PDFKit versions.
+   */
+  private arcWedgePath(
+    cx: number,
+    cy: number,
+    r: number,
+    start: number,
+    end: number,
+  ): string {
+    const segs = Math.max(2, Math.ceil(((end - start) / (Math.PI / 2)) * 8));
+    let d = `M ${cx} ${cy} `;
+    for (let i = 0; i <= segs; i++) {
+      const a = start + (end - start) * (i / segs);
+      const px = cx + r * Math.cos(a);
+      const py = cy + r * Math.sin(a);
+      d += `L ${px} ${py} `;
+    }
+    d += 'Z';
+    return d;
+  }
+
+  /**
+   * Picks black or white text for readability against a hex background color
+   * (relative-luminance threshold). Used for on-slice pie labels.
+   */
+  private contrastTextColor(hex: string): string {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+    if (!m) return '#FFFFFF';
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 255;
+    const g = (n >> 8) & 255;
+    const b = n & 255;
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return lum > 0.6 ? '#1B1B27' : '#FFFFFF';
+  }
+
+  /**
    * Renders a centered text line with horizontal lines on either side.
    */
   protected renderCenteredLineText(text: string, options: any = {}) {
@@ -2635,15 +2869,19 @@ export class BaseReport {
       this.doc.page.margins = { top: 0, bottom: 0, left: 0, right: 0 };
       this.doc.y = 0;
 
+      // Use the actual page geometry so footers sit correctly on landscape
+      // pages too (identical to the constants for portrait pages).
+      const pageW = this.doc.page.width;
+      const pageH = this.doc.page.height;
       const footerMargin = 15 * this.MM;
-      const footerY = this.PAGE_HEIGHT - footerMargin;
+      const footerY = pageH - footerMargin;
 
       // Line
       this.doc
         .lineWidth(0.5)
         .strokeColor('black')
         .moveTo(this.MARGIN_STD, footerY)
-        .lineTo(this.PAGE_WIDTH - this.MARGIN_STD, footerY)
+        .lineTo(pageW - this.MARGIN_STD, footerY)
         .stroke();
       const textY = footerY + 2 * this.MM;
 
@@ -2666,7 +2904,7 @@ export class BaseReport {
       this.doc
         .fillColor('black')
         .text(`Page ${i + 1} of ${totalPages}`, this.MARGIN_STD, textY, {
-          width: this.PAGE_WIDTH - 2 * this.MARGIN_STD,
+          width: pageW - 2 * this.MARGIN_STD,
           align: 'right',
           baseline: 'top',
         });

@@ -685,7 +685,7 @@ const MyEmployeesContent: React.FC = () => {
                             ({tabCounts.group !== null ? tabCounts.group : "..."})
                         </span>
                     </button>
-                    {/* Hidden Send Emails tab — revealed after clicking the button */}
+                    {/* Hidden Send Emails tab - revealed after clicking the button */}
                     {showSendEmailsTab && (
                         <button
                             onClick={() => setActiveTab('send-emails')}
@@ -705,7 +705,7 @@ const MyEmployeesContent: React.FC = () => {
                     )}
                 </div>
 
-                {/* Compact "Showing / per page / arrows" — swaps to send-emails pagination when active */}
+                {/* Compact "Showing / per page / arrows" - swaps to send-emails pagination when active */}
                 {activeTab !== 'send-emails' ? (
                     <div className="flex items-center gap-3 py-2 w-full xl:w-auto justify-end">
                         <span className="text-sm text-[#19211C] dark:text-brand-text-secondary hidden sm:inline font-[300]">
@@ -822,7 +822,7 @@ const MyEmployeesContent: React.FC = () => {
                 )}
             </div>
 
-            {/* Search + filters + buttons row — hidden on send-emails tab */}
+            {/* Search + filters + buttons row - hidden on send-emails tab */}
             {activeTab !== 'send-emails' && (
             <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
                 <div className="relative w-full xl:w-96">
@@ -910,7 +910,7 @@ const MyEmployeesContent: React.FC = () => {
                         </button>
                     )}
 
-                    {/* Send Emails button — only on Individual Assessment tab */}
+                    {/* Send Emails button - only on Individual Assessment tab */}
                     {activeTab === 'individual' && (
                         <button
                             onClick={() => { setShowSendEmailsTab(true); setActiveTab('send-emails'); }}
@@ -984,7 +984,7 @@ const MyEmployeesContent: React.FC = () => {
                 )}
             </div>
 
-            {/* Bottom pagination + footer — hidden on send-emails tab */}
+            {/* Bottom pagination + footer - hidden on send-emails tab */}
             {activeTab !== 'send-emails' && (
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs sm:text-sm text-brand-text-light-secondary dark:text-brand-text-secondary pt-6 pb-2">
                 {/* Left: Links */}

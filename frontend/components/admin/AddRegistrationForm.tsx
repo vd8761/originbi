@@ -191,7 +191,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   });
 
   // When an existing group is picked, adopt its program for the "group first"
-  // flow — but only when it's unambiguous (the group maps to exactly one
+  // flow - but only when it's unambiguous (the group maps to exactly one
   // program). Multi-program groups don't auto-pick.
   const handleGroupSelected = (opt: { value: string }) => {
     const full = groupOptions.find((g) => g.value === opt.value);

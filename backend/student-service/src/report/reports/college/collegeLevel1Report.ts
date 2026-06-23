@@ -9,14 +9,6 @@ import * as zlib from 'zlib';
 
 const WATERMARK_BG = 'public/assets/images/Watermark_Background.jpg';
 
-/**
- * Pure-trait threshold. The behavioural assessment has 40 questions; when a
- * single dimension is the most-answered type 20+ times it dominates strongly
- * enough to resolve to a "pure" single-trait profile (e.g. I = Pure Influence)
- * rather than a two-letter blend. Matches calculateDiscProfile().
- */
-const PURE_TRAIT_THRESHOLD = 20;
-
 /** Full-form names for the four behavioural dimensions (no letter codes). */
 const DIMENSION_NAMES: Record<string, string> = {
   D: 'Dominance',
@@ -78,10 +70,10 @@ export class CollegeLevel1Report extends BaseReport {
     this._useStdMargins = false;
     this._currentBackground = null;
 
-    const combo = this.resolveProfileCode(
-      this.data.most_answered_answer_type,
-      this.data,
-    );
+    // Headline profile code from the single source of truth: the exam engine's
+    // resolved code (`dominant_trait_code`), else the same dynamic pure-trait
+    // rule applied to the raw sums - never a hardcoded threshold. Pure-capable.
+    const combo = this.resolveHeadlineTrait(this.data);
     const block = blendedTraits[combo] || blendedTraits.DI;
 
     // ── PAGE 1 ──
@@ -276,8 +268,8 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 1 — HERO CARD
-  // Superhero image IS the card — it fills the entire card as the
+  // PAGE 1 - HERO CARD
+  // Superhero image IS the card - it fills the entire card as the
   // background. A dark gradient overlay on the left side makes
   // the text readable.
   // ============================================================
@@ -305,7 +297,7 @@ export class CollegeLevel1Report extends BaseReport {
     if (heroPath) {
       // The character is fitted to the card height and anchored to the right
       // edge so the full figure stays visible; the image bleeds to the card
-      // edges with no inner frame — the image IS the card.
+      // edges with no inner frame - the image IS the card.
       this.doc.image(heroPath, x, y, {
         fit: [w, h],
         align: 'right',
@@ -350,7 +342,7 @@ export class CollegeLevel1Report extends BaseReport {
 
     let cy = this.doc.y + 8;
 
-    // Top-traits pill — shows the DISC code(s) alongside the full dimension
+    // Top-traits pill - shows the DISC code(s) alongside the full dimension
     // name(s). A pure single-trait profile reads "Top Trait: I (Influence)";
     // a blend reads "Top Two Traits: CD (Conscientiousness & Dominance)".
     const c1 = combo.charAt(0);
@@ -400,7 +392,7 @@ export class CollegeLevel1Report extends BaseReport {
    * each superhero's own artwork. Falls back to the brand deep-blue.
    *
    * Uses a small pure-JS PNG decoder (Node's built-in zlib) so there is no
-   * native dependency — important for portability across Node versions.
+   * native dependency - important for portability across Node versions.
    */
   private getHeroPanelColor(heroPath: string | null): string {
     const FALLBACK = '#0D0055';
@@ -528,7 +520,7 @@ export class CollegeLevel1Report extends BaseReport {
       }
     }
 
-    // Average the left ~half — that is where the text panel sits, so the
+    // Average the left ~half - that is where the text panel sits, so the
     // panel colour blends into the artwork it overlaps.
     const cols = Math.max(1, Math.floor(width * 0.5));
     let r = 0;
@@ -564,7 +556,7 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 1 — DISC SCORE BARS  (new section)
+  // PAGE 1 - DISC SCORE BARS  (new section)
   // ============================================================
   private drawDiscBars(y: number): number {
     const x = this.CONTENT_X;
@@ -597,7 +589,7 @@ export class CollegeLevel1Report extends BaseReport {
     };
 
     // ── 3D bar graph (same "Nature style" chart used in the full report) ──
-    // Scores are already on a 0-100 scale — present directly as a percentage.
+    // Scores are already on a 0-100 scale - present directly as a percentage.
     const chartData = dims.map((key) => ({
       label: '', // category names are drawn manually below (full words)
       value: Math.max(0, Math.min(100, Math.round(scores[key]))),
@@ -644,7 +636,7 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 1 — DEFINING BEHAVIOURS
+  // PAGE 1 - DEFINING BEHAVIOURS
   // ============================================================
   private drawDefiningBehaviours(
     y: number,
@@ -722,8 +714,8 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 2 — SPECIALIZATION FIT
-  // Electives shown in canonical order — NOT sorted by rank.
+  // PAGE 2 - SPECIALIZATION FIT
+  // Electives shown in canonical order - NOT sorted by rank.
   // ============================================================
   private drawSpecializationFit(y: number, spec: SpecEntry): number {
     const x = this.CONTENT_X;
@@ -815,7 +807,7 @@ export class CollegeLevel1Report extends BaseReport {
         });
     });
 
-    // ── Elective fit — canonical order (no sorting) ──
+    // ── Elective fit - canonical order (no sorting) ──
     let cy = bannerY + bannerH + 12;
     this.doc
       .font(this.FONT_SORA_SEMIBOLD)
@@ -840,7 +832,7 @@ export class CollegeLevel1Report extends BaseReport {
     const tagW = 86;
     const barW = w - labelW - 10 - tagW - 10;
 
-    // Iterate in the canonical ELECTIVES order — rank 1 may not be first
+    // Iterate in the canonical ELECTIVES order - rank 1 may not be first
     ELECTIVES.forEach((e) => {
       const weight = (spec as unknown as Record<string, number>)[e.key];
       const strongest = weight === 1;
@@ -907,13 +899,13 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 2 — TOP FUTURE ROLES
+  // PAGE 2 - TOP FUTURE ROLES
   // ============================================================
   private drawFutureRoles(y: number, spec: SpecEntry): number {
     const x = this.CONTENT_X;
     const w = this.CONTENT_W;
     // Show every future role from the specialization mapping (the document
-    // lists ten per profile) — they flow as wrapping chips.
+    // lists ten per profile) - they flow as wrapping chips.
     const roles = spec.roles || [];
 
     this.doc
@@ -960,7 +952,7 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 2 — STRENGTHS & WATCH-OUTS  (new section)
+  // PAGE 2 - STRENGTHS & WATCH-OUTS  (new section)
   // ============================================================
   private drawStrengthsAndWatchOuts(
     y: number,
@@ -1038,7 +1030,7 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 2 — RECOMMENDED NEXT STEPS
+  // PAGE 2 - RECOMMENDED NEXT STEPS
   // ============================================================
   private drawNextSteps(y: number, spec: SpecEntry): number {
     const x = this.CONTENT_X;
@@ -1120,7 +1112,7 @@ export class CollegeLevel1Report extends BaseReport {
   }
 
   // ============================================================
-  // PAGE 2 — DISCLAIMER
+  // PAGE 2 - DISCLAIMER
   // ============================================================
   private drawDisclaimer(y: number): number {
     const x = this.CONTENT_X;
@@ -1151,35 +1143,6 @@ export class CollegeLevel1Report extends BaseReport {
   // ============================================================
   // UTILS
   // ============================================================
-  /**
-   * Resolves the DISC profile code for this student, honouring the pure-trait
-   * rule: when the strongest dimension is the most-answered type
-   * PURE_TRAIT_THRESHOLD (20) or more times, it resolves to a single-letter
-   * "pure" code (e.g. 'I' = Pure Influence) instead of a two-letter blend.
-   * Otherwise it falls back to the top-two traits concatenated.
-   *
-   * Sources values from the same place as getTopTwoTraits (most-answered
-   * counts when present, else the 0-100 scores) and uses the same priority
-   * tie-breaker, so the Level 1 report stays consistent with the rest of the
-   * suite.
-   */
-  private resolveProfileCode(
-    mostAnswered: { ANSWER_TYPE: string; COUNT: number }[],
-    scores: {
-      score_D: number;
-      score_I: number;
-      score_S: number;
-      score_C: number;
-    },
-  ): string {
-    const ranked = this.rankTraits(mostAnswered, scores);
-    const [top, second] = ranked;
-    // Pure-trait override: e.g. D:10 I:25 S:2 C:3 → 'I' (Pure Influence),
-    // because 25 >= 20, rather than the 'ID' blend.
-    if (top.val >= PURE_TRAIT_THRESHOLD) return top.type;
-    return top.type + second.type;
-  }
-
   /**
    * Legacy top-two blend code (no pure-trait override). Used only to pick the
    * hero artwork for pure profiles, which have no dedicated image of their own.

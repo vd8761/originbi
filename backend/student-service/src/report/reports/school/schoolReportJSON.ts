@@ -12,6 +12,7 @@
 
 import { SchoolData } from '../../types/types';
 import { logger } from '../../helpers/logger';
+import { resolveHeadlineFromReportData } from '../../helpers/discTrait';
 import {
   SCHOOL_DYNAMIC_CONTENT,
   SCHOOL_BLENDED_STYLE_MAPPING,
@@ -791,7 +792,11 @@ export async function buildSchoolReportJSON(data: SchoolData) {
 
   // ── 2. Dynamic Content ──
   const content = SCHOOL_DYNAMIC_CONTENT[primaryType as 'D' | 'I' | 'S' | 'C'];
-  const blendedContent = SCHOOL_BLENDED_STYLE_MAPPING[dominantTrait];
+  // Headline archetype is pure-capable (engine's resolved code); blend kept above.
+  const headlineTrait = resolveHeadlineFromReportData(data);
+  const blendedContent =
+    SCHOOL_BLENDED_STYLE_MAPPING[headlineTrait] ||
+    SCHOOL_BLENDED_STYLE_MAPPING[dominantTrait];
 
   // ── 3. Career Alignment Interpretation ──
   let careerAlignmentInterpretation: string;

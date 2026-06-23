@@ -51,7 +51,7 @@ const RequireAffiliate: React.FC<RequireAffiliateProps> = ({ children }) => {
                 const user = JSON.parse(storedUser);
                 if (!user.id || user.id === 'aff_001') {
                     // If still using mock ID, force re-login
-                    throw new Error('Invalid affiliate ID — re-login required');
+                    throw new Error('Invalid affiliate ID - re-login required');
                 }
 
                 setChecking(false);

@@ -121,7 +121,7 @@ export default function IatModuleBriefingScreen({
 
           <ul className="mt-4 space-y-1.5 text-sm leading-6 text-black/70 dark:text-white/65">
             <li>Items appear one at a time.</li>
-            <li>If you make a mistake, a red indicator appears — press the other key to continue.</li>
+            <li>If you make a mistake, a red indicator appears - press the other key to continue.</li>
             <li>Go as fast as you can while staying accurate.</li>
           </ul>
 

@@ -5,7 +5,7 @@
 -- 2. Add report password settings (toggle + admin password)
 -- 3. Update existing local override configs to support
 --    bcc_addresses and reply_to_address fields (done via
---    the JSON schema — no column changes needed since they
+--    the JSON schema - no column changes needed since they
 --    are stored inside value_json).
 -- ============================================================
 

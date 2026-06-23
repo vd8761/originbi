@@ -63,7 +63,7 @@ export class UserEnrichmentService {
       this.logger.warn(
         `No DB user found for cognito_sub=${cognitoSub}, email=${email}`,
       );
-      // Return a minimal context — the user exists in Cognito but not in our DB yet
+      // Return a minimal context - the user exists in Cognito but not in our DB yet
       return {
         id: 0,
         email,
@@ -215,7 +215,7 @@ export class UserEnrichmentService {
       return userContext;
     }
 
-    // No valid userId — return restricted context
+    // No valid userId - return restricted context
     return {
       id: 0,
       email: rawUser.email || '',
