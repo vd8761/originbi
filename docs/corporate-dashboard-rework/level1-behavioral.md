@@ -1,4 +1,4 @@
-# Level 1 — Behavioural (DISC)
+# Level 1 - Behavioural (DISC)
 
 The Know More page today is a single trait-count list. Level 1 is the most structured of the three levels: every answer maps to a `disc_factor` (D/I/S/C) on `assessment_question_options`, and every attempt has DISC totals, a dominant trait, sincerity scoring, and per-question behavioural telemetry. We can pivot the cohort across all of that.
 
@@ -15,7 +15,7 @@ The Know More page today is a single trait-count list. Level 1 is the most struc
 - `time_spent_seconds` per question
 - `answer_change_count` (indecision)
 - `is_attention_fail`, `is_distraction_chosen`, `sincerity_flag` (1 = fail, 2 = sincere, 0 = unset)
-- `question_options_order` (shown order — useful to detect position bias)
+- `question_options_order` (shown order - useful to detect position bias)
 - `main_option_id` chosen → option's `disc_factor` + `score_value`
 - `assessment_questions.category` (D/I/S/C category at the question level)
 
@@ -27,9 +27,9 @@ The Know More page today is a single trait-count list. Level 1 is the most struc
 ## What we can show on the Know More page
 
 ### 1. DISC distribution (replace the current donut)
-- **Cohort DISC profile** — stacked or radial bar of average `D / I / S / C` factor scores across all completed applicants. Lets the corporate see *what the pool looks like* in raw DISC, not just the labelled trait.
-- **DISC quadrant scatter** — each applicant as a dot on a D↔S × I↔C plane (Task vs People × Fast vs Cautious). Cluster centroids per job role.
-- **Blend distribution** — bar chart of 2-letter codes (`DI`, `DC`, `SI`, `SC`, …) sorted by count, not just the 4 pure types.
+- **Cohort DISC profile** - stacked or radial bar of average `D / I / S / C` factor scores across all completed applicants. Lets the corporate see *what the pool looks like* in raw DISC, not just the labelled trait.
+- **DISC quadrant scatter** - each applicant as a dot on a D↔S × I↔C plane (Task vs People × Fast vs Cautious). Cluster centroids per job role.
+- **Blend distribution** - bar chart of 2-letter codes (`DI`, `DC`, `SI`, `SC`, …) sorted by count, not just the 4 pure types.
 
 ### 2. Trait → role fit
 - For each trait, the count we show today, **but also**:
@@ -45,16 +45,16 @@ The Know More page today is a single trait-count list. Level 1 is the most struc
 - Avg attention fails per attempt, avg distraction picks per attempt
 
 ### 4. Per-question behavioural slices
-- **Indecision heatmap** — questions with the highest avg `answer_change_count` (which prompts make this cohort flip-flop?)
-- **Speed outliers** — questions answered in < 3 s on average (rushed) vs > 60 s (deliberation)
-- **Attention-fail leaderboard** — questions where this cohort fails attention checks most
-- **Position bias** — for questions where shuffle (`question_options_order`) varies, does the cohort still pick position-1 disproportionately?
+- **Indecision heatmap** - questions with the highest avg `answer_change_count` (which prompts make this cohort flip-flop?)
+- **Speed outliers** - questions answered in < 3 s on average (rushed) vs > 60 s (deliberation)
+- **Attention-fail leaderboard** - questions where this cohort fails attention checks most
+- **Position bias** - for questions where shuffle (`question_options_order`) varies, does the cohort still pick position-1 disproportionately?
 
 ### 5. Cohort comparisons (filters on the same page)
 - By job / job role (`corporate_jobs` → registration)
 - By gender (`registrations.gender`)
-- By date range (already in the dashboard widget — reuse)
-- By group (`groups` — useful when multiple intake batches)
+- By date range (already in the dashboard widget - reuse)
+- By group (`groups` - useful when multiple intake batches)
 - By DISC trait (click a trait → page filters to that subset)
 
 ### 6. Funnel / completion strip
@@ -104,4 +104,4 @@ The Know More page today is a single trait-count list. Level 1 is the most struc
 [Funnel: Registered → Started → Completed]
 ```
 
-Every chart should be click-through to a filtered candidate list — the current page is a dead end.
+Every chart should be click-through to a filtered candidate list - the current page is a dead end.

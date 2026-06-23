@@ -14,7 +14,7 @@ interface SemanticSearchOptions {
 }
 
 /**
- * Production-Grade Embeddings Service — Google Gemini
+ * Production-Grade Embeddings Service - Google Gemini
  * Model: gemini-embedding-001 (1536 dimensions)
  * Features:
  *   - Task-aware embeddings (RETRIEVAL_DOCUMENT vs RETRIEVAL_QUERY)
@@ -47,7 +47,7 @@ export class EmbeddingsService implements OnModuleInit {
   private readonly EMBEDDING_DIM = 1536;  // Safe dimension that works with both IVFFlat and HNSW
   private readonly GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 
-  // Cohere Reranker — re-scores vector search results for higher precision
+  // Cohere Reranker - re-scores vector search results for higher precision
   private cohereClient: CohereClient | null = null;
   private cohereAvailable = false;
   private readonly COHERE_RERANK_MODEL = 'rerank-v3.5'; // multilingual, best precision
@@ -65,7 +65,7 @@ export class EmbeddingsService implements OnModuleInit {
   private requestTimestamps: number[] = [];
   private RATE_LIMIT_RPM = 120;
 
-  // Quota exhaustion tracking — temporarily disable when quota is hit
+  // Quota exhaustion tracking - temporarily disable when quota is hit
   private quotaExhaustedUntil: number = 0;
   private QUOTA_COOLDOWN = 30 * 1000;
   private readonly BASE_QUOTA_COOLDOWN = 30 * 1000;
@@ -87,7 +87,7 @@ export class EmbeddingsService implements OnModuleInit {
       this.embeddingsAvailable = true;
     } else {
       this.logger.error(
-        '❌ No GOOGLE_API_KEY/GEMINI_API_KEY set — embeddings disabled. Add it to .env.local or .env',
+        '❌ No GOOGLE_API_KEY/GEMINI_API_KEY set - embeddings disabled. Add it to .env.local or .env',
       );
       this.embeddingsAvailable = false;
     }
@@ -104,9 +104,9 @@ export class EmbeddingsService implements OnModuleInit {
     if (cohereKey) {
       this.cohereClient = new CohereClient({ token: cohereKey });
       this.cohereAvailable = true;
-      this.logger.log('✅ Cohere Reranker initialized — search precision upgraded!');
+      this.logger.log('✅ Cohere Reranker initialized - search precision upgraded!');
     } else {
-      this.logger.warn('⚠️ No COHERE_API_KEY — reranking disabled, using plain vector similarity');
+      this.logger.warn('⚠️ No COHERE_API_KEY - reranking disabled, using plain vector similarity');
     }
 
     await this.checkPgvector();
@@ -302,10 +302,10 @@ export class EmbeddingsService implements OnModuleInit {
     if (now - lastLogAt >= this.COOLDOWN_LOG_INTERVAL_MS) {
       if (mode === 'single') {
         this.lastSingleCooldownLogAt = now;
-        this.logger.debug(`⏸️ Embedding skipped — API quota cooling down (${remainingSec}s remaining)`);
+        this.logger.debug(`⏸️ Embedding skipped - API quota cooling down (${remainingSec}s remaining)`);
       } else {
         this.lastBatchCooldownLogAt = now;
-        this.logger.debug(`⏸️ Batch embeddings skipped — API quota cooling down (${remainingSec}s remaining)`);
+        this.logger.debug(`⏸️ Batch embeddings skipped - API quota cooling down (${remainingSec}s remaining)`);
       }
     }
 
@@ -328,13 +328,13 @@ export class EmbeddingsService implements OnModuleInit {
     this.quotaExhaustedUntil = now + scaledCooldown;
     const cooldownSec = Math.ceil(scaledCooldown / 1000);
     this.logger.warn(
-      `🚫 ${source === 'batch' ? 'Batch ' : ''}API quota exhausted — cooldown ${cooldownSec}s (hit #${this.consecutiveQuotaHits})`,
+      `🚫 ${source === 'batch' ? 'Batch ' : ''}API quota exhausted - cooldown ${cooldownSec}s (hit #${this.consecutiveQuotaHits})`,
     );
   }
 
   private markQuotaRecovered(): void {
     if (this.consecutiveQuotaHits > 0) {
-      this.logger.log('✅ Embeddings quota recovered — resuming normal throughput');
+      this.logger.log('✅ Embeddings quota recovered - resuming normal throughput');
     }
     this.consecutiveQuotaHits = 0;
   }
@@ -687,7 +687,7 @@ export class EmbeddingsService implements OnModuleInit {
    *
    * WHY: Vector similarity is computed without knowing the query.
    * The reranker compares query vs. every document TOGETHER, giving
-   * a much more accurate relevance score — like a second opinion
+   * a much more accurate relevance score - like a second opinion
    * from a smarter judge after the fast first-pass.
    */
   private async rerankWithCohere<T extends { content: string }>({
@@ -719,7 +719,7 @@ export class EmbeddingsService implements OnModuleInit {
       );
       return reranked;
     } catch (err) {
-      // Never crash the main pipeline — fallback to plain vector order
+      // Never crash the main pipeline - fallback to plain vector order
       this.logger.warn(`⚠️ Cohere rerank failed (using vector order): ${err?.message || err}`);
       return documents.slice(0, topN);
     }

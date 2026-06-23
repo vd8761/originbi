@@ -107,7 +107,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
             setGenerating(true);
             setProgress('Initializing...');
 
-            // 1. Start Job — always send reportType so the backend knows which
+            // 1. Start Job - always send reportType so the backend knows which
             // report variant to generate (standard, mba, or level1).
             const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true&reportType=${reportType}`));
             const startData = await startRes.json();
@@ -176,7 +176,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
         try {
             setSendingReportEmail(true);
 
-            // 1. Start Generation — always send reportType.
+            // 1. Start Generation - always send reportType.
             const startRes = await fetch(buildReportApiUrl(`/generate/placement/${groupData.group.id}/${selectedDepartment}?json=true&reportType=${reportType}`));
             const startData = await startRes.json();
 
@@ -693,7 +693,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                 <div className="w-full sm:w-1/3 sm:block hidden order-3"></div>
             </div>
 
-            {/* Download Modal — group placement report */}
+            {/* Download Modal - group placement report */}
             {showDownloadModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowDownloadModal(false)}></div>
@@ -736,7 +736,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                 ) : (
                                     <div className="space-y-2.5">
                                         {departmentStats.map((dept) => {
-                                            // MBA departments get a special placement report — mirror the
+                                            // MBA departments get a special placement report - mirror the
                                             // backend isMBA detection in reportQueueService.processPlacementReport.
                                             const isMBA = (dept.name || '').toUpperCase().includes('MBA');
                                             const isSelected = selectedDepartment === dept.id;
@@ -803,7 +803,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                 )}
                             </div>
 
-                            {/* Report Type Chooser — always available. The
+                            {/* Report Type Chooser - always available. The
                                 "Special MBA Report" tile only shows for MBA
                                 departments; the Standard and Level 1 reports
                                 are available for every department. */}

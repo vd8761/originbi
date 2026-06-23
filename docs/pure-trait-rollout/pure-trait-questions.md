@@ -1,8 +1,8 @@
-# Pure Trait Rollout — Findings & Open Questions
+# Pure Trait Rollout - Findings & Open Questions
 
 > Goal (as I understand it): the system today recognises **12 two-letter DISC
 > blends** (DI, DS, DC, ID, IS, IC, SD, SI, SC, CD, CI, CS). We want to add the
-> **4 "Pure Traits"** — D, I, S, C on their own — for a total of **16**, derived
+> **4 "Pure Traits"** - D, I, S, C on their own - for a total of **16**, derived
 > from the DISC score using the same logic that already lives in the
 > **Level 1 Placement Report**. This must be additive: existing 12-blend
 > behaviour stays intact; pure traits are a new branch that fires only when the
@@ -35,7 +35,7 @@ that is already 16-aware.
 
 ## 2. There are THREE independent trait-computation paths today
 
-This is the crux of the rollout — the override currently lives in only one of
+This is the crux of the rollout - the override currently lives in only one of
 them.
 
 | # | Path | Where | Output today | Pure-aware? |
@@ -50,20 +50,20 @@ RAG/text-to-sql layer read. The student PDF reports mostly use path B. They do
 
 ---
 
-## 3. Inventory — every place the "12" assumption is baked in
+## 3. Inventory - every place the "12" assumption is baked in
 
 | Surface | File(s) | State | What pure traits would need |
 |---|---|---|---|
 | DISC → dominant trait calc | `exam_service.go` L523-541 | 12 only | add the override before the `personality_traits` lookup |
 | Report top-two calc | `BaseReport.ts` `getTopTwoTraits` | 12 only | optional override branch |
-| **DB `personality_traits`** | seeded **somewhere I can't find** (see Q6) — only *referenced* by `database/scripts/seed_corp_demo_20_users.sql`; not in `database/migrations/` | 12 rows (DI…CS) | **4 new rows** D/I/S/C: `code`, `blended_style_name`, `blended_style_desc`, `color_rgb`, `metadata{key_strengths, role_alignment, key_behaviors}` |
+| **DB `personality_traits`** | seeded **somewhere I can't find** (see Q6) - only *referenced* by `database/scripts/seed_corp_demo_20_users.sql`; not in `database/migrations/` | 12 rows (DI…CS) | **4 new rows** D/I/S/C: `code`, `blended_style_name`, `blended_style_desc`, `color_rgb`, `metadata{key_strengths, role_alignment, key_behaviors}` |
 | Character images (student) | `frontend/public/student_traits/*.png` + `backend/student-service/public/assets/images/student_traits/*.png` | 12 each | 4 new PNGs each |
 | Character images (corporate) | `frontend/public/traits/Corporate_*.png` | 12 | 4 new PNGs |
 | Employee report content | `reports/employee/employeeConstants.ts` `BLENDED_STYLE_MAPPING` | 12 keys | 4 keys D/I/S/C (full narrative blocks) |
 | CXO report content | `reports/cxo/cxoConstants.ts` `BLENDED_STYLE_MAPPING` | 12 keys | 4 keys |
 | School report content | `reports/school/schoolConstants.ts` `BLENDED_STYLE_MAPPING`, `IDENTITY_MAP`, `CAREER_DOMAIN_MAP`, `DUAL_ARCHETYPE` | 12 keys each (these fall back to `'DC'`) | 4 keys each. NOTE: `DISC_AGILE_CAREER_PACE` is already keyed by single trait |
-| College report content | `reports/college/collegeConstants.ts` `CONTENT` | **already keyed by single trait D/I/S/C** (uses primary only) | likely fine as-is — confirm |
-| MBA short / MBA placement | `reports/college/mbaConstants.ts` | `DISC_ALIGNMENT` keyed by single trait ✅; `BEHAVIORAL_ORIENTATION` has **both** 12 blends **and** 4 single-letter fallbacks ✅ | likely fine — confirm |
+| College report content | `reports/college/collegeConstants.ts` `CONTENT` | **already keyed by single trait D/I/S/C** (uses primary only) | likely fine as-is - confirm |
+| MBA short / MBA placement | `reports/college/mbaConstants.ts` | `DISC_ALIGNMENT` keyed by single trait ✅; `BEHAVIORAL_ORIENTATION` has **both** 12 blends **and** 4 single-letter fallbacks ✅ | likely fine - confirm |
 | Placement archetype list | `reports/placement/placementConstants.ts` | 12 archetype names | depends on scope |
 | Corporate dashboard buckets | `corporate-dashboard.service.ts` `bucketFor()` | uses **first letter** of code | already works for single letters ✅ |
 | Corporate dashboard trait cards | same file | generic over `personality_traits` rows | works **iff** the 4 DB rows + images exist ✅ |
@@ -71,7 +71,7 @@ RAG/text-to-sql layer read. The student PDF reports mostly use path B. They do
 | JD matching | `corporate-service/src/jd-matching/jd-matching.service.ts` | map keyed by archetype **name** | add 4 pure archetypes if in scope |
 | Frontend hardcoded archetypes | `components/corporate/candidates/CandidatesList.tsx`, `jobs/JobDetails.tsx` | enumerate archetype names/colors | add 4 if those lists must be exhaustive |
 
-**Good news:** the corporate dashboard + its frontend are already generic — they
+**Good news:** the corporate dashboard + its frontend are already generic - they
 will display pure traits automatically *once the 4 `personality_traits` rows and
 their images exist*. The real work is (a) where we apply the override, (b) the
 DB rows, (c) the images, and (d) narrative content for employee/cxo/school.
@@ -86,12 +86,12 @@ The override can go in path A (exam engine), path B (report layer), or both.
 
 - **Q1.** Do you want the override applied at the **exam engine** so
   `dominant_trait_id` itself can point to a pure-trait row? That makes the
-  **dashboard, JD-matching, RAG and every report** consistent in one place — but
+  **dashboard, JD-matching, RAG and every report** consistent in one place - but
   it **changes the stored dominant trait** for anyone whose top factor is
   dominant enough (e.g. someone who is "DC" today could become "D"). That is a
   real output change, which brushes against your "must not affect current
   workflow" rule. My recommendation: **yes, do it here** (single source of
-  truth) and accept that newly-completed attempts may resolve to a pure trait —
+  truth) and accept that newly-completed attempts may resolve to a pure trait -
   but I want your explicit OK because it is the one change that alters existing
   semantics.
 
@@ -120,8 +120,8 @@ scales differ between paths:
   (`most_answered_answer_type`), a different scale where "20" may be meaningless.
 
 - **Q4.** Should the pure-trait test use the **raw DISC score sum**
-  (`metadata.disc_scores`, the same input as the placement report) everywhere —
-  so the threshold stays comparable — or do you want it computed off answer
+  (`metadata.disc_scores`, the same input as the placement report) everywhere -
+  so the threshold stays comparable - or do you want it computed off answer
   counts in the report layer? My recommendation: **always use raw
   `disc_scores`** so the rule is identical to the placement report you built.
 
@@ -133,7 +133,7 @@ scales differ between paths:
 ### D. The DB rows + content + assets for the 4 pure traits
 
 - **Q6.** **Where are the 12 `personality_traits` rows defined/seeded?** I can't
-  find an INSERT in `database/migrations/` — only a *reference* in the demo seed.
+  find an INSERT in `database/migrations/` - only a *reference* in the demo seed.
   Were they inserted manually in the DB / via an ad-hoc script? I need to know so
   I can add the 4 pure rows the same way (and write a migration if appropriate).
 
@@ -174,11 +174,11 @@ scales differ between paths:
 
 ## 5. What I will NOT change without your sign-off
 
-- The exam-engine `dominant_trait_id` formula (Q1) — it ripples everywhere.
+- The exam-engine `dominant_trait_id` formula (Q1) - it ripples everywhere.
 - Any backfill of historical attempts (Q3).
 - The `>= 20` threshold value / rule shape (Q5).
 - Deleting or renaming any existing 12-blend row, image, or map key.
 
-Everything I'd add is intended to be **purely additive** — a new branch + new
-keys/rows/assets — so the existing 12-blend flows keep producing exactly what
+Everything I'd add is intended to be **purely additive** - a new branch + new
+keys/rows/assets - so the existing 12-blend flows keep producing exactly what
 they produce today.

@@ -260,7 +260,6 @@ export interface PieChartOptions {
   radius?: number; // Outer radius (default 70)
   innerRadiusRatio?: number; // 0 = full pie, >0 = donut hole as a fraction of radius
   fontSize?: number;
-  font?: string;
   colorText?: string;
   /** Draw a legend (label + count + %) to the right of the pie. Default true. */
   showLegend?: boolean;
@@ -413,7 +412,7 @@ export class BaseReport {
 
   /**
    * Resolves the HEADLINE trait code (pure-capable: may return a single letter).
-   * Single source of truth is the exam engine — prefer the resolved code stored
+   * Single source of truth is the exam engine - prefer the resolved code stored
    * on the data (`dominant_trait_code`); only fall back to recomputing from raw
    * DISC scores when that is absent (e.g. an attempt predating the engine change).
    * Use `discTrait.careerLookupCode` for the trait_id-keyed career/compat lookups.
@@ -2367,7 +2366,6 @@ export class BaseReport {
     // --- 1. Configuration & Defaults ---
     const {
       x = this.PAGE_WIDTH / 2, // Default to center of page
-      y = this.doc.y + 100, // Default to current Y + padding
       radius = 100, // Requested radius
       maxValue = 10,
       levels = 6,
@@ -2409,6 +2407,17 @@ export class BaseReport {
     // Use the smaller of the requested radius or the safe limit
     const finalRadius = Math.min(radius, safeRadius);
     const labelRadius = finalRadius + 4 * this.MM; // Text sits slightly outside
+
+    // Anchor the vertical centre AFTER the space check + radius calc. A
+    // caller-supplied `y` is honoured only while it keeps the whole chart on
+    // the current page; otherwise (e.g. the ensureSpace above just reset the
+    // cursor to a new page) it is re-anchored below the cursor so the axis
+    // labels never spill onto blank pages.
+    const radarBottomLimit = this.PAGE_HEIGHT - margin;
+    let y = options.y ?? this.doc.y + 100;
+    if (y < this.doc.y || y + labelRadius + fontSize > radarBottomLimit) {
+      y = this.doc.y + finalRadius + 26;
+    }
 
     // --- 3. Draw Grid (Concentric Polygons) ---
     this.doc.lineWidth(0.5).strokeColor(colorGrid);
@@ -2626,7 +2635,6 @@ export class BaseReport {
       radius = 70,
       innerRadiusRatio = 0.55,
       fontSize = 9,
-      font = this.FONT_SORA_REGULAR,
       colorText = '#1B1B27',
       showLegend = true,
       minLabelPct = 5,
@@ -2651,7 +2659,7 @@ export class BaseReport {
       let maxText = 0;
       slices.forEach((s) => {
         const pct = total > 0 ? Math.round((s.value / total) * 100) : 0;
-        const w = this.doc.widthOfString(`${s.label}  —  ${s.value} (${pct}%)`);
+        const w = this.doc.widthOfString(`${s.label}  -  ${s.value} (${pct}%)`);
         if (w > maxText) maxText = w;
       });
       legendBlockW = legendGap + swatch + 6 + maxText;
@@ -2665,8 +2673,12 @@ export class BaseReport {
     const innerR = Math.max(0, radius * innerRadiusRatio);
 
     if (total <= 0) {
-      // Nothing to chart — draw an empty ring so the layout stays stable.
-      this.doc.lineWidth(1).strokeColor('#E6E6EF').circle(cx, cy, radius).stroke();
+      // Nothing to chart - draw an empty ring so the layout stays stable.
+      this.doc
+        .lineWidth(1)
+        .strokeColor('#E6E6EF')
+        .circle(cx, cy, radius)
+        .stroke();
     } else {
       let startAngle = -Math.PI / 2; // 12 o'clock
       slices.forEach((s) => {
@@ -2738,7 +2750,7 @@ export class BaseReport {
           .fontSize(fontSize)
           .fillColor(dim ? '#9A9AA5' : colorText)
           .text(
-            `${s.label}  —  ${s.value} (${pct}%)`,
+            `${s.label}  -  ${s.value} (${pct}%)`,
             legendX + swatch + 6,
             ly - 1,
             { width: legendW - swatch - 6, ellipsis: true },

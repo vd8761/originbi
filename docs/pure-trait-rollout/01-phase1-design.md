@@ -1,4 +1,4 @@
-# Phase 1 — Design (BEFORE) · Make `dominant_trait_id` pure-capable
+# Phase 1 - Design (BEFORE) · Make `dominant_trait_id` pure-capable
 
 Covers **Job 2** (DB rows) + **Job 1** (engine resolver). They ship together
 because the engine's `personality_traits.code` lookup needs the 4 rows to exist.
@@ -11,7 +11,7 @@ because the engine's `personality_traits.code` lookup needs the 4 rows to exist.
 ## Objective
 
 When a single DISC factor is dominant enough, the engine writes a **pure**
-`dominant_trait_id` (`D`/`I`/`S`/`C`) instead of always a 2-letter blend — at the
+`dominant_trait_id` (`D`/`I`/`S`/`C`) instead of always a 2-letter blend - at the
 source, so every downstream reader (dashboard, reports, RAG) inherits it (Q1).
 Blends are otherwise unchanged.
 
@@ -33,9 +33,9 @@ Real-data sanity check (recent attempts): `D22/total52`→`DI` (unchanged),
 
 ---
 
-## Job 2 — DB rows (4 pure traits in two tables)
+## Job 2 - DB rows (4 pure traits in two tables)
 
-New migration **`database/migrations/032_pure_traits.sql`** — additive,
+New migration **`database/migrations/032_pure_traits.sql`** - additive,
 idempotent, reversible. (The original 12 were inserted out-of-band; this gives
 the pure rows proper traceability.)
 
@@ -48,7 +48,7 @@ the pure rows proper traceability.)
 | S | Pure Steadiness | 0,173,76 |
 | C | Pure Conscientiousness | 74,198,234 |
 
-- `metadata = '{}'` (consistent — all 12 existing rows have empty metadata).
+- `metadata = '{}'` (consistent - all 12 existing rows have empty metadata).
 - `is_active=true, is_deleted=false`.
 - Insert guarded by `ON CONFLICT (code) DO NOTHING` (code is unique).
 - Names/colours are **placeholders** taken from the specialization report's
@@ -73,7 +73,7 @@ nothing references them yet).
 
 ---
 
-## Job 1 — Engine resolver
+## Job 1 - Engine resolver
 
 **File:** `backend/exam-engine/internal/service/exam_service.go`, the Level-1
 DISC block (~L523-541). Today:
@@ -109,7 +109,7 @@ Notes:
 - Missing factor = absent from the SQL group → treated as 0 (matches today).
 - The existing `personality_traits` lookup is unchanged; with Job 2's rows a pure
   `dominantFactor` now resolves. If a row were somehow missing, `traitID` stays
-  nil and `dominant_trait_id` simply isn't updated (graceful, no crash) — same as
+  nil and `dominant_trait_id` simply isn't updated (graceful, no crash) - same as
   today's behaviour for an unmatched code.
 
 Report layer (Q2): no recompute. A tiny shared TS mirror of this rule will be

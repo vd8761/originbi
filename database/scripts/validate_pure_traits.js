@@ -1,10 +1,10 @@
 /**
- * Phase 1 validation — Pure Traits.
+ * Phase 1 validation - Pure Traits.
  * --------------------------------------------------------------------------
  * 1. Applies migration 032_pure_traits.sql (idempotent).
  * 2. Asserts the 4 pure rows exist in personality_traits AND aci_traits.
  * 3. Runs a JS mirror of the Go resolver (disc_trait.go) against the SAME
- *    canonical cases the Go unit test uses — guarantees cross-language parity.
+ *    canonical cases the Go unit test uses - guarantees cross-language parity.
  * 4. Replays the rule over every COMPLETED Level-1 attempt and reports how many
  *    now resolve to a Pure Trait (informational).
  *
@@ -91,7 +91,7 @@ const ok = (cond, msg) => {
 
   console.log('2. DB row assertions');
   // Forbidden: DISC-letter references like "(D)" or the old "Pure Dominance"
-  // placeholders. (We never ban a lone "I" — it is also the English pronoun.)
+  // placeholders. (We never ban a lone "I" - it is also the English pronoun.)
   const BANNED = [/\((?:D|I|S|C)\)/, /\bPure (?:Dominance|Influence|Steadiness|Conscientiousness)\b/, /\bD\/I\/S\/C\b/];
   const scan = (label, text) => {
     const t = text || '';

@@ -1,7 +1,7 @@
 "use client";
 
 // ============================================================
-// Level 3 "Metaphor" — pluggable speech-to-text hook (connector).
+// Level 3 "Metaphor" - pluggable speech-to-text hook (connector).
 // Headless: returns recognition state + controls; the exam page UI
 // (designed separately) binds to it. Provider is admin-configurable.
 //

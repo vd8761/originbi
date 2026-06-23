@@ -1,6 +1,6 @@
-# Level 4 — Metaphor (Image-prompt, voice answers)
+# Level 4 - Metaphor (Image-prompt, voice answers)
 
-Level 4 is the most free-form: candidates speak about an image, audio is transcribed, optionally translated, and an LLM writes a markdown report (`metaphor_reports.markdown`). The narrative is per-person and not directly aggregable — but **the inputs around it** (which image, language used, length, sentiment, time spent, transcription quality, audio metadata) are. The Know More page can show the corporate the *signal* across the answer pool even when the prose itself can only be read one report at a time.
+Level 4 is the most free-form: candidates speak about an image, audio is transcribed, optionally translated, and an LLM writes a markdown report (`metaphor_reports.markdown`). The narrative is per-person and not directly aggregable - but **the inputs around it** (which image, language used, length, sentiment, time spent, transcription quality, audio metadata) are. The Know More page can show the corporate the *signal* across the answer pool even when the prose itself can only be read one report at a time.
 
 ## Raw data available
 
@@ -11,16 +11,16 @@ Level 4 is the most free-form: candidates speak about an image, audio is transcr
 - `answer_text_web` (browser SpeechRecognition fallback)
 - `answer_text_en` (translated to English)
 - `translation_status`, `transcription_status`, `transcription_source` (`web` / `gemini`), `transcription_retry_count`, `transcription_error`
-- `audio_storage_key` — raw audio is on disk; size/duration retrievable
+- `audio_storage_key` - raw audio is on disk; size/duration retrievable
 - `status`, `created_at`, `updated_at`
-- Time spent is in the parallel `assessment_answers` row (linked via session/attempt) — `time_spent_seconds`, `answer_change_count` (= re-record count)
+- Time spent is in the parallel `assessment_answers` row (linked via session/attempt) - `time_spent_seconds`, `answer_change_count` (= re-record count)
 
 **`metaphor_questions`**
 - The prompt itself: `image_url`, `image_description_en`, `context_text_en`, `question_text_en`
 
 **`metaphor_reports`**
 - `markdown` (LLM narrative)
-- `model` (which LLM produced it — gemini, claude, gpt — useful for QA)
+- `model` (which LLM produced it - gemini, claude, gpt - useful for QA)
 - `generated_at`
 
 ---
@@ -58,14 +58,14 @@ For each metaphor question (image):
 - Click → list of answers from this cohort for that image
 
 ### 6. Text-derived cohort signals (computable without the LLM)
-The raw `answer_text_en` enables a lot of lightweight NLP — none of it requires re-calling the report-writing model:
-- **Word cloud / top-N keywords** per image (after stop-word removal) — what concepts this pool reaches for
+The raw `answer_text_en` enables a lot of lightweight NLP - none of it requires re-calling the report-writing model:
+- **Word cloud / top-N keywords** per image (after stop-word removal) - what concepts this pool reaches for
 - **Top bigrams / noun phrases** per image
-- **Sentiment polarity** (off-the-shelf model) — % positive / neutral / negative answers per image
+- **Sentiment polarity** (off-the-shelf model) - % positive / neutral / negative answers per image
 - **Reading-ease score** (Flesch) per answer → cohort distribution
 - **Emotion classification** (joy / fear / anger / sadness / surprise) per answer if we want a richer axis
-- **Theme clustering** — embed `answer_text_en`, cluster, label top 5 themes per image
-- **Lexical diversity** (type/token ratio) — proxy for richness of response
+- **Theme clustering** - embed `answer_text_en`, cluster, label top 5 themes per image
+- **Lexical diversity** (type/token ratio) - proxy for richness of response
 
 ### 7. Cross-cut filters
 - By image (which prompt)
@@ -121,7 +121,7 @@ Solution: store a structured JSON sidecar at generation time (themes, sentiment,
 
 [Language mix donut]   [Transcription quality bar]   [Data-quality flags]
 
-[Per-image grid — card per metaphor question]
+[Per-image grid - card per metaphor question]
   thumbnail | prompt | N | avg words | avg time | top themes | sentiment bar
 
 [Theme cluster cloud] [Sentiment per image] [Word-cloud per image (tab)]

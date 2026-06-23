@@ -2,7 +2,7 @@
  * Validates the TypeScript DISC resolver
  * (backend/student-service/src/report/helpers/discTrait.ts) by transpiling the
  * REAL source and running the same canonical cases as the Go unit test
- * (disc_trait_test.go) — guaranteeing Go ⇄ TS parity.
+ * (disc_trait_test.go) - guaranteeing Go ⇄ TS parity.
  *
  * Why not jest? student-service pins jest@30 + ts-jest@29, which are
  * incompatible (jest rejects the ts-jest transformer), so `.spec.ts` files
@@ -70,13 +70,13 @@ const ok = (cond, msg) => {
   if (!cond) failures++;
 };
 
-console.log('resolveDominantFactor — 17 parity cases (mirror of disc_trait_test.go)');
+console.log('resolveDominantFactor - 17 parity cases (mirror of disc_trait_test.go)');
 for (const [name, scores, want] of CASES) {
   const got = resolveDominantFactor(scores);
   ok(got === want, `${name} -> ${JSON.stringify(got)} (want ${JSON.stringify(want)})`);
 }
 
-console.log('\ntopTwoBlend — always the 2-letter blend (career/compat lookups)');
+console.log('\ntopTwoBlend - always the 2-letter blend (career/compat lookups)');
 const BLEND = [
   ['pure-C profile still blends to CI', { D: 1, I: 12, S: 7, C: 20 }, 'CI'],
   ['pure-D profile still blends to DI', { D: 20, I: 10, S: 5, C: 5 }, 'DI'],
@@ -89,13 +89,13 @@ for (const [name, scores, want] of BLEND) {
   ok(topTwoBlend(scores) === want, `${name} -> ${JSON.stringify(topTwoBlend(scores))} (want ${JSON.stringify(want)})`);
 }
 
-console.log('\ncareerLookupCode — pure students borrow their top-two blend (flag off)');
+console.log('\ncareerLookupCode - pure students borrow their top-two blend (flag off)');
 ok(PURE_CAREER_ROWS_AVAILABLE === false, 'PURE_CAREER_ROWS_AVAILABLE is false (fallback active)');
 ok(careerLookupCode('C', { D: 1, I: 12, S: 7, C: 20 }) === 'CI', "careerLookupCode('C', ...) -> 'CI' (pure borrows top-two)");
 ok(careerLookupCode('D', { D: 20, I: 10, S: 5, C: 5 }) === 'DI', "careerLookupCode('D', ...) -> 'DI'");
 ok(careerLookupCode('DI', { D: 22, I: 16, S: 6, C: 8 }) === 'DI', "careerLookupCode('DI', ...) -> 'DI' (blend unchanged)");
 
-console.log('\nresolveHeadlineFromReportData — engine code wins, then raw sums, then scores');
+console.log('\nresolveHeadlineFromReportData - engine code wins, then raw sums, then scores');
 // 1. stored engine code is authoritative (even a pure code, even if scores disagree)
 ok(
   resolveHeadlineFromReportData({ dominant_trait_code: 'D', score_D: 1, score_I: 99, score_S: 1, score_C: 1 }) === 'D',

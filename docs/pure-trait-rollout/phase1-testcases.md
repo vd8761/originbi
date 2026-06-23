@@ -1,6 +1,6 @@
-# Phase 1 — Test Cases & Validation
+# Phase 1 - Test Cases & Validation
 
-Last validated: **2026-06-21** — **ALL PASS**.
+Last validated: **2026-06-21** - **ALL PASS**.
 
 ## How to run
 
@@ -13,14 +13,14 @@ node database/scripts/validate_pure_traits.js          # exit 0 = pass
 ```
 
 Source under test:
-- `backend/exam-engine/internal/service/disc_trait.go` — `ResolveDominantFactor`
-- `backend/exam-engine/internal/service/disc_trait_test.go` — unit test
-- `database/migrations/032_pure_traits.sql` — the 4 pure rows
-- `database/scripts/validate_pure_traits.js` — DB + parity harness
+- `backend/exam-engine/internal/service/disc_trait.go` - `ResolveDominantFactor`
+- `backend/exam-engine/internal/service/disc_trait_test.go` - unit test
+- `database/migrations/032_pure_traits.sql` - the 4 pure rows
+- `database/scripts/validate_pure_traits.js` - DB + parity harness
 
 ---
 
-## 1. Resolver unit cases (`disc_trait_test.go`) — 17/17 PASS
+## 1. Resolver unit cases (`disc_trait_test.go`) - 17/17 PASS
 
 Rule: pure when `top*2 >= total` **OR** `top/2 > every other`; tie-break C>D>I>S;
 guard when `top<=0` or `total<=0`.
@@ -45,7 +45,7 @@ guard when `top<=0` or `total<=0`.
 | 16 | missing factor | {I:12,S:7,C:20} (tot 39) | `C` | 40 ≥ 39 → pure; D absent = 0 |
 | 17 | ignores `total` key | 22,16,6,8 + total:52 | `DI` | extra keys ignored |
 
-## 2. DB row assertions (`validate_pure_traits.js` step 2) — PASS
+## 2. DB row assertions (`validate_pure_traits.js` step 2) - PASS
 
 - `personality_traits` has 4 rows (codes D/I/S/C, not deleted), each with a
   populated `blended_style_name`, `blended_style_desc` and `color_rgb`:
@@ -58,22 +58,22 @@ guard when `top<=0` or `total<=0`.
   ACI band table + tailored micro-habits), matching the style of the 12 existing
   rows. `short_summary` NULL / `detailed_overview` '' as in existing rows.
 - **No DISC-letter references:** every name/title/insight/score_overview field is
-  scanned for `(D)`/`(I)`/`(S)`/`(C)` and the old "Pure …" labels — none present.
+  scanned for `(D)`/`(I)`/`(S)`/`(C)` and the old "Pure …" labels - none present.
 - Migration 032 is an idempotent upsert: re-running re-converges content with no
   duplicates.
 
-## 3. Go ⇄ JS parity (`validate_pure_traits.js` step 3) — 17/17 PASS
+## 3. Go ⇄ JS parity (`validate_pure_traits.js` step 3) - 17/17 PASS
 
 The JS mirror used by later (Phase 2) TS surfaces produces identical output to the
 Go resolver on all 17 cases above. Keep the two in lock-step.
 
-## 4. Real-data replay (`validate_pure_traits.js` step 4) — informational
+## 4. Real-data replay (`validate_pure_traits.js` step 4) - informational
 
 Over **719** completed Level-1 attempts, the new rule yields **110** Pure Traits
 (C:72, D:18, S:13, I:7); the remaining 609 stay as blends (1 empty = a zero-score
 attempt, which correctly leaves `dominant_trait_id` unset). This is the bounded,
 expected behavioural change (Q1). Stored historical `dominant_trait_id` values are
-**not** rewritten here — that is the opt-in backfill (Job 9, last).
+**not** rewritten here - that is the opt-in backfill (Job 9, last).
 
 ## Regression guard
 

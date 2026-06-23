@@ -49,7 +49,7 @@ interface AffiliateProfileData {
 const DetailItem = ({ label, value }: { label: string; value?: string | number | null }) => (
     <div>
         <label className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white block mb-1 font-normal opacity-70">{label}</label>
-        <p className="text-[clamp(14px,1vw,16px)] font-medium text-[#19211C] dark:text-white">{value || '—'}</p>
+        <p className="text-[clamp(14px,1vw,16px)] font-medium text-[#19211C] dark:text-white">{value || '-'}</p>
     </div>
 );
 
@@ -151,7 +151,7 @@ const AffiliateProfile: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Quick Stats — from affiliate_referral_transactions */}
+                        {/* Quick Stats - from affiliate_referral_transactions */}
                         <div className="w-full pt-4 border-t border-[#E0E0E0] dark:border-white/10 grid grid-cols-3 gap-4 mt-6">
                             <div className="text-center">
                                 <p className="text-[clamp(11px,0.73vw,13px)] text-[#19211C] dark:text-white opacity-60 mb-1 font-normal">Referrals</p>

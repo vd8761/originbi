@@ -1,5 +1,5 @@
 /**
- * Specialization & Trait Mapping content — ported from the standalone
+ * Specialization & Trait Mapping content - ported from the standalone
  * placement-cell "Specialization Report" (specialization-report/src/constants.ts
  * and discProfile.ts).
  *
@@ -457,7 +457,7 @@ export type DiscScores = { D: number; I: number; S: number; C: number };
  * the top-two blend). Delegates to the single source of truth
  * (`discTrait.resolveDominantFactor`, the TS mirror of the exam engine's
  * `ResolveDominantFactor`), so the placement report's pure-trait threshold is the
- * dynamic "50% of the candidate's own total" rule used everywhere else — never a
+ * dynamic "50% of the candidate's own total" rule used everywhere else - never a
  * hardcoded cutoff. (Previously this hardcoded `top.score >= 20`.)
  */
 export function calculateDiscProfile(scores: DiscScores): string {

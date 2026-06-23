@@ -1,7 +1,7 @@
 "use client";
 
 /* ============================================================
-   Level 3 "Metaphor" — candidate exam page (ported from the
+   Level 3 "Metaphor" - candidate exam page (ported from the
    Claude Design prototype). Wired to the metaphor connectors +
    pluggable speech hook. Desktop layout; images via URL.
    ============================================================ */
@@ -246,7 +246,7 @@ export default function MetaphorExam({
 
     const pct = Math.round((idx / total) * 100);
     const tcls = timeLeft <= 0 ? "is-out" : timeLeft <= 120 ? "is-low" : "";
-    // Pick list excludes "auto" — students choose a real spoken language; default = Tamil.
+    // Pick list excludes "auto" - students choose a real spoken language; default = Tamil.
     const speechLanguages = langs.length > 0
         ? langs
         : [{ code: "ta-IN", label: "Tamil", native: "தமிழ்" }, { code: "en-IN", label: "English", native: "English" }];
@@ -489,7 +489,7 @@ export default function MetaphorExam({
                                 onClick={() => switchTo(i)}
                                 aria-current={st === "current"}
                                 aria-label={`Question ${i + 1}${st === "done" ? " answered" : st === "current" ? " current" : ""}`}
-                                title={`Question ${i + 1}${st === "done" ? " — answered" : st === "current" ? " — current" : ""}`}>
+                                title={`Question ${i + 1}${st === "done" ? " - answered" : st === "current" ? " - current" : ""}`}>
                                 <span className="qnav__num">{i + 1}</span>
                                 <span className="qnav__label">Q{i + 1}</span>
                             </button>
@@ -532,11 +532,11 @@ export default function MetaphorExam({
                 <div className="modal-scrim">
                     <div className="modal sheet">
                         <h2>How Level 3 works</h2>
-                        <p className="sheet__sub">A voice assessment — you answer out loud, one image at a time.</p>
+                        <p className="sheet__sub">A voice assessment - you answer out loud, one image at a time.</p>
                         <div className="sheet__steps">
                             {[
-                                ["Pick your spoken language", "Use the language selector — that’s the language you’ll answer in by voice."],
-                                ["Look, then speak", "Study the image, description and context. Press Speak and respond naturally — there’s no right answer."],
+                                ["Pick your spoken language", "Use the language selector - that’s the language you’ll answer in by voice."],
+                                ["Look, then speak", "Study the image, description and context. Press Speak and respond naturally - there’s no right answer."],
                                 ["Speak continuously", "Your live transcript appears automatically while you answer."],
                                 ["Save & Next", "Your transcript is saved for that question before you continue."],
                             ].map((s, i) => (

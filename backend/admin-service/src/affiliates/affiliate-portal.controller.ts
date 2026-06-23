@@ -23,7 +23,7 @@ export class AffiliatePortalController {
     );
   }
 
-  // Referrals page — full table + cards
+  // Referrals page - full table + cards
   @Get('referrals-full')
   async getReferralsPage(
     @Query('affiliateId') affiliateId: string,
@@ -41,19 +41,19 @@ export class AffiliatePortalController {
     );
   }
 
-  // Earnings page — stats cards
+  // Earnings page - stats cards
   @Get('earnings-stats')
   async getEarningsStats(@Query('affiliateId') affiliateId: string) {
     return this.affiliatesService.getEarningsStats(Number(affiliateId));
   }
 
-  // Earnings page — chart data (12 months)
+  // Earnings page - chart data (12 months)
   @Get('earnings-chart')
   async getEarningsChart(@Query('affiliateId') affiliateId: string) {
     return this.affiliatesService.getEarningsChart(Number(affiliateId));
   }
 
-  // Earnings page — transaction history (paginated)
+  // Earnings page - transaction history (paginated)
   @Get('earnings')
   async getEarnings(
     @Query('affiliateId') affiliateId: string,
@@ -67,7 +67,7 @@ export class AffiliatePortalController {
     );
   }
 
-  // Settings — Profile
+  // Settings - Profile
   @Get('profile')
   async getProfile(@Query('affiliateId') affiliateId: string) {
     return this.affiliatesService.getProfileWithStats(Number(affiliateId));
@@ -87,7 +87,7 @@ export class AffiliatePortalController {
     return this.affiliatesService.updateProfile(Number(affiliateId), dto);
   }
 
-  // Settings — Payout
+  // Settings - Payout
   @Put('payout')
   async updatePayout(
     @Query('affiliateId') affiliateId: string,
@@ -107,7 +107,7 @@ export class AffiliatePortalController {
     );
   }
 
-  // Settings — Change Password
+  // Settings - Change Password
   @Post('change-password')
   async changePassword(
     @Query('affiliateId') affiliateId: string,

@@ -21,7 +21,7 @@ export interface SendTemplateParams {
  *   - fetching component values (image URLs, body text, button URLs) from settings
  *   - gating on the relevant `whatsapp.send_*` toggle
  *
- * This service never throws for a missing auth key — it logs a warning and
+ * This service never throws for a missing auth key - it logs a warning and
  * returns. Callers should still wrap .send() in try/catch since the MSG91
  * API itself may fail; a WhatsApp failure must never break the user's flow.
  */
@@ -100,7 +100,7 @@ export class WhatsappTemplatesService {
   }
 
   /**
-   * Format phone number for MSG91 — digits only, no `+` prefix.
+   * Format phone number for MSG91 - digits only, no `+` prefix.
    * e.g. "+91", "9876543210" → "919876543210"
    */
   static formatPhoneNumber(

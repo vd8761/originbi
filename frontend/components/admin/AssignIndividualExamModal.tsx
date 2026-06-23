@@ -131,7 +131,7 @@ const AssignIndividualExamModal: React.FC<AssignIndividualExamModalProps> = ({
         ) : (
           <>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-              Pick an exam window. The exam below — based on current settings —
+              Pick an exam window. The exam below - based on current settings -
               will be assigned{fullName ? ` to ${fullName}` : ""}. The previous
               exam is not affected; this becomes the latest.
             </p>

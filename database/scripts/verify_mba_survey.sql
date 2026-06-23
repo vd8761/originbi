@@ -46,7 +46,7 @@ SELECT * FROM (
          CASE WHEN COUNT(*) FILTER (WHERE COALESCE(option_text_ta,'')='') = 0 THEN 'PASS' ELSE 'FAIL' END,
          COUNT(*) FILTER (WHERE COALESCE(option_text_ta,'')='')::text || ' option(s) missing TA' FROM o
   UNION ALL
-  SELECT 9, 'context is optional (info only — count with context)',
+  SELECT 9, 'context is optional (info only - count with context)',
          'PASS',
          COUNT(*) FILTER (WHERE COALESCE(context_text_en,'') <> '')::text || ' of ' || COUNT(*)::text || ' have context_en' FROM q
 ) checks ORDER BY n;

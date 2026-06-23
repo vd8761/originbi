@@ -1,4 +1,4 @@
-# Phase 2 — Design (BEFORE) · Reports honour the resolved trait + Pure Traits
+# Phase 2 - Design (BEFORE) · Reports honour the resolved trait + Pure Traits
 
 Covers **Jobs 3–6** (school / employee / CXO / college report families).
 Approve (and answer the one product decision at the end) to authorise implementation.
@@ -9,7 +9,7 @@ Approve (and answer the one product decision at the end) to authorise implementa
 
 Make the per-student PDF reports (a) use the **engine's** resolved trait instead
 of recomputing their own, and (b) render correctly when that trait is a Pure
-Trait (D/I/S/C) — without changing any of the existing 12-blend output.
+Trait (D/I/S/C) - without changing any of the existing 12-blend output.
 
 ## Current state (what I found)
 
@@ -49,19 +49,19 @@ the same archetype names as the DB rows (Bold Driver / Inspiring Motivator /
 Steadfast Anchor / Precise Perfectionist). I draft this copy (Q9), consistent
 with the `personality_traits.blended_style_desc` already shipped.
 
-**C. Trait_id-keyed DB content for pure traits** — see the decision below.
+**C. Trait_id-keyed DB content for pure traits** - see the decision below.
 
 ## Sub-jobs (each ships with a test)
 
-- **Job 3a — Shared TS resolver + report-data field.** Add `resolveReportTrait`
+- **Job 3a - Shared TS resolver + report-data field.** Add `resolveReportTrait`
   + the `dominant_trait_code` field; unit test mirrors the 17 Go cases (Go⇄TS
   parity). No visual change yet.
-- **Job 3b — Employee report.** 4 pure keys in `employeeConstants.BLENDED_STYLE_MAPPING`;
+- **Job 3b - Employee report.** 4 pure keys in `employeeConstants.BLENDED_STYLE_MAPPING`;
   switch `employeeReport`/`employeeReportJSON` to `resolveReportTrait`.
-- **Job 3c — CXO report.** Same for `cxoConstants` + cxo reports.
-- **Job 3d — School report.** 4 pure keys in `BLENDED_STYLE_MAPPING`,
+- **Job 3c - CXO report.** Same for `cxoConstants` + cxo reports.
+- **Job 3d - School report.** 4 pure keys in `BLENDED_STYLE_MAPPING`,
   `IDENTITY_MAP`, `CAREER_DOMAIN_MAP`, `DUAL_ARCHETYPE`; switch school reports.
-- **Job 6 — College/MBA/placement verify.** Confirm pure codes flow through
+- **Job 6 - College/MBA/placement verify.** Confirm pure codes flow through
   `CONTENT`/`SPEC_MAP`/`mbaConstants` with no `'DC'` fallback; patch any gap.
 
 **Test per job:** a TS unit test asserting all **16** codes resolve to non-fallback
@@ -70,7 +70,7 @@ content in each map (no silent `|| 'DC'`), plus the resolver parity test.
 ## Tests / runners
 
 **Finding (Job 3a):** `student-service` pins **jest@30 + ts-jest@29**, which are
-incompatible — jest rejects the ts-jest transformer, so `.spec.ts` files cannot
+incompatible - jest rejects the ts-jest transformer, so `.spec.ts` files cannot
 run (and adding one would break `npm test`). Until ts-jest is upgraded, TS logic
 is validated with **node transpile-and-run scripts** under `database/scripts/`
 (no transformer needed, runs anywhere). The case tables are written so they can
@@ -79,9 +79,9 @@ move into a jest spec verbatim once the toolchain is aligned.
 `*.spec.ts`.
 
 **Status:**
-- Job 3a ✅ — `discTrait.ts` + `validate_disc_trait_ts.js` (resolver + blend +
+- Job 3a ✅ - `discTrait.ts` + `validate_disc_trait_ts.js` (resolver + blend +
   career seam, all green).
-- Job 3b ✅ (content) — employee `BLENDED_STYLE_MAPPING` gained 4 pure entries;
+- Job 3b ✅ (content) - employee `BLENDED_STYLE_MAPPING` gained 4 pure entries;
   `validate_report_trait_maps.js` confirms all 16 codes + pure-entry shape.
   Report **wiring** (read engine code + `careerLookupCode`) still pending.
 - Jobs 3c (CXO), 3d (school), 6 (college verify) + wiring: pending.
@@ -89,17 +89,17 @@ move into a jest spec verbatim once the toolchain is aligned.
 ## Guardrails
 
 - Additive: every existing 12-blend key/lookup is untouched; pure keys are new.
-- A pure code only appears when the engine emits one — existing data is unchanged
+- A pure code only appears when the engine emits one - existing data is unchanged
   until the Job 9 backfill.
 
-## Product decision (RESOLVED) — career_roles / compatibility for pure traits
+## Product decision (RESOLVED) - career_roles / compatibility for pure traits
 
 `career_roles` (~137 roles × 31 depts/trait) and `trait_based_course_details`
 (360/trait × 24 stream-depts) exist for the 12 blends only (~6,000 rows to mirror).
 
 **Decision:** do **not** author pure rows now. A Pure-Trait student's
 career-guidance & course-compatibility sections use their **top-two blend** (two
-highest factors) — the blend rows always exist. The HEADLINE/narrative/identity
+highest factors) - the blend rows always exist. The HEADLINE/narrative/identity
 still uses the pure trait. This is a **swappable seam**, not permanent:
 
 - `discTrait.careerLookupCode(resolvedTrait, scores)` returns `topTwoBlend(scores)`

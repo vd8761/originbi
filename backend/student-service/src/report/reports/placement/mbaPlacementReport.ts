@@ -35,7 +35,7 @@ interface ScoredStudent {
   readinessPct: Record<ReadinessKey, number>;
   rankings: SpecRanking[];
   /**
-   * Suitability ranking for the character's primary specialization — the fit
+   * Suitability ranking for the character's primary specialization - the fit
    * shown throughout the report. Organizing by character means the cohort-level
    * specialization (pie, glance table, priorities) is character-driven, while
    * this score captures how ready the student is for that specialization.
@@ -116,9 +116,7 @@ export class MBAPlacementReport extends BaseReport {
       const character = getMBACharacter(row.trait_code);
       const characterCode = character.code;
       const primaryTrait = (
-        validTraits.has(characterCode[0] as DiscTrait)
-          ? characterCode[0]
-          : 'D'
+        validTraits.has(characterCode[0] as DiscTrait) ? characterCode[0] : 'D'
       ) as DiscTrait;
       const secondaryChar =
         characterCode[1] && validTraits.has(characterCode[1] as DiscTrait)
@@ -373,7 +371,7 @@ export class MBAPlacementReport extends BaseReport {
     );
     this.doc.moveDown(0.5);
 
-    // 1. Specialization fitment — pie chart (where the cohort's careers concentrate)
+    // 1. Specialization fitment - pie chart (where the cohort's careers concentrate)
     this.h2(MBA_PLACEMENT_CONTENT.spec_chart_title);
     const pieSlices: PieSlice[] = SPECIALIZATION_ORDER.map((code) => ({
       label: SPECIALIZATIONS[code].name,
@@ -388,7 +386,7 @@ export class MBAPlacementReport extends BaseReport {
       font: this.FONT_ITALIC,
     });
 
-    // 2. Cohort at a glance — how many students fall under each character
+    // 2. Cohort at a glance - how many students fall under each character
     this.h2(MBA_PLACEMENT_CONTENT.cohort_glance_title);
     const glanceRows = this.presentCharacters()
       .map((code) => {
@@ -427,7 +425,11 @@ export class MBAPlacementReport extends BaseReport {
       },
     );
 
-    // 3. Cohort readiness profile — radar across the five readiness indicators
+    // 3. Cohort readiness profile - radar across the five readiness indicators.
+    // Reserve the heading + chart height up-front so the page break (if any)
+    // happens before the centre is fixed - otherwise the radar gets stranded at
+    // the page bottom and its axis labels scatter across blank pages.
+    this.ensureSpace(0.55, true);
     this.h2(MBA_PLACEMENT_CONTENT.readiness_radar_title);
     const avg = this.averageReadiness(this.students);
     const radarData = READINESS_ORDER.reduce(
@@ -489,7 +491,7 @@ export class MBAPlacementReport extends BaseReport {
     this.h1(MBA_PLACEMENT_CONTENT.elective_title, { ensureSpace: 0.35 });
     this.p(MBA_PLACEMENT_CONTENT.elective_intro);
 
-    // About the electives — accent-barred briefs.
+    // About the electives - accent-barred briefs.
     this.h2(MBA_PLACEMENT_CONTENT.elective_about_title);
     const x = this.MARGIN_STD;
     const labelX = x + 12;
@@ -558,11 +560,14 @@ export class MBAPlacementReport extends BaseReport {
       headerAlign: ['left', 'center'],
       rowAlign: ['left', 'center'],
     });
-    this.pHtml(MBA_PLACEMENT_CONTENT.elective_legend(this.data.total_students), {
-      fontSize: 8,
-      color: '#58595b',
-      font: this.FONT_ITALIC,
-    });
+    this.pHtml(
+      MBA_PLACEMENT_CONTENT.elective_legend(this.data.total_students),
+      {
+        fontSize: 8,
+        color: '#58595b',
+        font: this.FONT_ITALIC,
+      },
+    );
   }
 
   // ── Per-character section ────────────────────────────────────────────────────
@@ -575,7 +580,7 @@ export class MBAPlacementReport extends BaseReport {
 
     this.h1(c.mbaPersona, { ensureSpace: 0.35 });
 
-    // Best-fit specialization line — the reader sees the MBA role identity.
+    // Best-fit specialization line - the reader sees the MBA role identity.
     this.pHtml(
       `<b>Best fit:</b> ${primaryName} (also strong in ${secondaryName})`,
       { fontSize: 10, font: this.FONT_REGULAR, align: 'left' },
@@ -588,7 +593,7 @@ export class MBAPlacementReport extends BaseReport {
     });
     this.p(c.narrative);
 
-    // 1. Roster — the individuals under this character. Their best-fit
+    // 1. Roster - the individuals under this character. Their best-fit
     // specialization is the character's (stated above); the per-student columns
     // show how ready each individual is for it.
     this.h2(`Students in this Character (${bucket.length})`);
@@ -631,10 +636,10 @@ export class MBAPlacementReport extends BaseReport {
       },
     );
 
-    // 2. Future role fitment — roles with the reasoning per role.
+    // 2. Future role fitment - roles with the reasoning per role.
     this.h2('Future Role Fitment');
     this.list(
-      c.futureRoles.map((r) => `<b>${r.name}</b> — ${r.why}`),
+      c.futureRoles.map((r) => `<b>${r.name}</b> - ${r.why}`),
       { indent: 20, gap: 4 },
     );
 
@@ -642,11 +647,11 @@ export class MBAPlacementReport extends BaseReport {
     this.h2('Recommendations');
     this.list(c.recommendations, { type: 'number', indent: 20, gap: 4 });
 
-    // 4. Why these careers — the reasoning behind the suggestions.
+    // 4. Why these careers - the reasoning behind the suggestions.
     this.h2('Why These Careers');
     this.p(c.reasoning, { align: 'justify' });
 
-    // 5. Raw data table — placed at the end of the section. Reserve enough
+    // 5. Raw data table - placed at the end of the section. Reserve enough
     // space that the heading, note, and the start of the table stay together
     // (never orphan the "Raw Data" heading at the bottom of a page).
     this.ensureSpace(0.2, true);
@@ -686,8 +691,24 @@ export class MBAPlacementReport extends BaseReport {
       rowTextColor: TABLE_STYLES.rowTextColor,
       alternateRowColor: TABLE_STYLES.alternateRowColor,
       colWidths: ['fill', 'fit', 'fit', 'fit', 'fit', 'fit', 'fit'],
-      headerAlign: ['left', 'center', 'center', 'center', 'center', 'center', 'center'],
-      rowAlign: ['left', 'center', 'center', 'center', 'center', 'center', 'center'],
+      headerAlign: [
+        'left',
+        'center',
+        'center',
+        'center',
+        'center',
+        'center',
+        'center',
+      ],
+      rowAlign: [
+        'left',
+        'center',
+        'center',
+        'center',
+        'center',
+        'center',
+        'center',
+      ],
       mergeRepeatedHeaders: true,
     });
   }
@@ -748,7 +769,14 @@ export class MBAPlacementReport extends BaseReport {
       Math.round(s.specFit.finalScore),
     ]);
     this.table(
-      ['S.No', 'Student', 'MBA Persona', 'Best-Fit Specialization', 'Fit Level', 'Score'],
+      [
+        'S.No',
+        'Student',
+        'MBA Persona',
+        'Best-Fit Specialization',
+        'Fit Level',
+        'Score',
+      ],
       rows,
       this.shortlistTableOptions([
         'center',

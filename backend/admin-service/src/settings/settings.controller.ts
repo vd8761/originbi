@@ -20,7 +20,7 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   // ---------------------------------------------------------
-  // GET /settings — All settings grouped by category
+  // GET /settings - All settings grouped by category
   // ---------------------------------------------------------
   @Get()
   async getAll() {
@@ -38,7 +38,7 @@ export class SettingsController {
   }
 
   // ---------------------------------------------------------
-  // GET /settings/:category — Settings for a specific category
+  // GET /settings/:category - Settings for a specific category
   // ---------------------------------------------------------
   @Get(':category')
   async getByCategory(@Param('category') category: string) {
@@ -46,7 +46,7 @@ export class SettingsController {
   }
 
   // ---------------------------------------------------------
-  // GET /settings/:category/:key — Single setting value
+  // GET /settings/:category/:key - Single setting value
   // ---------------------------------------------------------
   @Get(':category/:key')
   async getOne(@Param('category') category: string, @Param('key') key: string) {
@@ -58,7 +58,7 @@ export class SettingsController {
   }
 
   // ---------------------------------------------------------
-  // PUT /settings/:category/:key — Update a single setting
+  // PUT /settings/:category/:key - Update a single setting
   // Body: { value: ..., updatedBy?: string }
   // ---------------------------------------------------------
   @Put(':category/:key')
@@ -72,7 +72,7 @@ export class SettingsController {
   }
 
   // ---------------------------------------------------------
-  // PATCH /settings/bulk — Update multiple settings at once
+  // PATCH /settings/bulk - Update multiple settings at once
   // Body: { updates: [{ category, key, value }], updatedBy?: string }
   // ---------------------------------------------------------
   @Patch('bulk')

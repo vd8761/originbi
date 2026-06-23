@@ -1,5 +1,5 @@
 /**
- * DISC trait resolver — TypeScript mirror of
+ * DISC trait resolver - TypeScript mirror of
  * backend/exam-engine/internal/service/disc_trait.go.
  *
  * The exam engine is the single source of truth for `dominant_trait_id`; the
@@ -7,7 +7,7 @@
  * trait. This helper exists for (a) a fallback when an attempt predates the
  * engine change, and (b) the top-two blend used by the career/compatibility
  * lookups (see below). `resolveDominantFactor` MUST stay byte-for-byte
- * equivalent to the Go resolver — both are validated against the same canonical
+ * equivalent to the Go resolver - both are validated against the same canonical
  * cases (disc_trait_test.go and validate_disc_trait_ts.js).
  */
 
@@ -36,7 +36,7 @@ function sortedFactors(scores: Record<string, number>): FactorScore[] {
 
 /**
  * Resolves the HEADLINE trait code from raw DISC factor sums. Returns a single
- * letter ("D"/"I"/"S"/"C") — a Pure Trait — when one DISC dimension is dominant
+ * letter ("D"/"I"/"S"/"C") - a Pure Trait - when one DISC dimension is dominant
  * enough, otherwise the top-two blend (e.g. "DI").
  *
  * Rule (total = D+I+S+C): pure when `top*2 >= total` OR `top/2 > every other`;
@@ -59,7 +59,7 @@ export function resolveDominantFactor(scores: Record<string, number>): string {
 }
 
 /**
- * The top-two DISC blend (two highest factors, tie-break C>D>I>S) — always the
+ * The top-two DISC blend (two highest factors, tie-break C>D>I>S) - always the
  * 2-letter code, with NO pure-trait override. This is what the existing 12-blend
  * content keyed by `trait_id` expects.
  */
@@ -73,13 +73,13 @@ export function topTwoBlend(scores: Record<string, number>): string {
 /**
  * Resolves the HEADLINE trait code from per-student report data, honouring the
  * exam engine as the single source of truth. Order of preference:
- *   1. `dominant_trait_code` — the code the engine already stored (authoritative,
+ *   1. `dominant_trait_code` - the code the engine already stored (authoritative,
  *      pure-capable). In production this is always present for completed attempts.
  *   2. the raw DISC sums in `most_answered_answer_type` (these COUNT values ARE the
- *      engine's `disc_scores` input — see groupReportHelper), applying the same
+ *      engine's `disc_scores` input - see groupReportHelper), applying the same
  *      rule the engine uses, so the fallback matches the engine byte-for-byte.
  *   3. the percentage-scaled `score_*` as a last resort (e.g. legacy mock data
- *      with no counts) — ordering is preserved even if the absolute cutoff is not.
+ *      with no counts) - ordering is preserved even if the absolute cutoff is not.
  */
 export function resolveHeadlineFromReportData(data: {
   dominant_trait_code?: string;
@@ -113,7 +113,7 @@ export function isPureTrait(code: string): boolean {
 
 /**
  * Splits a resolved code into [primary, secondary]. For a Pure Trait the
- * secondary is '' — callers that look up two-letter maps should guard on that.
+ * secondary is '' - callers that look up two-letter maps should guard on that.
  */
 export function splitTrait(code: string): [string, string] {
   return [code.charAt(0) || '', code.charAt(1) || ''];
@@ -124,7 +124,7 @@ export function splitTrait(code: string): [string, string] {
  * tables (`career_roles`, `career_role_*`, `trait_based_course_details`).
  *
  * While `false`, a Pure-Trait student's career-guidance and course-compatibility
- * sections fall back to their **top-two blend** (their two highest factors) — the
+ * sections fall back to their **top-two blend** (their two highest factors) - the
  * blend rows always exist. Flip to `true` once pure rows are authored to switch
  * pure students onto their own data; nothing else changes.
  */
@@ -133,7 +133,7 @@ export const PURE_CAREER_ROWS_AVAILABLE = false;
 /**
  * The trait code to use for the `trait_id`-keyed career/compatibility lookups,
  * given the resolved headline trait. This is the single seam where "pure traits
- * borrow the top-two blend's data" lives — see PURE_CAREER_ROWS_AVAILABLE.
+ * borrow the top-two blend's data" lives - see PURE_CAREER_ROWS_AVAILABLE.
  */
 export function careerLookupCode(
   resolvedTrait: string,

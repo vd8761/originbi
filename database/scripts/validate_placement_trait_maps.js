@@ -27,7 +27,7 @@ try {
   college = require(path.join(DIST, 'reports', 'college', 'collegeConstants.js'));
   discTrait = require(path.join(DIST, 'helpers', 'discTrait.js'));
 } catch (e) {
-  console.error('Could not load dist modules — run `npx nest build` in backend/student-service first.');
+  console.error('Could not load dist modules - run `npx nest build` in backend/student-service first.');
   console.error(e.message);
   process.exit(1);
 }
@@ -77,7 +77,7 @@ const CASES = [
   { D: 1, I: 12, S: 7, C: 20 },   // pure C
   { D: 20, I: 10, S: 5, C: 5 },   // pure D (exact 50%)
   { D: 22, I: 16, S: 6, C: 8 },   // blend DI
-  { D: 11, I: 10, S: 1, C: 0 },   // pure D under dynamic rule (11<20, 22>=22) — the OLD >=20 would have said "DI"
+  { D: 11, I: 10, S: 1, C: 0 },   // pure D under dynamic rule (11<20, 22>=22) - the OLD >=20 would have said "DI"
   { D: 6, I: 24, S: 17, C: 7 },   // blend IS
   { D: 10, I: 10, S: 10, C: 10 }, // blend CD (all equal)
 ];

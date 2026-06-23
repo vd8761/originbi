@@ -145,7 +145,7 @@ export default function IatExam({
   const completedModules = modules.filter((m) => m.status === "COMPLETED").length;
   const currentModule = useMemo(
     // currentModuleId arrives as a bigint string while module DTO ids are
-    // numbers — compare as strings so the lookup actually matches.
+    // numbers - compare as strings so the lookup actually matches.
     () => modules.find((m) => String(m.id) === String(state?.currentModuleId)) || null,
     [modules, state?.currentModuleId],
   );
@@ -160,7 +160,7 @@ export default function IatExam({
     [trials, activeStep],
   );
   // Total questions for this part includes the words that have to be re-asked
-  // because they were missed — so the bar only fills once everything (misses
+  // because they were missed - so the bar only fills once everything (misses
   // included) has been answered correctly.
   const partTotal = partCount + retryQueueRef.current.length + (retryTrial ? 1 : 0);
   const partProgress = partTotal ? Math.min(100, (partPassed / partTotal) * 100) : 0;
@@ -256,7 +256,7 @@ export default function IatExam({
     }
   }, [attemptId, currentModule, flushEvents, state]);
 
-  // Move to the next queued re-ask word, or — when the queue is empty — run the
+  // Move to the next queued re-ask word, or - when the queue is empty - run the
   // transition that was deferred while the student cleared their misses.
   const advanceRetry = useCallback(() => {
     awaitingCorrectionRef.current = false;
@@ -333,7 +333,7 @@ export default function IatExam({
     resetClock();
   }, [currentTrial, finishModuleOrAttempt, screen, startRetryPhase, trialIndex, trials]);
 
-  // Drives the re-ask rounds at the end of a part. Nothing here is persisted —
+  // Drives the re-ask rounds at the end of a part. Nothing here is persisted -
   // it only enforces that every missed word is eventually answered correctly.
   const handleRetryKey = useCallback(
     (key: "E" | "I") => {
@@ -385,7 +385,7 @@ export default function IatExam({
 
       const count = (keyCountRef.current[trial.id] || 0) + 1;
       keyCountRef.current[trial.id] = count;
-      // Buffer the event and save in the background — never block the advance
+      // Buffer the event and save in the background - never block the advance
       // on the network. This is what keeps fast/repeated key presses snappy
       // and stops them from spilling into the next trial.
       eventBufferRef.current.push({

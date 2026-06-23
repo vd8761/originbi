@@ -155,7 +155,7 @@ export default function StudentLayout({
     }
 
     // Detect special modes for Header. The Level 3 metaphor exam lives at
-    // /student/metaphor — treat it as an assessment page (full-screen, no nav)
+    // /student/metaphor - treat it as an assessment page (full-screen, no nav)
     // so the assessment-mode redirect doesn't bounce the student off it.
     // The IAT and Metaphor exams draw their own full-screen top bar, so the
     // global header stays hidden there to avoid a double header. The standard

@@ -191,8 +191,8 @@ export class CareerFitmentReport extends BaseReport {
       items.push({ label: 'Academic Background', value: academicBg });
 
       let program = 'School Students';
-      if (profile.currentRole && profile.currentRole.includes('—')) {
-        program = profile.currentRole.split('—')[1].trim();
+      if (profile.currentRole && profile.currentRole.includes('-')) {
+        program = profile.currentRole.split('-')[1].trim();
       } else if (profile.currentRole && profile.currentRole.includes('-')) {
         program = profile.currentRole.split('-')[1].trim();
       } else if (profile.programName) {

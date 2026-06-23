@@ -6,7 +6,7 @@ import { OriginbiSetting } from '@originbi/shared-entities';
 /**
  * Read-only settings service for student-service.
  * Reads from the shared `originbi_settings` table managed by admin-service.
- * Only exposes the getValue() helper — no write/update operations.
+ * Only exposes the getValue() helper - no write/update operations.
  */
 @Injectable()
 export class SettingsService {

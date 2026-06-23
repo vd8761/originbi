@@ -95,7 +95,7 @@ async function q(client, label, sql, params = []) {
     `SELECT id, name, level_number, pattern_type, total_questions, is_active
      FROM assessment_levels ORDER BY level_number`,
   ).catch(() => {});
-  // schema may differ — try a loose select
+  // schema may differ - try a loose select
   await q(
     client,
     'levels (loose)',

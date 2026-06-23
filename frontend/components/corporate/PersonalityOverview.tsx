@@ -165,7 +165,7 @@ const PersonalityOverview: React.FC = () => {
                             Workforce Overview
                         </h1>
                         <p className="text-sm text-[#19211C]/70 dark:text-white/60 mt-1">
-                            What kind of people are in your applicant pool — and what their gut-level patterns look like.
+                            What kind of people are in your applicant pool - and what their gut-level patterns look like.
                         </p>
                     </div>
                 </div>
@@ -263,7 +263,7 @@ const BehaviouralPanel: React.FC<{ data: BehaviouralCohort | null }> = ({ data }
                     {data.buckets.map((b) => (
                         <div
                             key={b.key}
-                            title={`${b.label} — ${b.count} (${b.percentage}%)`}
+                            title={`${b.label} - ${b.count} (${b.percentage}%)`}
                             style={{
                                 width: `${Math.max(b.percentage, b.count > 0 ? 1 : 0)}%`,
                                 backgroundColor: b.color,
@@ -493,7 +493,7 @@ const TraitCard = ({ trait }: { trait: TraitCharacter }) => {
 };
 
 // =========================================================================
-// Inner Patterns Panel (Level 3 / IAT — plain English)
+// Inner Patterns Panel (Level 3 / IAT - plain English)
 // =========================================================================
 const InnerPanel: React.FC<{ data: InnerPatternsCohort | null }> = ({ data }) => {
     if (!data || data.totalCompleted === 0) {
@@ -519,7 +519,7 @@ const InnerPanel: React.FC<{ data: InnerPatternsCohort | null }> = ({ data }) =>
                         Based on <span className="font-semibold">{data.totalCompleted}</span> {data.totalCompleted === 1 ? "person who has" : "people who have"} finished the gut-reaction check.
                     </div>
                     <p className="text-[12px] text-[#19211C]/60 dark:text-white/60 mt-3 leading-snug max-w-xl">
-                        This part of the assessment measures the snap-second associations people make before thinking. It is a sensitive picture of the group's mindset — not a judgement of any individual.
+                        This part of the assessment measures the snap-second associations people make before thinking. It is a sensitive picture of the group's mindset - not a judgement of any individual.
                     </p>
                 </div>
                 <ReliabilityBanner reliability={data.reliability} />
@@ -559,7 +559,7 @@ const ThemeCardView: React.FC<{ theme: ThemeCard }> = ({ theme }) => {
                     {theme.distribution.map((slice) => (
                         <div
                             key={slice.key}
-                            title={`${slice.label} — ${slice.count} (${slice.percentage}%)`}
+                            title={`${slice.label} - ${slice.count} (${slice.percentage}%)`}
                             style={{
                                 width: `${Math.max(slice.percentage, slice.count > 0 ? 1 : 0)}%`,
                                 backgroundColor: slice.color,

@@ -29,7 +29,7 @@ import { logger } from '../../helpers/logger';
 /**
  * Career-lookup code for a trait GROUP. A Pure-Trait group (single-letter code)
  * has no `career_roles` of its own yet, so it borrows a representative blend
- * (primary + highest-priority partner, tie-break C>D>I>S) — the group-level
+ * (primary + highest-priority partner, tie-break C>D>I>S) - the group-level
  * analogue of the per-student top-two fallback. Blend codes are unchanged.
  */
 function groupCareerLookupCode(code: string): string {

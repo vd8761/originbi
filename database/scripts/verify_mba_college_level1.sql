@@ -2,7 +2,7 @@
 -- VERIFY: MBA College Level-1 import
 --
 -- Run this AFTER mba_college_level1_questions.sql. It returns one row per
--- check with PASS / FAIL — read top-to-bottom, every status should be PASS.
+-- check with PASS / FAIL - read top-to-bottom, every status should be PASS.
 -- Read-only: nothing here mutates data.
 -- ============================================================
 

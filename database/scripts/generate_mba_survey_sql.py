@@ -20,7 +20,7 @@ non-scoring, so options carry no DISC factor and is_valid = false.
 
 Idempotent (preamble deletes prior rows with the source marker). Open questions
 are global (not program/level scoped), so no sub-selects are needed.
-This script never touches a database — it only writes a .sql file.
+This script never touches a database - it only writes a .sql file.
 """
 import sys
 import json

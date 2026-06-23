@@ -201,7 +201,7 @@ const BulkEmailTab: React.FC<BulkEmailTabProps> = ({ onViewSession, page, entrie
     };
 
     // ── Pagination ──
-    // (page & entriesPerPage come from parent — no local state needed)
+    // (page & entriesPerPage come from parent - no local state needed)
 
     // ── Date Range ──
     const handleDateRangeSelect = (option: DateRangeOption) => {

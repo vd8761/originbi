@@ -83,7 +83,7 @@ export class CorporateService {
         await new Promise((res) => setTimeout(res, delay));
         return this.withRetry(operation, retries - 1, delay * 2);
       }
-      // Re-throw the original error (unknown) — caller will handle it
+      // Re-throw the original error (unknown) - caller will handle it
       throw error;
     }
   }

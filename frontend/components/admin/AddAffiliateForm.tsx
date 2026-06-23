@@ -332,7 +332,7 @@ const AddAffiliateForm: React.FC<AddAffiliateFormProps> = ({
             if (hasNewFiles && affiliateId) {
                 setUploadProgress("Uploading documents to cloud...");
 
-                // Refresh token right before upload — the session may have changed
+                // Refresh token right before upload - the session may have changed
                 const uploadSession = await fetchAuthSession();
                 const uploadToken = uploadSession.tokens?.idToken?.toString();
 

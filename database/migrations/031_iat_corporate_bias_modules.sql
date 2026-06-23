@@ -86,32 +86,32 @@ DELETE FROM iat_stimuli
 
 WITH seed(code, concept_key, words) AS (
     VALUES
-    -- Module 1 — Leadership Potential Bias
+    -- Module 1 - Leadership Potential Bias
     ('leadership_potential','emerging',ARRAY['High-Potential','Successor','Innovator','Change-Agent','Growth-Mindset']),
     ('leadership_potential','established',ARRAY['Executive','Veteran','Senior-Leader','Director','Authority']),
     ('leadership_potential','strategic_cap',ARRAY['Visionary','Influential','Decisive','Architect','Transformational']),
     ('leadership_potential','operational_cap',ARRAY['Executor','Coordinator','Maintainer','Administrator','Supporter']),
-    -- Module 2 — Performance Reputation Bias
+    -- Module 2 - Performance Reputation Bias
     ('performance_reputation','high_visibility',ARRAY['Presenter','Stakeholder-Facing','Influencer','Networked','Recognised']),
     ('performance_reputation','low_visibility',ARRAY['Specialist','Analyst','Contributor','Technical','Individual']),
     ('performance_reputation','high_performance',ARRAY['Exceptional','Impactful','Valuable','Strategic','Elite']),
     ('performance_reputation','average_performance',ARRAY['Routine','Standard','Adequate','Replaceable','Baseline']),
-    -- Module 3 — Diversity & Inclusion Bias
+    -- Module 3 - Diversity & Inclusion Bias
     ('diversity_inclusion','female',ARRAY['Priya','Ananya','Kavya','Deepika','Meera']),
     ('diversity_inclusion','male',ARRAY['Rahul','Arjun','Vikram','Amit','Karan']),
     ('diversity_inclusion','exec_leadership',ARRAY['Boardroom','Strategy','Ownership','Expansion','Governance']),
     ('diversity_inclusion','support_functions',ARRAY['Coordination','Assistance','Administration','Documentation','Facilitation']),
-    -- Module 4 — Communication Style Bias
+    -- Module 4 - Communication Style Bias
     ('communication_style','assertive',ARRAY['Persuasive','Confident','Vocal','Influential','Charismatic']),
     ('communication_style','reserved',ARRAY['Reflective','Thoughtful','Quiet','Deliberate','Measured']),
     ('communication_style','leadership_traits',ARRAY['Strategic','Visionary','Decisive','Authority','Executive']),
     ('communication_style','technical_expertise',ARRAY['Analyst','Engineer','Specialist','Architect','Researcher']),
-    -- Module 5 — Authority & Challenge Bias
+    -- Module 5 - Authority & Challenge Bias
     ('authority_challenge','senior_authority',ARRAY['CEO','Vice-President','Director','Executive','Chairman']),
     ('authority_challenge','team_contributors',ARRAY['Associate','Specialist','Coordinator','Analyst','Consultant']),
     ('authority_challenge','always_correct',ARRAY['Infallible','Final','Absolute','Certain','Unquestionable']),
     ('authority_challenge','open_to_feedback',ARRAY['Discussed','Challenged','Reviewed','Debated','Improved']),
-    -- Module 6 — Innovation & Change Bias
+    -- Module 6 - Innovation & Change Bias
     ('innovation_change','innovation',ARRAY['Transformation','Disruption','Experimentation','Agility','Reinvention']),
     ('innovation_change','stability',ARRAY['Consistency','Predictability','Governance','Process','Control']),
     ('innovation_change','business_success',ARRAY['Growth','Competitive-Advantage','Opportunity','Expansion','Value']),

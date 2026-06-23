@@ -1,5 +1,5 @@
 /* ================================================================
-   Origin BI — Level 3 "Metaphor" Exam Page
+   Origin BI - Level 3 "Metaphor" Exam Page
    Built on the Origin BI Design System tokens.
    ================================================================ */
 
@@ -55,7 +55,7 @@
   --ease-spring: cubic-bezier(0.18, 0.89, 0.32, 1.28);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
 
-  /* themed surface vars — overwritten by [data-theme] */
+  /* themed surface vars - overwritten by [data-theme] */
   --bg: var(--dark-900);
   --panel: var(--dark-800);
   --panel-2: #1d2125;
@@ -120,7 +120,7 @@ button { font-family: inherit; }
   isolation: isolate;
 }
 
-/* ===================== ZONE A — TOP BAR ===================== */
+/* ===================== ZONE A - TOP BAR ===================== */
 .topbar {
   flex-shrink: 0;
   height: 68px;
@@ -275,7 +275,7 @@ button { font-family: inherit; }
 .exam.layout-stacked .answer { order: 3; }
 .exam.layout-stacked .qrail { order: 1; }
 
-/* ===================== ZONE B — STIMULUS ===================== */
+/* ===================== ZONE B - STIMULUS ===================== */
 .stimulus { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .stimulus__scroll { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: clamp(10px, 1.2vw, 16px); overflow-y: auto; overflow-x: hidden; padding-right: 4px; }
 
@@ -355,7 +355,7 @@ button { font-family: inherit; }
 .question--xlong { font-size: 20px; }
 .question-block { display: flex; flex-direction: column; gap: 8px; padding-top: 2px; flex-shrink: 0; }
 
-/* ===================== ZONE C — ANSWER PANEL ===================== */
+/* ===================== ZONE C - ANSWER PANEL ===================== */
 .answer {
   display: flex; flex-direction: column; min-height: 0;
   background: var(--panel);
@@ -683,7 +683,7 @@ button { font-family: inherit; }
 
 /* ===================== QUESTION RAIL ===================== */
 .qrail {
-  /* justify-content: flex-start — when the content is taller than the column
+  /* justify-content: flex-start - when the content is taller than the column
      'center' pushes the top arrow ABOVE the visible area (and visually under
      the sticky topbar at high browser zoom). Start anchors it cleanly. */
   display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
@@ -880,7 +880,7 @@ button { font-family: inherit; }
 .notice.warn { background: color-mix(in srgb, var(--yellow-400) 12%, transparent); border: 1px solid color-mix(in srgb, var(--yellow-400) 35%, transparent); color: var(--yellow-400); }
 .notice.info { background: var(--field); border: 1px solid var(--line); color: var(--fg-2); }
 
-/* ===================== ZONE D — BOTTOM BAR ===================== */
+/* ===================== ZONE D - BOTTOM BAR ===================== */
 .bottombar {
   display: none;
   flex-shrink: 0; margin-top: clamp(12px,1.5vw,18px);
@@ -960,7 +960,7 @@ button { font-family: inherit; }
 .modal__actions { flex: 0 0 auto; }
 
 /* When any modal is open inside the exam, lock background scroll so the
-   page can't slide behind it. Uses :has() — falls back to a no-op on older
+   page can't slide behind it. Uses :has() - falls back to a no-op on older
    browsers (the inner scrim/modal scroll still works). */
 .exam:has(.modal-scrim) { overflow: hidden; }
 html:has(.modal-scrim) { overflow: hidden; }
@@ -1069,7 +1069,7 @@ html:has(.modal-scrim) { overflow: hidden; }
 .msheet__controls .startover-btn { width: 50px; height: 50px; }
 
 /* ============================================================
-   RESPONSIVE — tablet & mobile
+   RESPONSIVE - tablet & mobile
    ============================================================ */
 
 /* Intermediate desktop (1080-1300px, e.g. 1440×900 @ 125% browser/OS zoom):
@@ -1141,7 +1141,7 @@ html:has(.modal-scrim) { overflow: hidden; }
 
   /* rail horizontal */
   .qrail {
-    /* Sit BELOW the sticky topbar (68px) — not at top:0 — so the rail and the
+    /* Sit BELOW the sticky topbar (68px) - not at top:0 - so the rail and the
        topbar don't pile up at high zoom. */
     position: sticky; top: 68px; z-index: 55;
     flex-direction: row; align-items: center; justify-content: stretch;
@@ -1277,7 +1277,7 @@ html:has(.modal-scrim) { overflow: hidden; }
   }
   /* On mobile, keep the voice answer panel INLINE in the flow (was fixed at
      the bottom, which hid the mic + transcript entirely). The whole answer
-     panel — mic button, status, and floating transcript — stays visible. */
+     panel - mic button, status, and floating transcript - stays visible. */
   .voice-answer {
     position: static;
     z-index: auto;

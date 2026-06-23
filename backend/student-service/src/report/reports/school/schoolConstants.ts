@@ -1887,7 +1887,7 @@ export const SCHOOL_BLENDED_STYLE_MAPPING: Record<string, any> = {
   // ── Pure Traits (a single dominant DISC dimension) ────────────────────────
   D: {
     style_name: 'You are Bold Driver',
-    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a confident, goal-driven student who likes to take charge and make things happen. You set your sights high, act decisively, and aren't afraid of a challenge — qualities that mark you out as a natural leader among your peers.</p>`,
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a confident, goal-driven student who likes to take charge and make things happen. You set your sights high, act decisively, and aren't afraid of a challenge - qualities that mark you out as a natural leader among your peers.</p>`,
     nature_suggestions:
       'Science with Entrepreneurship or Commerce with Business Studies; take up debate, student council, and leadership or innovation clubs',
     key_behaviours: [

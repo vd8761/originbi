@@ -48,7 +48,7 @@ export const MBA_PLACEMENT_CONTENT = {
 
   master_grid_title: 'Specialization Master Grid',
   master_grid_intro:
-    "Every student on a single page - their character and best-fit ranking across the five MBA specializations (1 = strongest fit), with the top future roles their profile points to.",
+    'Every student on a single page - their character and best-fit ranking across the five MBA specializations (1 = strongest fit), with the top future roles their profile points to.',
   master_grid_legend:
     '1 = Strongest Fit   ·   5 = Weakest Fit   ·   Each student’s strongest-fit specialization is highlighted in green.',
 

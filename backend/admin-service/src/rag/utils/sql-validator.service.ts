@@ -167,7 +167,7 @@ export class SqlValidatorService {
     // Step 6: Enforce row limit
     cleaned = this.enforceRowLimit(cleaned, warnings);
 
-    // Step 7: Final safety check — re-verify no forbidden patterns after transformation
+    // Step 7: Final safety check - re-verify no forbidden patterns after transformation
     for (const { pattern, reason } of this.FORBIDDEN_PATTERNS) {
       if (pattern.test(cleaned)) {
         return { isValid: false, sanitizedSql: '', error: `Post-transform safety check failed: ${reason}`, warnings };
@@ -346,7 +346,7 @@ export class SqlValidatorService {
         warnings.push(`Row limit capped from ${requestedLimit} to ${this.MAX_ROW_LIMIT}`);
       }
     } else {
-      // No LIMIT found — add default
+      // No LIMIT found - add default
       // Insert before any trailing semicolon or at the end
       sql = sql.replace(/\s*$/, ` LIMIT ${this.DEFAULT_ROW_LIMIT}`);
       warnings.push(`Default LIMIT ${this.DEFAULT_ROW_LIMIT} applied`);

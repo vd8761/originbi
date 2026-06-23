@@ -217,35 +217,35 @@ const PERSONALITY_VECTORS: Record<string, {
   // ── Additional styles from DB (DISC code-based) ──
 
   'Energetic Visionary': {
-    // DISC: ID — High Influence + High Dominance
+    // DISC: ID - High Influence + High Dominance
     // "Charismatic and bold leader focused on achieving goals while engaging and inspiring others"
     dominance: 78, influence: 92, steadiness: 38, compliance: 35,
     leadership: 82, creativity: 80, analytical: 48, teamwork: 75,
     independence: 80, adaptability: 85, communication: 92, empathy: 65,
   },
   'Collaborative Optimist': {
-    // DISC: SI — High Steadiness + High Influence
+    // DISC: SI - High Steadiness + High Influence
     // "Friendly and supportive, builds strong relationships, prioritizes harmony and teamwork"
     dominance: 30, influence: 82, steadiness: 90, compliance: 38,
     leadership: 45, creativity: 55, analytical: 38, teamwork: 95,
     independence: 30, adaptability: 65, communication: 82, empathy: 92,
   },
   'Dependable Specialist': {
-    // DISC: SC — High Steadiness + High Compliance
+    // DISC: SC - High Steadiness + High Compliance
     // "Systematic, detail-oriented, excels in structured environments, precision and reliability"
     dominance: 35, influence: 30, steadiness: 88, compliance: 92,
     leadership: 40, creativity: 28, analytical: 82, teamwork: 65,
     independence: 72, adaptability: 32, communication: 42, empathy: 55,
   },
   'Logical Innovator': {
-    // DISC: CI — High Compliance + High Influence
+    // DISC: CI - High Compliance + High Influence
     // "Creative and structured, balances analytical thinking with engaging communication"
     dominance: 48, influence: 72, steadiness: 42, compliance: 88,
     leadership: 55, creativity: 78, analytical: 90, teamwork: 60,
     independence: 75, adaptability: 65, communication: 78, empathy: 55,
   },
   'Structured Supporter': {
-    // DISC: CS — High Compliance + High Steadiness
+    // DISC: CS - High Compliance + High Steadiness
     // "Systematic, reliable, values harmony, consistency, and accuracy"
     dominance: 28, influence: 32, steadiness: 85, compliance: 92,
     leadership: 35, creativity: 28, analytical: 85, teamwork: 72,
@@ -405,7 +405,7 @@ export class JDMatchingService {
     }
 
     const executionTimeMs = Date.now() - startTime;
-    this.logger.log(`✅ Matching complete in ${executionTimeMs}ms — ${topCandidates.length} matches`);
+    this.logger.log(`✅ Matching complete in ${executionTimeMs}ms - ${topCandidates.length} matches`);
 
     return {
       jobDescription,
@@ -814,16 +814,16 @@ RULES:
     // Get personality vector for this candidate
     const vector = this.getPersonalityVector(candidate.personalityStyle);
 
-    // 1. BEHAVIORAL ALIGNMENT SCORE (BAS) — 35% weight
+    // 1. BEHAVIORAL ALIGNMENT SCORE (BAS) - 35% weight
     const bas = this.calculateBehavioralAlignment(vector, requirements);
 
-    // 2. AGILE READINESS SCORE (ARS) — 25% weight
+    // 2. AGILE READINESS SCORE (ARS) - 25% weight
     const ars = this.calculateAgileReadiness(candidate, requirements.agileRequirement);
 
-    // 3. TRAIT-ROLE FIT SCORE (TFS) — 25% weight
+    // 3. TRAIT-ROLE FIT SCORE (TFS) - 25% weight
     const tfs = this.calculateTraitRoleFit(vector, requirements);
 
-    // 4. RELIABILITY & SINCERITY INDEX (RSI) — 15% weight
+    // 4. RELIABILITY & SINCERITY INDEX (RSI) - 15% weight
     const rsi = this.calculateReliabilityIndex(candidate);
 
     // 5. CONFIDENCE MULTIPLIER (based on data completeness)
@@ -946,7 +946,7 @@ RULES:
       }
     }
 
-    this.logger.warn(`⚠️ Unknown personality style: "${styleName}" — using default vector`);
+    this.logger.warn(`⚠️ Unknown personality style: "${styleName}" - using default vector`);
     return { ...DEFAULT_VECTOR };
   }
 
@@ -1074,19 +1074,19 @@ RULES:
     const { minScore, idealScore, adaptabilityWeight } = requirement;
 
     if (score >= idealScore) {
-      // At or above ideal — full score with bonus for exceeding
+      // At or above ideal - full score with bonus for exceeding
       const bonus = Math.min(10, ((score - idealScore) / idealScore) * 20);
       return Math.min(100, 90 + bonus);
     }
 
     if (score >= minScore) {
-      // Between min and ideal — linear interpolation
+      // Between min and ideal - linear interpolation
       const range = idealScore - minScore;
       const progress = (score - minScore) / (range || 1);
       return 50 + (progress * 40); // Range: 50-90
     }
 
-    // Below minimum — sigmoid decay
+    // Below minimum - sigmoid decay
     // score/minScore gives ratio (0 to 1), apply sigmoid
     const ratio = score / (minScore || 1);
     const sigmoidScore = 50 / (1 + Math.exp(-8 * (ratio - 0.5)));
@@ -1518,30 +1518,30 @@ RULES:
     const areas: string[] = [];
 
     if (requirements.leadershipRequired && vector.leadership < 60) {
-      areas.push('Leadership development needed — consider mentoring/coaching programs');
+      areas.push('Leadership development needed - consider mentoring/coaching programs');
     }
     if (requirements.analyticalRequired && vector.analytical < 60) {
-      areas.push('Analytical skills enhancement — data literacy training recommended');
+      areas.push('Analytical skills enhancement - data literacy training recommended');
     }
     if (requirements.creativityRequired && vector.creativity < 60) {
-      areas.push('Creative thinking — design thinking workshops could help');
+      areas.push('Creative thinking - design thinking workshops could help');
     }
     if (requirements.customerFacing && vector.communication < 60) {
-      areas.push('Communication skills — presentation and interpersonal training');
+      areas.push('Communication skills - presentation and interpersonal training');
     }
     if (requirements.customerFacing && vector.empathy < 60) {
       areas.push('Emotional intelligence development for client interactions');
     }
     if (requirements.agileRequirement.adaptabilityWeight > 0.6 && vector.adaptability < 60) {
-      areas.push('Adaptability & change management — agile training recommended');
+      areas.push('Adaptability & change management - agile training recommended');
     }
 
     // Team dynamic gaps
     if ((requirements.teamDynamic === 'large_team' || requirements.teamDynamic === 'cross_functional') && vector.teamwork < 60) {
-      areas.push('Team collaboration skills — cross-functional project experience needed');
+      areas.push('Team collaboration skills - cross-functional project experience needed');
     }
     if (requirements.teamDynamic === 'solo' && vector.independence < 60) {
-      areas.push('Independent working capability — self-management skills development');
+      areas.push('Independent working capability - self-management skills development');
     }
 
     return areas;
@@ -1607,7 +1607,7 @@ Output ONLY a JSON array:
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // RESPONSE FORMATTING — Professional report for chat display
+  // RESPONSE FORMATTING - Professional report for chat display
   // ═══════════════════════════════════════════════════════════════════════════
   formatMatchResultForChat(result: JDMatchResult): string {
     const req = result.parsedRequirements;

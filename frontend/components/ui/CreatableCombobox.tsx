@@ -168,7 +168,7 @@ const CreatableCombobox: React.FC<CreatableComboboxProps> = ({
             )}
             {filtered.length === 0 && !showCreate && (
               <div className="px-4 py-3 text-sm text-gray-500 text-center">
-                No groups yet — start typing to create one
+                No groups yet - start typing to create one
               </div>
             )}
           </div>

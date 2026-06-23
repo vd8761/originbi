@@ -1,33 +1,33 @@
-# Level 3 — IAT Gen (Implicit Association Test)
+# Level 3 - IAT Gen (Implicit Association Test)
 
-Level 3's report (`iat_reports.report_text`) is AI-generated and therefore not directly aggregable across a cohort. But the **inputs** to that report — module-level speeds, error rates, slowest words, and the structured `bias_map` — are all clean numbers and arrays we can pivot, rank, and compare. The Know More page can show the corporate what the AI saw across the whole pool, not just one person.
+Level 3's report (`iat_reports.report_text`) is AI-generated and therefore not directly aggregable across a cohort. But the **inputs** to that report - module-level speeds, error rates, slowest words, and the structured `bias_map` - are all clean numbers and arrays we can pivot, rank, and compare. The Know More page can show the corporate what the AI saw across the whole pool, not just one person.
 
 ## Raw data available
 
-**`iat_attempt_modules` — one row per (candidate × IAT module)**
+**`iat_attempt_modules` - one row per (candidate × IAT module)**
 - `module_id` → `iat_modules.code / display_name` (e.g. Career bias, Gender bias, Leadership bias…)
-- `compatible_average_ms` — RT when stereotype-aligned pairing
-- `incompatible_average_ms` — RT when stereotype-conflicting pairing
+- `compatible_average_ms` - RT when stereotype-aligned pairing
+- `incompatible_average_ms` - RT when stereotype-conflicting pairing
 - `speed_gap_ms` = incompat − compat (the IAT D-score input)
 - `pattern_label` (e.g. `STRONG_BIAS`, `MODERATE`, `NEUTRAL`, `REVERSE_BIAS`)
-- `slowest_words` (jsonb array) — stimulus words this candidate slowed down on
-- `error_words` (jsonb array) — words they misclassified
+- `slowest_words` (jsonb array) - stimulus words this candidate slowed down on
+- `error_words` (jsonb array) - words they misclassified
 - `error_rate` (0–100)
 - `started_at`, `completed_at` → per-module duration
 
-**`iat_trials` — one row per stimulus shown**
+**`iat_trials` - one row per stimulus shown**
 - `block_type` (practice / compatible / incompatible / etc.)
 - `word_shown`, `left_label`, `right_label`
 - `expected_key`, `final_key_pressed`, `is_correct`
 - `response_time_ms`, `first_response_time_ms` (gap between them = hesitation)
 - `stimulus_id` → `iat_stimulus` (concept it belongs to)
 
-**`iat_keypress`** — every keypress including reversals (rare but tells us "almost picked X, switched to Y")
+**`iat_keypress`** - every keypress including reversals (rare but tells us "almost picked X, switched to Y")
 
 **`iat_reports`**
 - `bias_map` (jsonb array, structured per-module bias scores from the LLM)
-- `report_input` (jsonb — the exact data we fed the model; we can re-aggregate from it)
-- `report_text` (markdown narrative — *not* aggregable, candidate-level only)
+- `report_input` (jsonb - the exact data we fed the model; we can re-aggregate from it)
+- `report_text` (markdown narrative - *not* aggregable, candidate-level only)
 
 ---
 
@@ -60,7 +60,7 @@ The AI's structured per-module bias array is the same shape across candidates. W
 - Count candidates where bias_map[i].severity == "high" per dimension
 
 ### 6. Data-quality strip
-- % of attempts with error_rate > 30 (unreliable — IAT convention)
+- % of attempts with error_rate > 30 (unreliable - IAT convention)
 - % with extreme compatible_average_ms < 300 (too fast = random clicking)
 - Trustworthy cohort size after filtering noisy attempts
 - Toggle to filter the whole page to trustworthy-only
@@ -89,10 +89,10 @@ The AI's structured per-module bias array is the same shape across candidates. W
 | Practice effect | trials | First-block avg RT vs last-block avg RT |
 | Noisy attempt flag | module | `error_rate > 30 OR compat_avg < 300` |
 | Cohort bias strength | per module | `mean(speed_gap_ms)` across non-noisy attempts |
-| Cohort polarisation | per module | `std(speed_gap_ms)` — high = mixed pool, low = uniform |
+| Cohort polarisation | per module | `std(speed_gap_ms)` - high = mixed pool, low = uniform |
 | Concept hotspot | trials | `word_shown` ranked by `mean(RT)` across cohort |
 | Mistake hotspot | trials | `word_shown` ranked by `% incorrect` across cohort |
-| Cross-module consistency | per candidate | corr of speed_gap across their modules — flags response-style artefacts |
+| Cross-module consistency | per candidate | corr of speed_gap across their modules - flags response-style artefacts |
 
 ---
 
@@ -106,7 +106,7 @@ The AI narrative in `report_text` is per-person prose; we should not try to "ave
 ```
 [KPI strip] Completed L3 | Avg D-score | % strong bias | Noisy attempts excluded
 
-[Module bias panel — one card per IAT module]
+[Module bias panel - one card per IAT module]
   module name | distribution bar | avg speed gap | avg error rate | top slow words
 
 [Speed-gap distribution chart]  [Bias-map top dimensions]

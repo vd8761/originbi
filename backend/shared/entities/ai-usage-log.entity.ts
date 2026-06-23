@@ -5,7 +5,7 @@ import {
     CreateDateColumn,
 } from 'typeorm';
 
-/** Generic AI usage / token log — reusable across AI features (not just metaphor). */
+/** Generic AI usage / token log - reusable across AI features (not just metaphor). */
 @Entity('ai_usage_logs')
 export class AiUsageLog {
     @PrimaryGeneratedColumn({ type: 'bigint' })

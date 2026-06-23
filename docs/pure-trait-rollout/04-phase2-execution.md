@@ -1,4 +1,4 @@
-# Phase 2 — Execution (BEFORE → AFTER) · Finish the empty parts, make it real
+# Phase 2 - Execution (BEFORE → AFTER) · Finish the empty parts, make it real
 
 Completes the remaining Phase-2 jobs (CXO, School content + wiring across all
 report families) and threads the **engine's resolved trait** into the report
@@ -23,7 +23,7 @@ real `dominant_trait_code` source.
 1. **`most_answered_answer_type` COUNT values *are* the raw `disc_scores` sums**
    (`groupReportHelper.processSessionRows`, lines ~394-399). So the existing
    `getTopTwoTraits(most_answered…)` already orders on the **engine's own input**
-   and always returns a **2-letter** blend — it never emits a pure code and never
+   and always returns a **2-letter** blend - it never emits a pure code and never
    breaks on one. ⇒ The career/compatibility/element lookups need **no change**;
    only the **headline/archetype** site per report must become pure-capable.
 2. **College is already pure-compatible.** `collegeConstants.CONTENT` is keyed by
@@ -44,10 +44,10 @@ real `dominant_trait_code` source.
 ## Changes in this batch
 
 ### A. Content (4 pure keys each; no DISC letters; archetype names from the DB rows)
-- `cxoConstants.BLENDED_STYLE_MAPPING` — Bold Driver / Inspiring Motivator /
+- `cxoConstants.BLENDED_STYLE_MAPPING` - Bold Driver / Inspiring Motivator /
   Steadfast Anchor / Precise Perfectionist, **executive-flavoured** roles +
   `trait_combinations` (5-col table the CXO report renders).
-- `schoolConstants.SCHOOL_BLENDED_STYLE_MAPPING` — same 4 archetypes,
+- `schoolConstants.SCHOOL_BLENDED_STYLE_MAPPING` - same 4 archetypes,
   **school-flavoured** (stream/subject suggestions) + `trait_mapping1` /
   `trait_mapping2` (4-col tables the school report renders).
 - Employee: already authored (unchanged).
@@ -62,7 +62,7 @@ real `dominant_trait_code` source.
 - JSON builders (`employeeReportJSON`, `cxoReportJSON`, `schoolReportJSON`) →
   pure-capable headline for the blended-style block; other lookups untouched.
 
-### C. Real data source (Q2 — stop recomputing, read the engine)
+### C. Real data source (Q2 - stop recomputing, read the engine)
 - `types.ts`: add `dominant_trait_code?: string` to College/School/Employee/Cxo.
 - `groupReportHelper.processSessionRows`: select `aa.dominant_trait_id` +
   `LEFT JOIN personality_traits pt` → set `baseData.dominant_trait_code` from the
@@ -95,7 +95,7 @@ top-two blend behind `PURE_CAREER_ROWS_AVAILABLE`.
 - Content: `cxoConstants.ts` (+4 pure keys in `BLENDED_STYLE_MAPPING`),
   `schoolConstants.ts` (+4 pure keys in `SCHOOL_BLENDED_STYLE_MAPPING`, each with
   `trait_mapping1`/`trait_mapping2`).
-- Helper: `discTrait.ts` — new `resolveHeadlineFromReportData(data)` (single
+- Helper: `discTrait.ts` - new `resolveHeadlineFromReportData(data)` (single
   engine-consistent implementation: stored code → raw sums → scores).
 - Wiring: `cxoReport.ts`, `schoolReport.ts`, `schoolShortReport.ts`,
   `employeeReportJSON.ts`, `cxoReportJSON.ts`, `schoolReportJSON.ts` →
@@ -123,7 +123,7 @@ top-two blend behind `PURE_CAREER_ROWS_AVAILABLE`.
   PURE-I→"Inspiring Motivator"; blend-with-no-code→"Charismatic Leader".
 - 24 sample PDFs regenerated (12 jobs × ACI on/off), all `OK`. The PURE-I school
   log shows the headline using pure-I while the college/element fetch used the
-  top-two blend `ID` — the intended split in action.
+  top-two blend `ID` - the intended split in action.
 
 ### Behavioural guarantee confirmed
 - Existing blend profiles are unchanged: with a stored blend code the headline
@@ -134,7 +134,7 @@ top-two blend behind `PURE_CAREER_ROWS_AVAILABLE`.
   stored code, the identical rule on the raw sums). Career/compat/element sections
   keep the top-two blend behind `PURE_CAREER_ROWS_AVAILABLE` (still `false`).
 
-### Follow-up audit — placement / Level-1 family (Q10) — FIXED
+### Follow-up audit - placement / Level-1 family (Q10) - FIXED
 A re-audit surfaced that the **placement / Level-1 family** (in scope per Q10) had
 been missed and still carried the very issues Q1/Q5 called out:
 
@@ -149,26 +149,26 @@ been missed and still carried the very issues Q1/Q5 called out:
   `"Pure Dominance"…`, `HIGH_FACTOR_TEXT` was `"Pure Dominance (D): …"`, and
   `collegeConstants.blendedTraits` named them `"Decisive Driver" / "Inspiring
   Influencer" / "Steady Supporter" / "Precise Analyst"`. All three now use the
-  **canonical** names — Bold Driver / Inspiring Motivator / Steadfast Anchor /
-  Precise Perfectionist — with no DISC letters.
+  **canonical** names - Bold Driver / Inspiring Motivator / Steadfast Anchor /
+  Precise Perfectionist - with no DISC letters.
 - New guard: `database/scripts/validate_placement_trait_maps.js` (dist-based)
   asserts all 16 codes, canonical pure names, banned-pattern-free copy, and
-  `calculateDiscProfile == resolveDominantFactor` (incl. a discriminating case —
+  `calculateDiscProfile == resolveDominantFactor` (incl. a discriminating case -
   11/10/1/0 now resolves pure **D** where the old `>=20` gave `DI`). **PASS.**
-- Sample added: `college_level1_PURE-S` (Steadfast Anchor) — renders the canonical
+- Sample added: `college_level1_PURE-S` (Steadfast Anchor) - renders the canonical
   name across hero, specialization, and high-factor sections.
 
 With this, **all three pure-trait resolvers (Go engine, TS report mirror, and the
 placement helper) and every rendered pure name are consistent.**
 
-### Follow-up 2 — image/colour fallback + dashboard/JD/frontend audit
+### Follow-up 2 - image/colour fallback + dashboard/JD/frontend audit
 
 **Superhero image + trait colour → top-two blend fallback (pure score/name kept).**
 A Pure Trait has no dedicated artwork or colour yet (those are Q7/Q8), so every
 per-student surface that renders an archetype image/colour now borrows the
 candidate's **top-two blend** for the image + colour while still showing the Pure
 Trait's name and its own score. Implemented at:
-- `collegeLevel1Report` (PDF hero) — already did this (verified).
+- `collegeLevel1Report` (PDF hero) - already did this (verified).
 - `student.service.ts` → `PersonalityCard.tsx` (student's own card): the resolved
   trait now carries `imageName` (top-two blend name for a pure code, own name for
   a blend) + `colorRgb`; the card uses `imageName` for `/student_traits/*.png`.
@@ -185,19 +185,19 @@ Trait's name and its own score. Implemented at:
 - `mbaConstants.BEHAVIORAL_ORIENTATION` already had pure (D/I/S/C) keys.
 - Frontend `PersonalityOverview` aggregate cards hide a missing image via
   `onError` (graceful); aggregate has no per-card top-two so it keeps the DB
-  colour — acceptable until Q7/Q8.
+  colour - acceptable until Q7/Q8.
 
 **Hardcoded `20`:** confirmed the only pure-trait `>= 20` thresholds were
 `calculateDiscProfile` + `collegeLevel1Report` (both now delegate to the dynamic
 resolver). The remaining `20` in `exam_service.go` is the **sincerity** penalty
-(`AttentionFails * 20.0`), unrelated to pure traits — left as-is.
+(`AttentionFails * 20.0`), unrelated to pure traits - left as-is.
 
 **Build/verify:** `student-service` + `corporate-service` `nest build` → EXIT 0;
 trait validators still green. (Frontend `tsc` shows only pre-existing errors in
-Next's generated `.next/dev/types/*` cache — unrelated to the one-line component
+Next's generated `.next/dev/types/*` cache - unrelated to the one-line component
 change; recommend a `.next` rebuild to clear them.)
 
 ### Still open (master checklist, unchanged)
-Final pure-trait **images** (Q8) + **colours** (Q7) — until then the top-two
+Final pure-trait **images** (Q8) + **colours** (Q7) - until then the top-two
 blend fallback above is used; historical backfill (Job 9, last); ts-jest upgrade
 to enable jest `.spec.ts`.

@@ -44,7 +44,7 @@ export class GroupsService {
    *   - the programs of its member registrations (the few that carry one).
    *
    * Groups with no association at all get an empty `programs` array, meaning
-   * "no known program" — the UI treats those as program-agnostic (selectable
+   * "no known program" - the UI treats those as program-agnostic (selectable
    * for any program).
    */
   async findAll(): Promise<

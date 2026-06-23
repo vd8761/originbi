@@ -275,7 +275,7 @@ export class ChatMemoryService {
 
   /**
    * Compress older messages into a concise summary string.
-   * This is a fast, deterministic summarizer — no LLM call needed.
+   * This is a fast, deterministic summarizer - no LLM call needed.
    * Extracts key entities, topics, and data points mentioned.
    */
   private summarizeMessages(messages: { role: string; content: string }[]): string {

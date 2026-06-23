@@ -692,11 +692,11 @@ export class CorporateDashboardService {
       const second = topBuckets[1];
       const combined = first.percentage + second.percentage;
       if (first.percentage >= 60) {
-        verdict = `Mostly ${first.label.toLowerCase()} — this group leans strongly toward ${first.tagline.toLowerCase().replace(/\.$/, '')}.`;
+        verdict = `Mostly ${first.label.toLowerCase()} - this group leans strongly toward ${first.tagline.toLowerCase().replace(/\.$/, '')}.`;
       } else if (combined >= 60) {
-        verdict = `A mix of ${first.label.toLowerCase()} and ${second.label.toLowerCase()} — your pool is balanced between two energies.`;
+        verdict = `A mix of ${first.label.toLowerCase()} and ${second.label.toLowerCase()} - your pool is balanced between two energies.`;
       } else {
-        verdict = `A mixed group — no single style dominates, so expect varied working preferences.`;
+        verdict = `A mixed group - no single style dominates, so expect varied working preferences.`;
       }
     }
 
@@ -708,7 +708,7 @@ export class CorporateDashboardService {
     bucketList.forEach((b) => {
       if (b.percentage >= SHARE_HIGH) {
         if (b.key === 'action')
-          strengths.push('Strong on initiative — this group will move fast.');
+          strengths.push('Strong on initiative - this group will move fast.');
         if (b.key === 'people')
           strengths.push('Great at collaboration and communication.');
         if (b.key === 'steady')
@@ -718,18 +718,18 @@ export class CorporateDashboardService {
       }
       if (b.percentage < SHARE_LOW) {
         if (b.key === 'action')
-          watchouts.push('Few natural drivers — decision-making could slow.');
+          watchouts.push('Few natural drivers - decision-making could slow.');
         if (b.key === 'people')
           watchouts.push(
-            'Few natural connectors — team energy may need a boost.',
+            'Few natural connectors - team energy may need a boost.',
           );
         if (b.key === 'steady')
           watchouts.push(
-            'Few steady supporters — risk of burnout under pressure.',
+            'Few steady supporters - risk of burnout under pressure.',
           );
         if (b.key === 'careful')
           watchouts.push(
-            'Few careful thinkers — be cautious with detail-heavy roles.',
+            'Few careful thinkers - be cautious with detail-heavy roles.',
           );
       }
     });
@@ -741,14 +741,14 @@ export class CorporateDashboardService {
     if (reliablePct >= 80) {
       reliabilityTone = 'good';
       reliabilityNote =
-        'We trust this picture — most answers were given honestly.';
+        'We trust this picture - most answers were given honestly.';
     } else if (reliablePct >= 50) {
       reliabilityTone = 'mixed';
-      reliabilityNote = 'Mostly reliable — a few responses look rushed.';
+      reliabilityNote = 'Mostly reliable - a few responses look rushed.';
     } else if (total > 0) {
       reliabilityTone = 'weak';
       reliabilityNote =
-        'Many responses look rushed — read this picture loosely.';
+        'Many responses look rushed - read this picture loosely.';
     }
 
     return {
@@ -957,13 +957,13 @@ export class CorporateDashboardService {
         let verdict = `Not much signal on “${t.label}” yet.`;
         if (t.total > 0) {
           if (dominant.key === 'none') {
-            verdict = `Most people in your group show no hidden lean on “${t.label}” — a balanced picture.`;
+            verdict = `Most people in your group show no hidden lean on “${t.label}” - a balanced picture.`;
           } else if (dominant.key === 'slight') {
             verdict = `Most show only a slight hidden lean on “${t.label}”.`;
           } else if (dominant.key === 'moderate') {
-            verdict = `Most show a moderate hidden lean on “${t.label}” — worth noticing.`;
+            verdict = `Most show a moderate hidden lean on “${t.label}” - worth noticing.`;
           } else if (dominant.key === 'strong') {
-            verdict = `Most show a strong hidden lean on “${t.label}” — pay attention here.`;
+            verdict = `Most show a strong hidden lean on “${t.label}” - pay attention here.`;
           }
         }
 
@@ -1016,14 +1016,14 @@ export class CorporateDashboardService {
     let reliabilityNote = 'Treat these patterns with caution.';
     if (reliablePct >= 80) {
       reliabilityTone = 'good';
-      reliabilityNote = 'We trust this picture — most responses were clean.';
+      reliabilityNote = 'We trust this picture - most responses were clean.';
     } else if (reliablePct >= 50) {
       reliabilityTone = 'mixed';
-      reliabilityNote = 'Mostly reliable — a few responses look noisy.';
+      reliabilityNote = 'Mostly reliable - a few responses look noisy.';
     } else if (totalCandidates > 0) {
       reliabilityTone = 'weak';
       reliabilityNote =
-        'Many responses look noisy — read this picture loosely.';
+        'Many responses look noisy - read this picture loosely.';
     }
 
     return {
@@ -2641,7 +2641,7 @@ export class CorporateDashboardService {
   /**
    * Visual fallback for a Pure Trait (single-letter code): returns the image key
    * + colour of the candidate's TOP-TWO DISC blend (two highest factors,
-   * tie-break C>D>I>S — same rule as the report layer's `topTwoBlend`). Pure
+   * tie-break C>D>I>S - same rule as the report layer's `topTwoBlend`). Pure
    * traits have no dedicated artwork/colour yet, so they borrow the blend's;
    * the trait name + score stay the Pure Trait's own. Returns null on failure.
    */

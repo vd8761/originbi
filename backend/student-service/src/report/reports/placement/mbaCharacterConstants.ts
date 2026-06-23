@@ -13,7 +13,7 @@
 // cryptic code), the best-fit MBA specialization(s), concrete future roles with
 // the reasoning behind each suggestion, and targeted preparation recommendations.
 //
-// Authored content — intentionally self-contained so the report does not depend
+// Authored content - intentionally self-contained so the report does not depend
 // on per-trait DB career rows being populated for the MBA department.
 
 import { SpecializationCode } from '../college/mbaConstants';
@@ -27,7 +27,7 @@ export interface MBACharacterRole {
 }
 
 export interface MBACharacter {
-  /** DISC code — 2-letter blend or single-letter Pure Trait. */
+  /** DISC code - 2-letter blend or single-letter Pure Trait. */
   code: string;
   /** Canonical archetype name (matches personality_traits.blended_style_name). */
   name: string;
@@ -80,7 +80,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Growth Driver',
     tagline: 'Bold, persuasive, and energised by winning new business.',
     narrative:
-      'Growth Drivers combine decisive drive with natural influence — they set ambitious targets and rally people behind them. In a cohort they are the candidates who pitch confidently, take ownership of outcomes, and thrive when results are visible and measured.',
+      'Growth Drivers combine decisive drive with natural influence - they set ambitious targets and rally people behind them. In a cohort they are the candidates who pitch confidently, take ownership of outcomes, and thrive when results are visible and measured.',
     primarySpec: 'MKT',
     secondarySpec: 'OPS',
     futureRoles: [
@@ -98,12 +98,12 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
       },
     ],
     recommendations: [
-      'Channel drive into structured pitching — practise consultative selling, not just confident talking',
+      'Channel drive into structured pitching - practise consultative selling, not just confident talking',
       'Build numerical fluency (pricing, margins, ROI) so ambition is backed by data',
       'Take a visible team-lead role in a live project before campus drives',
     ],
     reasoning:
-      'High drive plus strong influence is the classic growth-leadership profile. These students close, persuade, and push outcomes — so revenue-facing marketing, sales, and business-development tracks reward their strengths fastest, with operations leadership as a strong second path.',
+      'High drive plus strong influence is the classic growth-leadership profile. These students close, persuade, and push outcomes - so revenue-facing marketing, sales, and business-development tracks reward their strengths fastest, with operations leadership as a strong second path.',
   },
   DS: {
     code: 'DS',
@@ -174,7 +174,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Brand Builder',
     tagline: 'Turns ideas and energy into market momentum.',
     narrative:
-      'Brand Builders lead with enthusiasm and creative drive. They generate ideas, energise teams, and move fast — a natural fit for brand, campaign, and growth roles that reward initiative and communication.',
+      'Brand Builders lead with enthusiasm and creative drive. They generate ideas, energise teams, and move fast - a natural fit for brand, campaign, and growth roles that reward initiative and communication.',
     primarySpec: 'MKT',
     secondarySpec: 'HR',
     futureRoles: [
@@ -205,7 +205,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The People Champion',
     tagline: 'Builds morale, trust, and engagement across teams.',
     narrative:
-      'People Champions blend warmth with people-energy. They make others feel included, smooth over friction, and keep teams motivated — strengths that map directly onto human-resources and engagement roles.',
+      'People Champions blend warmth with people-energy. They make others feel included, smooth over friction, and keep teams motivated - strengths that map directly onto human-resources and engagement roles.',
     primarySpec: 'HR',
     secondarySpec: 'MKT',
     futureRoles: [
@@ -236,7 +236,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Market Storyteller',
     tagline: 'Pairs communication flair with an eye for detail.',
     narrative:
-      'Market Storytellers combine expressive communication with attention to detail. They craft messages that land and back them with substance — well suited to research-led marketing, content, and customer-insight roles.',
+      'Market Storytellers combine expressive communication with attention to detail. They craft messages that land and back them with substance - well suited to research-led marketing, content, and customer-insight roles.',
     primarySpec: 'MKT',
     secondarySpec: 'BA',
     futureRoles: [
@@ -268,7 +268,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Delivery Manager',
     tagline: 'Gets things done consistently, under any conditions.',
     narrative:
-      'Delivery Managers are steady, responsible, and quietly driven. They deliver on commitments without drama and keep operations running — the backbone of execution-heavy teams.',
+      'Delivery Managers are steady, responsible, and quietly driven. They deliver on commitments without drama and keep operations running - the backbone of execution-heavy teams.',
     primarySpec: 'OPS',
     secondarySpec: 'FIN',
     futureRoles: [
@@ -299,7 +299,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Engagement Partner',
     tagline: 'Keeps teams aligned, positive, and working together.',
     narrative:
-      'Engagement Partners are supportive communicators who keep groups cohesive. They listen, mediate, and maintain a positive tone — strengths that suit HR partnering and client-coordination roles.',
+      'Engagement Partners are supportive communicators who keep groups cohesive. They listen, mediate, and maintain a positive tone - strengths that suit HR partnering and client-coordination roles.',
     primarySpec: 'HR',
     secondarySpec: 'MKT',
     futureRoles: [
@@ -330,7 +330,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Process Custodian',
     tagline: 'Guards quality, accuracy, and consistency.',
     narrative:
-      'Process Custodians combine steadiness with precision. They follow process meticulously, catch errors early, and hold standards — ideal for quality, compliance, and process-governance roles.',
+      'Process Custodians combine steadiness with precision. They follow process meticulously, catch errors early, and hold standards - ideal for quality, compliance, and process-governance roles.',
     primarySpec: 'OPS',
     secondarySpec: 'FIN',
     futureRoles: [
@@ -350,7 +350,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     recommendations: [
       'Learn Six Sigma, SOP design, and quality-control frameworks',
       'Build Excel and documentation depth for controls-heavy roles',
-      'Practise pace — set review cut-offs so thoroughness stays time-bound',
+      'Practise pace - set review cut-offs so thoroughness stays time-bound',
     ],
     reasoning:
       'Steadiness with precision is the process-and-controls profile. Operations and quality rewards meticulous, consistent specialists; finance (audit, compliance) is a strong second fit.',
@@ -362,7 +362,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Business Analyst',
     tagline: 'Leads with logic, structure, and data-backed decisions.',
     narrative:
-      'Business Analysts combine analytical depth with the confidence to drive conclusions. They structure ambiguous problems, interrogate data, and make recommendations stick — the core business-analytics and strategy profile.',
+      'Business Analysts combine analytical depth with the confidence to drive conclusions. They structure ambiguous problems, interrogate data, and make recommendations stick - the core business-analytics and strategy profile.',
     primarySpec: 'BA',
     secondarySpec: 'FIN',
     futureRoles: [
@@ -385,7 +385,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
       'Assemble a small portfolio of dashboards or analysis case studies',
     ],
     reasoning:
-      'Analytical strength paired with drive is the business-analyst profile — the reason this character reads as "Business Analyst" rather than a code. Analytics rewards their structured problem-solving; finance is a strong second fit for the same quantitative discipline.',
+      'Analytical strength paired with drive is the business-analyst profile - the reason this character reads as "Business Analyst" rather than a code. Analytics rewards their structured problem-solving; finance is a strong second fit for the same quantitative discipline.',
   },
   CI: {
     code: 'CI',
@@ -393,7 +393,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Data Storyteller',
     tagline: 'Finds patterns and explains them clearly.',
     narrative:
-      'Data Storytellers pair analytical thinking with communication. They uncover insight in data and make it understandable to non-technical stakeholders — a natural fit for analytics, BI, and insight roles.',
+      'Data Storytellers pair analytical thinking with communication. They uncover insight in data and make it understandable to non-technical stakeholders - a natural fit for analytics, BI, and insight roles.',
     primarySpec: 'BA',
     secondarySpec: 'MKT',
     futureRoles: [
@@ -424,7 +424,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Risk & Compliance Analyst',
     tagline: 'Methodical, accurate, and steady with detail.',
     narrative:
-      'Risk & Compliance Analysts combine precision with patience and reliability. They work systematically, document thoroughly, and keep things compliant — well matched to finance operations, audit, and risk roles.',
+      'Risk & Compliance Analysts combine precision with patience and reliability. They work systematically, document thoroughly, and keep things compliant - well matched to finance operations, audit, and risk roles.',
     primarySpec: 'FIN',
     secondarySpec: 'OPS',
     futureRoles: [
@@ -456,7 +456,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Frontline Leader',
     tagline: 'Decisive, competitive, and energised by ownership.',
     narrative:
-      'Frontline Leaders are direct and results-focused — they take charge, decide fast, and thrive under pressure. They suit roles where ownership and a competitive edge convert directly into performance.',
+      'Frontline Leaders are direct and results-focused - they take charge, decide fast, and thrive under pressure. They suit roles where ownership and a competitive edge convert directly into performance.',
     primarySpec: 'OPS',
     secondarySpec: 'MKT',
     futureRoles: [
@@ -474,7 +474,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
       },
     ],
     recommendations: [
-      'Pair drive with listening — invite input before committing decisions',
+      'Pair drive with listening - invite input before committing decisions',
       'Build the data fluency (targets, margins, KPIs) that backs bold calls',
       'Take a measurable, target-owning role before campus drives',
     ],
@@ -487,7 +487,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Relationship Builder',
     tagline: 'Wins people over with optimism and energy.',
     narrative:
-      'Relationship Builders are outgoing, persuasive, and people-first. They build rapport quickly and spark enthusiasm — strengths that shine in customer-facing marketing and people-facing HR roles.',
+      'Relationship Builders are outgoing, persuasive, and people-first. They build rapport quickly and spark enthusiasm - strengths that shine in customer-facing marketing and people-facing HR roles.',
     primarySpec: 'MKT',
     secondarySpec: 'HR',
     futureRoles: [
@@ -505,7 +505,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
       },
     ],
     recommendations: [
-      'Ground enthusiasm in strategy — learn the 4Ps and segmentation',
+      'Ground enthusiasm in strategy - learn the 4Ps and segmentation',
       'Build focus and follow-through to finish what energy starts',
       'Practise active listening so persuasion is balanced with empathy',
     ],
@@ -518,7 +518,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Dependable Coordinator',
     tagline: 'Calm, consistent, and trusted to follow through.',
     narrative:
-      'Dependable Coordinators bring calm, patience, and dependability. They support others, honour commitments, and keep teams stable — ideal for coordination, support, and people-operations roles.',
+      'Dependable Coordinators bring calm, patience, and dependability. They support others, honour commitments, and keep teams stable - ideal for coordination, support, and people-operations roles.',
     primarySpec: 'OPS',
     secondarySpec: 'HR',
     futureRoles: [
@@ -537,7 +537,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     ],
     recommendations: [
       'Practise adapting quickly when priorities change',
-      'Build assertiveness — voice your views as openly as you support others',
+      'Build assertiveness - voice your views as openly as you support others',
       'Strengthen Excel and coordination tooling for operations roles',
     ],
     reasoning:
@@ -549,7 +549,7 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
     mbaPersona: 'The Analytical Specialist',
     tagline: 'Accurate, evidence-led, and quality-driven.',
     narrative:
-      'Analytical Specialists hold a high bar for accuracy and structure. They think things through, rely on evidence, and produce work that withstands scrutiny — a natural fit for finance and analytics roles.',
+      'Analytical Specialists hold a high bar for accuracy and structure. They think things through, rely on evidence, and produce work that withstands scrutiny - a natural fit for finance and analytics roles.',
     primarySpec: 'FIN',
     secondarySpec: 'BA',
     futureRoles: [
@@ -582,7 +582,9 @@ export const MBA_CHARACTERS: Record<string, MBACharacter> = {
  * (the 2-letter blend of the first two valid DISC letters, else the pure trait,
  * else the Charismatic Leader) so the report never crashes on odd data.
  */
-export function getMBACharacter(rawCode: string | null | undefined): MBACharacter {
+export function getMBACharacter(
+  rawCode: string | null | undefined,
+): MBACharacter {
   const code = (rawCode || '').toUpperCase().replace(/[^DISC]/g, '');
   if (MBA_CHARACTERS[code]) return MBA_CHARACTERS[code];
   if (code.length >= 2 && MBA_CHARACTERS[code.slice(0, 2)]) {

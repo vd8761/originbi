@@ -12,7 +12,7 @@ var discFactorPriority = map[string]int{"C": 0, "D": 1, "I": 2, "S": 3}
 // trait code that is stored on assessment_attempts.dominant_trait_id (via the
 // personality_traits.code lookup).
 //
-// It returns a single letter ("D"/"I"/"S"/"C") — a "Pure Trait" — when one
+// It returns a single letter ("D"/"I"/"S"/"C") - a "Pure Trait" - when one
 // dimension is dominant enough, otherwise the top-two blend (e.g. "DI").
 //
 // Pure-trait rule (raw disc_scores; total = D+I+S+C):
@@ -20,7 +20,7 @@ var discFactorPriority = map[string]int{"C": 0, "D": 1, "I": 2, "S": 3}
 //	(1) top*2 >= total          // top is at least 50% of the candidate's own total
 //	(2) top/2  >  every other   // top strictly dominates each other dimension
 //
-// Guard: when the top score or the total is non-positive we never override —
+// Guard: when the top score or the total is non-positive we never override -
 // the result is the same blend (or single factor) the engine produced before,
 // so an empty/abandoned attempt is unaffected.
 //

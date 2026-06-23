@@ -17,7 +17,7 @@ const patternClass: Record<string, string> = {
   low: 'bg-emerald-500',
 };
 
-/** Slowest words from STRONG-pattern modules — used to flag scenario paragraphs. */
+/** Slowest words from STRONG-pattern modules - used to flag scenario paragraphs. */
 function collectStrongWords(modules: IatReportStatus['modules']): string[] {
   const words = new Set<string>();
   (modules || []).forEach((m) => {

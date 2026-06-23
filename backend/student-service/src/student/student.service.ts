@@ -462,7 +462,7 @@ export class StudentService {
       // The image/colour the UI should use. For a 2-letter blend it is the
       // trait's own. A Pure Trait (single-letter code) has no dedicated artwork
       // or colour yet (pending final assets), so it borrows the student's
-      // top-two blend for the superhero image + colour — while the headline
+      // top-two blend for the superhero image + colour - while the headline
       // still shows the Pure Trait name and its own score. Single seam, mirrors
       // the report layer's PURE_CAREER_ROWS_AVAILABLE fallback.
       trait.imageName = trait.name;
@@ -690,7 +690,7 @@ export class StudentService {
     // Retroactively honour the per-level enable toggle: hide levels that are
     // currently disabled AND not yet started. Started/completed levels are
     // kept so we never yank an in-progress or finished assessment. This is
-    // reversible — re-enabling the level brings the (still-existing) attempt
+    // reversible - re-enabling the level brings the (still-existing) attempt
     // back. Mirrors the registration-time filter for candidates who were
     // registered while the level was enabled.
     const toggledOffLevels =
@@ -1871,7 +1871,7 @@ export class StudentService {
             level,
           );
         }
-        // Generate Metaphor questions — gated + NON-FATAL: a metaphor
+        // Generate Metaphor questions - gated + NON-FATAL: a metaphor
         // failure must never break the core registration / Level 1.
         // Matched by pattern_type so it is robust to the level number.
         else if (this.isMetaphorLevel(level)) {
@@ -2376,7 +2376,7 @@ export class StudentService {
     const openQuestions = await this.selectOpenQuestionIds();
 
     // 4. Build the final order: all main questions, with the open/survey
-    // questions SCATTERED at random positions among them (no fixed ratio —
+    // questions SCATTERED at random positions among them (no fixed ratio -
     // they "appear anywhere in the exam").
     const finalQuestions: { id: number; type: 'MAIN' | 'OPEN' }[] =
       mainQuestions.map((q: any) => ({ id: q.id, type: 'MAIN' as const }));
@@ -2754,7 +2754,7 @@ export class StudentService {
 
   /**
    * Sends an SMS when WhatsApp was skipped (disabled) or failed. No-op if
-   * the per-template SMS toggle is off. Errors are swallowed — SMS is a
+   * the per-template SMS toggle is off. Errors are swallowed - SMS is a
    * best-effort fallback.
    */
   private async trySmsFallback(
@@ -2921,7 +2921,7 @@ export class StudentService {
         return;
       }
 
-      // Fire Completion WhatsApp (fire-and-forget) — before report generation
+      // Fire Completion WhatsApp (fire-and-forget) - before report generation
       this.fireCompletionWhatsapp(registration).catch((err) =>
         this.logger.error(
           `Completion WhatsApp failed for user ${userId}: ${err.message}`,
@@ -4228,14 +4228,14 @@ export class StudentService {
       // --- Positions calibrated to match frontend CertificatePreviewModal.tsx ---
       // Frontend uses cqw (container query width) units; 100cqw = 842pt
 
-      // Date (right 7%, top 12%) — Open Sans Bold 2.8cqw ≈ 24pt
+      // Date (right 7%, top 12%) - Open Sans Bold 2.8cqw ≈ 24pt
       doc
         .font(titleFont)
         .fontSize(24)
         .fillColor('#ffffff')
         .text(formattedDate, 580, 71, { width: 203, align: 'right' });
 
-      // Assessment Title (left 7%, top 27%) — Open Sans Bold, 7cqw or 5.5cqw
+      // Assessment Title (left 7%, top 27%) - Open Sans Bold, 7cqw or 5.5cqw
       const titleFontSize = assessmentTitle.length > 20 ? 46 : 59;
       doc
         .font(titleFont)
@@ -4283,7 +4283,7 @@ export class StudentService {
       doc.fillColor('#34d399').font(titleFont).text(part4, { continued: true });
       doc.fillColor('#e2e8f0').font(bodyFont).text(part5);
 
-      // Student Name — DM Serif Display Italic, 7.2cqw ≈ 61pt
+      // Student Name - DM Serif Display Italic, 7.2cqw ≈ 61pt
       // Frontend position: left 7%, top 54.0cqw (54% of container width = 454pt)
       // Title-cased name
       const titleCaseName = userName

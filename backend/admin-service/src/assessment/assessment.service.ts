@@ -49,7 +49,7 @@ export class AssessmentService {
     private readonly levelEligibility: LevelEligibilityService,
   ) {}
 
-  /** Terminal session statuses — a user with only these can receive a new exam. */
+  /** Terminal session statuses - a user with only these can receive a new exam. */
   private static readonly TERMINAL_SESSION_STATUSES = [
     'COMPLETED',
     'EXPIRED',
@@ -196,7 +196,7 @@ export class AssessmentService {
       }
       const programId = Number(registration.programId);
 
-      // Block assignment while a non-terminal session exists — only users with
+      // Block assignment while a non-terminal session exists - only users with
       // a completed/expired exam may receive a new one.
       const ongoingSession = await manager
         .getRepository(AssessmentSession)
@@ -635,7 +635,7 @@ export class AssessmentService {
     };
     qb.orderBy(sortMap[sortBy ?? ''] ?? 'MIN(ga.valid_from)', sortOrder);
 
-    // Aggregate rows are few (one per group+program) — fetch all, count, slice.
+    // Aggregate rows are few (one per group+program) - fetch all, count, slice.
     const allRows = await qb.getRawMany();
     const total = allRows.length;
     const pageRows = allRows.slice((page - 1) * limit, page * limit);
@@ -744,7 +744,7 @@ export class AssessmentService {
 
   /**
    * Survey (open question_type='SURVEY') answers for a session: the questions
-   * shown to this candidate plus the option they picked. Non-scoring — purely
+   * shown to this candidate plus the option they picked. Non-scoring - purely
    * for the admin "Survey" preview tab. Empty array => no survey in this exam.
    */
   async findSurveyAnswers(sessionId: number) {
@@ -1535,7 +1535,7 @@ export class AssessmentService {
       return {
         departments: stats.map((s) => {
           // Avoid duplicating the degree prefix when the department name already
-          // begins with it — e.g. "MBA" + "MBA (Master of Business Administration)"
+          // begins with it - e.g. "MBA" + "MBA (Master of Business Administration)"
           // collapses to "MBA (Master of Business Administration)".
           const deptName: string = s.departmentName ?? '';
           const degreeName: string = s.degreeName ?? '';
@@ -1828,7 +1828,7 @@ export class AssessmentService {
       );
       if (search && search.trim()) {
         const s = search.trim().toLowerCase();
-        // Allow email search too — re-filter in memory since email lives in
+        // Allow email search too - re-filter in memory since email lives in
         // a different table.
         const filtered = rows.filter((r) => {
           const email = emailByUserId.get(String(r.userId)) || '';

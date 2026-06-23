@@ -9,7 +9,7 @@ import Groq from 'groq-sdk';
  * ║   Advanced Multi-Dimensional Candidate-Job Matching for Corporate Users      ║
  * ╠═══════════════════════════════════════════════════════════════════════════════╣
  * ║  CORPORATE-SPECIFIC FEATURES:                                                ║
- * ║  • Mandatory corporate_id scoping — ONLY your candidates                     ║
+ * ║  • Mandatory corporate_id scoping - ONLY your candidates                     ║
  * ║  • Group-level filtering for department-specific matching                    ║
  * ║  • Company context-aware scoring with organizational fit analysis           ║
  * ║  • Department distribution insights                                          ║
@@ -375,7 +375,7 @@ export class CorporateJDMatchingService {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // MAIN ENTRY POINT: Corporate JD → Candidate Match
-  // corporateId is MANDATORY — enforces corporate scoping
+  // corporateId is MANDATORY - enforces corporate scoping
   // ═══════════════════════════════════════════════════════════════════════════
   async matchCandidatesToJD(
     jobDescription: string,
@@ -394,7 +394,7 @@ export class CorporateJDMatchingService {
 
     this.logger.log('═══════════════════════════════════════════════════');
     this.logger.log(
-      `🎯 CORPORATE JD MATCHING ENGINE — Corporate #${corporateId}`,
+      `🎯 CORPORATE JD MATCHING ENGINE - Corporate #${corporateId}`,
     );
     this.logger.log(`📄 JD Length: ${jobDescription.length} chars`);
     this.logger.log('═══════════════════════════════════════════════════');
@@ -474,7 +474,7 @@ export class CorporateJDMatchingService {
 
     const executionTimeMs = Date.now() - startTime;
     this.logger.log(
-      `✅ Corporate JD Matching complete in ${executionTimeMs}ms — ${topCandidates.length} matches`,
+      `✅ Corporate JD Matching complete in ${executionTimeMs}ms - ${topCandidates.length} matches`,
     );
 
     return {
@@ -901,7 +901,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     return key ? { ...PERSONALITY_VECTORS[key] } : { ...DEFAULT_VECTOR };
   }
 
-  // ── BEHAVIORAL ALIGNMENT SCORE (BAS) — 35% ──
+  // ── BEHAVIORAL ALIGNMENT SCORE (BAS) - 35% ──
 
   private calculateBehavioralAlignment(
     candidateVector: typeof DEFAULT_VECTOR,
@@ -1008,7 +1008,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     return denominator === 0 ? 0 : dotProduct / denominator;
   }
 
-  // ── AGILE READINESS SCORE (ARS) — 25% ──
+  // ── AGILE READINESS SCORE (ARS) - 25% ──
 
   private calculateAgileReadiness(
     candidate: CandidateProfile,
@@ -1031,7 +1031,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     return Math.max(0, sigmoidScore);
   }
 
-  // ── TRAIT-ROLE FIT SCORE (TFS) — 25% ──
+  // ── TRAIT-ROLE FIT SCORE (TFS) - 25% ──
 
   private calculateTraitRoleFit(
     candidateVector: typeof DEFAULT_VECTOR,
@@ -1124,7 +1124,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     return Math.max(0, Math.min(100, score / factors));
   }
 
-  // ── RELIABILITY & SINCERITY INDEX (RSI) — 15% ──
+  // ── RELIABILITY & SINCERITY INDEX (RSI) - 15% ──
 
   private calculateReliabilityIndex(candidate: CandidateProfile): number {
     let score = 50;
@@ -1414,17 +1414,17 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
 
     if (requirements.leadershipRequired && vector.leadership < 60)
       areas.push(
-        'Leadership development needed — consider mentoring/coaching programs',
+        'Leadership development needed - consider mentoring/coaching programs',
       );
     if (requirements.analyticalRequired && vector.analytical < 60)
       areas.push(
-        'Analytical skills enhancement — data literacy training recommended',
+        'Analytical skills enhancement - data literacy training recommended',
       );
     if (requirements.creativityRequired && vector.creativity < 60)
-      areas.push('Creative thinking — design thinking workshops could help');
+      areas.push('Creative thinking - design thinking workshops could help');
     if (requirements.customerFacing && vector.communication < 60)
       areas.push(
-        'Communication skills — presentation and interpersonal training',
+        'Communication skills - presentation and interpersonal training',
       );
     if (requirements.customerFacing && vector.empathy < 60)
       areas.push('Emotional intelligence development for client interactions');
@@ -1433,7 +1433,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
       vector.adaptability < 60
     )
       areas.push(
-        'Adaptability & change management — agile training recommended',
+        'Adaptability & change management - agile training recommended',
       );
     if (
       (requirements.teamDynamic === 'large_team' ||
@@ -1441,11 +1441,11 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
       vector.teamwork < 60
     )
       areas.push(
-        'Team collaboration skills — cross-functional project experience needed',
+        'Team collaboration skills - cross-functional project experience needed',
       );
     if (requirements.teamDynamic === 'solo' && vector.independence < 60)
       areas.push(
-        'Independent working capability — self-management skills development',
+        'Independent working capability - self-management skills development',
       );
 
     return areas;
@@ -1602,11 +1602,11 @@ Output ONLY a JSON array:
 
     if (strongFitPct < 5) {
       talentGapsSummary.push(
-        `Critical gap: Only ${Math.round(strongFitPct)}% of your workforce is a strong fit for this role — consider external hiring or targeted development programs`,
+        `Critical gap: Only ${Math.round(strongFitPct)}% of your workforce is a strong fit for this role - consider external hiring or targeted development programs`,
       );
     } else if (strongFitPct < 15) {
       talentGapsSummary.push(
-        `Moderate gap: ${Math.round(strongFitPct)}% strong fit rate — some development investment recommended`,
+        `Moderate gap: ${Math.round(strongFitPct)}% strong fit rate - some development investment recommended`,
       );
     }
 
@@ -1654,7 +1654,7 @@ Output ONLY a JSON array:
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // RESPONSE FORMATTING — Premium corporate-branded output
+  // RESPONSE FORMATTING - Premium corporate-branded output
   // ═══════════════════════════════════════════════════════════════════════════
 
   formatMatchResultForChat(result: JDMatchResult): string {
@@ -1662,7 +1662,7 @@ Output ONLY a JSON array:
 
     if (result.matchedCandidates.length === 0) {
       return (
-        `**🎯 Talent Match Report — ${company}**\n\n` +
+        `**🎯 Talent Match Report - ${company}**\n\n` +
         `No candidates matched the criteria for **${result.parsedRequirements.roleTitle}**.\n\n` +
         `**Position Details:**\n` +
         `• Seniority: ${result.parsedRequirements.seniorityLevel}\n` +
@@ -1684,7 +1684,7 @@ Output ONLY a JSON array:
     ).length;
 
     let response = `**🎯 Talent Intelligence Report**\n`;
-    response += `**${company}** — Internal Talent Match\n`;
+    response += `**${company}** - Internal Talent Match\n`;
     response += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     // ── Role Overview ──
@@ -1756,7 +1756,7 @@ Output ONLY a JSON array:
       // Predictions
       if (sc.successPrediction !== undefined) {
         response += `\n**Predictions:**\n`;
-        response += `• Success Rate — **${sc.successPrediction}%**`;
+        response += `• Success Rate - **${sc.successPrediction}%**`;
         if (sc.retentionRisk) {
           const riskIcon =
             sc.retentionRisk === 'LOW'
@@ -1764,11 +1764,11 @@ Output ONLY a JSON array:
               : sc.retentionRisk === 'MEDIUM'
                 ? '⚠️'
                 : '🔴';
-          response += `  ·  Retention Risk — ${riskIcon} ${sc.retentionRisk}`;
+          response += `  ·  Retention Risk - ${riskIcon} ${sc.retentionRisk}`;
         }
         response += '\n';
         if (sc.teamFitScore !== undefined) {
-          response += `• Team Compatibility — **${sc.teamFitScore}**/100\n`;
+          response += `• Team Compatibility - **${sc.teamFitScore}**/100\n`;
         }
       }
 

@@ -78,7 +78,7 @@ export { Notification } from './notification.entity';
 // Admin Settings
 export { OriginbiSetting } from './originbi-setting.entity';
 
-// Level 3 — Metaphor
+// Level 3 - Metaphor
 export { MetaphorQuestion } from './metaphor-question.entity';
 export { MetaphorAnswer } from './metaphor-answer.entity';
 export { MetaphorTranscriptionJob } from './metaphor-transcription-job.entity';
@@ -87,7 +87,7 @@ export { MetaphorReport } from './metaphor-report.entity';
 export { MetaphorReportJob } from './metaphor-report-job.entity';
 export { AiUsageLog } from './ai-usage-log.entity';
 
-// Level 2 — IAT Gen
+// Level 2 - IAT Gen
 export { IatModule } from './iat-module.entity';
 export { IatStimulus } from './iat-stimulus.entity';
 export { IatIntakeProfile } from './iat-intake-profile.entity';

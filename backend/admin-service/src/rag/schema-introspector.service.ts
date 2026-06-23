@@ -7,7 +7,7 @@ import { DataSource } from 'typeorm';
  * ║              SCHEMA INTROSPECTOR SERVICE                                  ║
  * ║     Auto-discovers database schema from the live database                 ║
  * ╠═══════════════════════════════════════════════════════════════════════════╣
- * ║  - No hardcoded schema — always in sync with the real DB                  ║
+ * ║  - No hardcoded schema - always in sync with the real DB                  ║
  * ║  - Caches at startup, refreshes periodically                              ║
  * ║  - Includes table relationships (foreign keys)                            ║
  * ║  - Provides sample data hints for LLM context                             ║
@@ -59,7 +59,7 @@ export class SchemaIntrospectorService implements OnModuleInit {
     'affiliate_accounts', 'affiliate_referral_transactions', 'affiliate_settlement_transactions',
   ];
 
-  // Columns that contain sensitive PII — never include sample values
+  // Columns that contain sensitive PII - never include sample values
   private readonly SENSITIVE_COLUMNS = new Set([
     'password', 'password_hash', 'token', 'secret', 'api_key',
     'mobile_number', 'phone', 'cognito_sub', 'refresh_token',
@@ -196,7 +196,7 @@ export class SchemaIntrospectorService implements OnModuleInit {
         AND tc.table_name = $1
     `, [tableName]);
 
-    // Get approximate row count (fast — uses pg statistics)
+    // Get approximate row count (fast - uses pg statistics)
     const countResult = await this.dataSource.query(`
       SELECT reltuples::bigint AS estimate
       FROM pg_class

@@ -152,7 +152,7 @@ const idbSet = async (key: string, value: any): Promise<void> => {
       req.onerror = () => reject(req.error);
     });
   } catch {
-    // Silently fail — cache is best-effort
+    // Silently fail - cache is best-effort
   }
 };
 
@@ -976,7 +976,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false);
   const [pdfPreviewProgress, setPdfPreviewProgress] = useState('');
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
-  // "Blocked" message (e.g. required assessment not completed) — shown WITHOUT
+  // "Blocked" message (e.g. required assessment not completed) - shown WITHOUT
   // a retry button, since retrying won't help until the data exists.
   const [pdfPreviewBlockedMessage, setPdfPreviewBlockedMessage] = useState<string | null>(null);
   // Whether we're currently restoring from cache (blocks generation trigger)
@@ -987,7 +987,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   // Track if cache restore has been attempted this mount
   const cacheRestoreAttemptedRef = useRef(false);
   // Track if the preview has been auto-generated this mount. Prevents the
-  // auto-trigger from retrying after a failure/blocked result — the user must
+  // auto-trigger from retrying after a failure/blocked result - the user must
   // click "Retry" explicitly (which bypasses this guard via forceRefresh).
   const previewAutoAttemptedRef = useRef(false);
   const [showReportPreviewAfterExam, setShowReportPreviewAfterExam] = useState(true);
@@ -1158,8 +1158,8 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       return;
     }
 
-    // Report is ready only when EVERY assigned level is completed — not a fixed
-    // count — so enabling Level 3/4 keeps the student in the assessment until done.
+    // Report is ready only when EVERY assigned level is completed - not a fixed
+    // count - so enabling Level 3/4 keeps the student in the assessment until done.
     const reportReady =
       assessments.length > 0 && completedAssessmentCount >= assessments.length;
     setForceReportPageMode(
@@ -1446,7 +1446,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       }
     }
 
-    // ===== NO CACHE — GENERATE FRESH REPORT =====
+    // ===== NO CACHE - GENERATE FRESH REPORT =====
     setIsPdfPreviewLoading(true);
     setReportPdfBytes(null);
     setReportPdfPassword(null);
@@ -1477,7 +1477,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       };
 
       // Blocked (e.g. required ACI assessment not completed): stop with the
-      // admin-configured message and NO retry button — retrying won't help.
+      // admin-configured message and NO retry button - retrying won't help.
       if (startData?.blocked) {
         setPdfPreviewBlockedMessage(
           startData.message || 'Please contact your administrator to receive your report.',
@@ -1576,7 +1576,7 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   // - No PDF in state, not loading, not restoring from cache, not locked
   // - Show report preview after exam is enabled
   // - It hasn't already been auto-attempted (so a failure/blocked result does
-  //   NOT auto-retry — the user must click Retry).
+  //   NOT auto-retry - the user must click Retry).
   useEffect(() => {
     if (!isReportPageMode || loading || !studentId || !showReportPreviewAfterExam) return;
     if (reportPdfBytes || isPdfPreviewLoading || isRestoringFromCache) return;

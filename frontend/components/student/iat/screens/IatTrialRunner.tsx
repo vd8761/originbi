@@ -129,7 +129,7 @@ export default function IatTrialRunner({
               )}
             </div>
 
-            {/* Per-part progress — quiet and thin so it doesn't pull focus. */}
+            {/* Per-part progress - quiet and thin so it doesn't pull focus. */}
             <IatProgressBar value={partProgress} />
 
             {modules.length > 0 && (

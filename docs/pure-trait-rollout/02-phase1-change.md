@@ -1,4 +1,4 @@
-# Phase 1 — Change Log (AFTER) · `dominant_trait_id` is pure-capable
+# Phase 1 - Change Log (AFTER) · `dominant_trait_id` is pure-capable
 
 Shipped: **2026-06-21** · Status: **complete, all tests green.**
 Design: see `01-phase1-design.md`. Tests: see `phase1-testcases.md`.
@@ -15,12 +15,12 @@ them.
 
 | File | Change |
 |------|--------|
-| `backend/exam-engine/internal/service/disc_trait.go` | **new** — `ResolveDominantFactor(map[string]float64) string` (the rule + C>D>I>S tie-break) |
-| `backend/exam-engine/internal/service/disc_trait_test.go` | **new** — 17-case table test |
+| `backend/exam-engine/internal/service/disc_trait.go` | **new** - `ResolveDominantFactor(map[string]float64) string` (the rule + C>D>I>S tie-break) |
+| `backend/exam-engine/internal/service/disc_trait_test.go` | **new** - 17-case table test |
 | `backend/exam-engine/internal/service/exam_service.go` | Level-1 block now calls `ResolveDominantFactor(scoreMap)`; removed the local top-two concat + `validScores` slice; dropped the now-unused `sort` import |
-| `database/migrations/032_pure_traits.sql` | **new** — 4 pure rows into `personality_traits` + `aci_traits` (idempotent, additive) |
-| `database/scripts/validate_pure_traits.js` | **new** — applies 032, asserts rows, Go/JS parity, real-data replay |
-| `database/scripts/explore_traits_db.js` | **new** — read-only schema/data explorer used during design |
+| `database/migrations/032_pure_traits.sql` | **new** - 4 pure rows into `personality_traits` + `aci_traits` (idempotent, additive) |
+| `database/scripts/validate_pure_traits.js` | **new** - applies 032, asserts rows, Go/JS parity, real-data replay |
+| `database/scripts/explore_traits_db.js` | **new** - read-only schema/data explorer used during design |
 
 ## Behaviour delta
 
@@ -46,7 +46,7 @@ node database/scripts/validate_pure_traits.js                                   
 - Engine: revert `disc_trait.go` + the `exam_service.go` block (re-add the
   top-two concat and the `sort` import). No data migration needed to revert code.
 - Rows: `UPDATE personality_traits SET is_deleted=true WHERE code IN ('D','I','S','C');`
-  and the same on `aci_traits.trait_code` (or `DELETE` — nothing references them yet).
+  and the same on `aci_traits.trait_code` (or `DELETE` - nothing references them yet).
 
 ## Content correction (post-review)
 
@@ -73,7 +73,7 @@ pure rows match the existing 12 in style and carry **no DISC-letter references**
 
 ## Still placeholder (tracked in master checklist)
 
-- Pure-trait **names/colours** are now real but **proposed** — swap via `UPDATE`
+- Pure-trait **names/colours** are now real but **proposed** - swap via `UPDATE`
   if you prefer different ones (Q7); image filenames derive from the name.
-- **Images** (Q8) — needed before the dashboard cards look right (Job 7).
-- Report-layer narrative for employee/CXO/school (Q9) — Phase 2.
+- **Images** (Q8) - needed before the dashboard cards look right (Job 7).
+- Report-layer narrative for employee/CXO/school (Q9) - Phase 2.

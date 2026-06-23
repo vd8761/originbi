@@ -5,7 +5,7 @@
  * Transpiles the real .ts constants (they have no imports).
  *
  * Covers: employee + cxo BLENDED_STYLE_MAPPING and school
- * SCHOOL_BLENDED_STYLE_MAPPING — the three headline-archetype maps that gained
+ * SCHOOL_BLENDED_STYLE_MAPPING - the three headline-archetype maps that gained
  * pure keys. (School's IDENTITY_MAP / CAREER_DOMAIN_MAP / DUAL_ARCHETYPE and the
  * college CONTENT map stay top-two-blend / single-primary keyed by design and so
  * need no pure keys.)

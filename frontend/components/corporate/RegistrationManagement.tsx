@@ -425,7 +425,7 @@ const RegistrationManagement: React.FC = () => {
               ({tabCounts[tab as keyof typeof tabCounts] ?? '...'})
             </button>
           ))}
-          {/* Send Emails — hidden tab revealed after clicking the button */}
+          {/* Send Emails - hidden tab revealed after clicking the button */}
           {showSendEmailsTab && (
             <button
               onClick={() => setActiveTab('send-emails')}
@@ -557,7 +557,7 @@ const RegistrationManagement: React.FC = () => {
         )}
       </div>
 
-      {/* Filters — hidden when Send Emails tab is active */}
+      {/* Filters - hidden when Send Emails tab is active */}
       {activeTab !== 'send-emails' && (
         <div className="flex flex-col xl:flex-row justify-between gap-4 items-start xl:items-center">
           <div className="relative w-full xl:w-96">
@@ -577,7 +577,7 @@ const RegistrationManagement: React.FC = () => {
               <BulkUploadIcon className="w-4 h-4 dark:text-white text-brand-green" />
             </button>
 
-            {/* Send Emails button — visible only on Individual Assessment tab */}
+            {/* Send Emails button - visible only on Individual Assessment tab */}
             {activeTab === 'individual' && (
               <button
                 onClick={() => { setShowSendEmailsTab(true); setActiveTab('send-emails'); }}
@@ -633,7 +633,7 @@ const RegistrationManagement: React.FC = () => {
         />
       )}
 
-      {/* Footer Pagination — hidden on Send Emails tab (pagination is in the top bar) */}
+      {/* Footer Pagination - hidden on Send Emails tab (pagination is in the top bar) */}
       {activeTab !== 'send-emails' && (
         <div className="flex justify-end gap-2 mt-4">
           <div className="flex items-center gap-2">

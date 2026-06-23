@@ -10,7 +10,7 @@
 --
 -- Additive + idempotent. Mutates existing level rows in place (never
 -- recreates) so existing attempts' assessment_level_id stays valid.
--- Existing in-flight registrations are NOT backfilled — the new levels
+-- Existing in-flight registrations are NOT backfilled - the new levels
 -- apply to NEW registrations only.
 -- ============================================================
 
@@ -51,7 +51,7 @@ INSERT INTO assessment_levels
     (level_number, name, description, pattern_type,
      unlock_after_hours, sort_order, is_mandatory, created_at, updated_at)
 SELECT 3, 'IAT Gen',
-       'Level 3 — IAT Gen. Implicit Association Test measuring instinctive bias patterns.',
+       'Level 3 - IAT Gen. Implicit Association Test measuring instinctive bias patterns.',
        'IAT_GEN', 0, 3, false, NOW(), NOW()
 WHERE NOT EXISTS (
     SELECT 1 FROM assessment_levels
@@ -77,43 +77,43 @@ WHERE UPPER(COALESCE(pattern_type, '')) = 'IAT_GEN';
 --    condition matches (see LevelEligibilityService).
 -- ------------------------------------------------------------
 
--- Level 1 — Behavioral
+-- Level 1 - Behavioral
 INSERT INTO originbi_settings (category, setting_key, value_type, value_boolean, label, description, display_order)
 VALUES ('levels', 'level1_enabled', 'boolean', true,
-        'Level 1 — Behavioral (enabled)', 'Enable the Level 1 Behavioral (DISC) assessment.', 1)
+        'Level 1 - Behavioral (enabled)', 'Enable the Level 1 Behavioral (DISC) assessment.', 1)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
 INSERT INTO originbi_settings (category, setting_key, value_type, value_json, label, description, display_order)
 VALUES ('levels', 'level1_scope_rules', 'json', '{"rules":[]}'::jsonb,
-        'Level 1 — Behavioral (scope)',
+        'Level 1 - Behavioral (scope)',
         'Restrict Level 1 to selected programs / departments / boards. Empty = everyone.', 2)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
--- Level 2 — ACI
+-- Level 2 - ACI
 INSERT INTO originbi_settings (category, setting_key, value_type, value_boolean, label, description, display_order)
 VALUES ('levels', 'level2_enabled', 'boolean', true,
-        'Level 2 — ACI (enabled)', 'Enable the Level 2 ACI assessment.', 3)
+        'Level 2 - ACI (enabled)', 'Enable the Level 2 ACI assessment.', 3)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
 INSERT INTO originbi_settings (category, setting_key, value_type, value_json, label, description, display_order)
 VALUES ('levels', 'level2_scope_rules', 'json', '{"rules":[]}'::jsonb,
-        'Level 2 — ACI (scope)',
+        'Level 2 - ACI (scope)',
         'Restrict Level 2 to selected programs / departments / boards. Empty = everyone.', 4)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
--- Level 3 — IAT Gen (off by default; opt-in)
+-- Level 3 - IAT Gen (off by default; opt-in)
 INSERT INTO originbi_settings (category, setting_key, value_type, value_boolean, label, description, display_order)
 VALUES ('levels', 'level3_enabled', 'boolean', false,
-        'Level 3 — IAT Gen (enabled)', 'Enable the Level 3 IAT Gen assessment.', 5)
+        'Level 3 - IAT Gen (enabled)', 'Enable the Level 3 IAT Gen assessment.', 5)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
 INSERT INTO originbi_settings (category, setting_key, value_type, value_json, label, description, display_order)
 VALUES ('levels', 'level3_scope_rules', 'json', '{"rules":[]}'::jsonb,
-        'Level 3 — IAT Gen (scope)',
+        'Level 3 - IAT Gen (scope)',
         'Restrict Level 3 to selected programs / departments / boards. Empty = everyone.', 6)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
--- Level 4 — Metaphor. Default enabled-state mirrors the metaphor level's
+-- Level 4 - Metaphor. Default enabled-state mirrors the metaphor level's
 -- current is_mandatory flag so behaviour is preserved.
 INSERT INTO originbi_settings (category, setting_key, value_type, value_boolean, label, description, display_order)
 VALUES ('levels', 'level4_enabled', 'boolean',
@@ -121,19 +121,19 @@ VALUES ('levels', 'level4_enabled', 'boolean',
                   WHERE level_number = 4
                      OR UPPER(COALESCE(pattern_type, '')) = 'METAPHOR'
                   LIMIT 1), true),
-        'Level 4 — Metaphor (enabled)', 'Enable the Level 4 Metaphor assessment.', 7)
+        'Level 4 - Metaphor (enabled)', 'Enable the Level 4 Metaphor assessment.', 7)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
 INSERT INTO originbi_settings (category, setting_key, value_type, value_json, label, description, display_order)
 VALUES ('levels', 'level4_scope_rules', 'json', '{"rules":[]}'::jsonb,
-        'Level 4 — Metaphor (scope)',
+        'Level 4 - Metaphor (scope)',
         'Restrict Level 4 to selected programs / departments / boards. Empty = everyone.', 8)
 ON CONFLICT (category, setting_key) DO NOTHING;
 
 -- ------------------------------------------------------------
 -- 3. Behaviour-preserving migration of the old IAT replacement config.
 --    If IAT was enabled as a Level-2 replacement, carry those rules onto
---    Level 3 and turn Level 3 on so the same cohorts keep getting IAT —
+--    Level 3 and turn Level 3 on so the same cohorts keep getting IAT -
 --    now as its own level instead of replacing ACI.
 -- ------------------------------------------------------------
 UPDATE originbi_settings dst
@@ -157,7 +157,7 @@ WHERE dst.category = 'levels' AND dst.setting_key = 'level3_enabled'
 --     can't be edited from the admin UI (kept for audit / rollback).
 UPDATE originbi_settings
 SET is_readonly = true,
-    description = description || ' [DEPRECATED — replaced by the Levels settings in migration 025.]',
+    description = description || ' [DEPRECATED - replaced by the Levels settings in migration 025.]',
     updated_at  = NOW()
 WHERE category = 'iat'
   AND setting_key IN ('enabled', 'level2_replacement_rules')
