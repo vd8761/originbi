@@ -9,13 +9,6 @@ import * as zlib from 'zlib';
 
 const WATERMARK_BG = 'public/assets/images/Watermark_Background.jpg';
 
-/**
- * Pure-trait threshold. The behavioural assessment has 40 questions; when a
- * single dimension is the most-answered type 20+ times it dominates strongly
- * enough to resolve to a "pure" single-trait profile (e.g. I = Pure Influence)
- * rather than a two-letter blend. Matches calculateDiscProfile().
- */
-const PURE_TRAIT_THRESHOLD = 20;
 
 /** Full-form names for the four behavioural dimensions (no letter codes). */
 const DIMENSION_NAMES: Record<string, string> = {
@@ -78,10 +71,10 @@ export class CollegeLevel1Report extends BaseReport {
     this._useStdMargins = false;
     this._currentBackground = null;
 
-    const combo = this.resolveProfileCode(
-      this.data.most_answered_answer_type,
-      this.data,
-    );
+    // Headline profile code from the single source of truth: the exam engine's
+    // resolved code (`dominant_trait_code`), else the same dynamic pure-trait
+    // rule applied to the raw sums — never a hardcoded threshold. Pure-capable.
+    const combo = this.resolveHeadlineTrait(this.data);
     const block = blendedTraits[combo] || blendedTraits.DI;
 
     // ── PAGE 1 ──
@@ -1151,35 +1144,6 @@ export class CollegeLevel1Report extends BaseReport {
   // ============================================================
   // UTILS
   // ============================================================
-  /**
-   * Resolves the DISC profile code for this student, honouring the pure-trait
-   * rule: when the strongest dimension is the most-answered type
-   * PURE_TRAIT_THRESHOLD (20) or more times, it resolves to a single-letter
-   * "pure" code (e.g. 'I' = Pure Influence) instead of a two-letter blend.
-   * Otherwise it falls back to the top-two traits concatenated.
-   *
-   * Sources values from the same place as getTopTwoTraits (most-answered
-   * counts when present, else the 0-100 scores) and uses the same priority
-   * tie-breaker, so the Level 1 report stays consistent with the rest of the
-   * suite.
-   */
-  private resolveProfileCode(
-    mostAnswered: { ANSWER_TYPE: string; COUNT: number }[],
-    scores: {
-      score_D: number;
-      score_I: number;
-      score_S: number;
-      score_C: number;
-    },
-  ): string {
-    const ranked = this.rankTraits(mostAnswered, scores);
-    const [top, second] = ranked;
-    // Pure-trait override: e.g. D:10 I:25 S:2 C:3 → 'I' (Pure Influence),
-    // because 25 >= 20, rather than the 'ID' blend.
-    if (top.val >= PURE_TRAIT_THRESHOLD) return top.type;
-    return top.type + second.type;
-  }
-
   /**
    * Legacy top-two blend code (no pure-trait override). Used only to pick the
    * hero artwork for pure profiles, which have no dedicated image of their own.

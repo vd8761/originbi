@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -511,25 +510,15 @@ func (s *ExamService) SubmitAnswer(req models.StudentAnswer) error {
 					GROUP BY o.disc_factor
 				`, answerRecord.AssessmentAttemptID).Scan(&scores)
 
-				var validScores []ScoreResult
 				for _, s := range scores {
 					totalScore += s.Total
 					if s.DiscFactor != "" {
 						scoreMap[s.DiscFactor] = s.Total
-						validScores = append(validScores, s)
 					}
 				}
 
-				// Determine Dominant Factor
-				sort.Slice(validScores, func(i, j int) bool {
-					return validScores[i].Total > validScores[j].Total
-				})
-
-				if len(validScores) >= 2 {
-					dominantFactor = validScores[0].DiscFactor + validScores[1].DiscFactor
-				} else if len(validScores) == 1 {
-					dominantFactor = validScores[0].DiscFactor
-				}
+				// Determine Dominant Factor (pure-trait aware — see disc_trait.go).
+				dominantFactor = ResolveDominantFactor(scoreMap)
 
 				// Find Dominant Trait ID
 				if dominantFactor != "" {

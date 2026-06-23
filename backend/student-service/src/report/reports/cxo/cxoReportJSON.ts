@@ -12,6 +12,7 @@
 
 import { CxoData, COLORS } from '../../types/types';
 import { logger } from '../../helpers/logger';
+import { resolveHeadlineFromReportData } from '../../helpers/discTrait';
 import {
   CXO_TOC_CONTENT,
   CXO_CONTENT,
@@ -359,8 +360,10 @@ export async function buildCxoReportJSON(
   // ── 2. Agile Scores ──
   const agile = data.agile_scores?.[0];
 
-  // ── 3. Blended Style ──
-  const blendedContent = BLENDED_STYLE_MAPPING[dominantTrait];
+  // ── 3. Blended Style ── (headline is pure-capable: engine's resolved code)
+  const headlineTrait = resolveHeadlineFromReportData(data);
+  const blendedContent =
+    BLENDED_STYLE_MAPPING[headlineTrait] || BLENDED_STYLE_MAPPING[dominantTrait];
 
   // ── Build the JSON response ──
   const response = {

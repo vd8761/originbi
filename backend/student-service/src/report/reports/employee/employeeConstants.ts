@@ -551,6 +551,123 @@ export const EMPLOYEE_DYNAMIC_CONTENT: Record<string, any> = {
 };
 
 export const BLENDED_STYLE_MAPPING: Record<string, any> = {
+  // ── Pure Traits (a single dominant DISC dimension) ────────────────────────
+  D: {
+    style_name: 'You are Bold Driver',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a decisive, results-driven professional who takes charge of challenges and pushes initiatives forward. Your confidence, urgency, and sense of ownership make you a natural force in fast-moving, high-stakes environments.</p>`,
+    nature_suggestions:
+      'Business Unit Head, Operations Director, Entrepreneur, Sales Director, Turnaround Manager',
+    key_behaviours: [
+      'Sets ambitious goals and pursues them decisively.',
+      'Makes fast, confident decisions under pressure.',
+      'Takes ownership and drives initiatives to completion.',
+      'Removes obstacles and keeps momentum high.',
+      'Thrives on competition, autonomy, and measurable results.',
+    ],
+    typical_scenarios: [
+      'Leading a high-stakes project against a tight deadline.',
+      'Turning around an underperforming team or function.',
+      'Driving an aggressive growth or expansion target.',
+      'Making the final call when a team is stalled or divided.',
+    ],
+    trait_combinations: [
+      [
+        'Bold Driver',
+        'Business Unit Head, Operations Director, Entrepreneur, Sales Director, Turnaround Manager',
+        'Driving results, decisive leadership, fast execution.',
+        'Slow-consensus, highly routine, or low-autonomy settings.',
+        'Detailed compliance work and long deliberation cycles.',
+      ],
+    ],
+  },
+
+  I: {
+    style_name: 'You are Inspiring Motivator',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are an outgoing, persuasive professional who energises people and builds relationships with ease. Your optimism and communication draw others in and turn ideas into shared momentum.</p>`,
+    nature_suggestions:
+      'Brand Manager, Corporate Communications Lead, Sales Manager, Talent Engagement Lead, Public Relations Manager',
+    key_behaviours: [
+      'Builds rapport quickly and connects people.',
+      'Communicates persuasively and with energy.',
+      'Inspires and rallies teams around a goal.',
+      'Adapts quickly to new people and situations.',
+      'Champions collaboration, recognition, and morale.',
+    ],
+    typical_scenarios: [
+      'Rallying a team around a new product or campaign launch.',
+      'Winning over stakeholders or clients in a pitch.',
+      'Representing the brand or function externally.',
+      'Lifting morale and engagement during a period of change.',
+    ],
+    trait_combinations: [
+      [
+        'Inspiring Motivator',
+        'Brand Manager, Corporate Communications Lead, Sales Manager, Talent Engagement Lead, Public Relations Manager',
+        'Inspiring people, building relationships, driving engagement.',
+        'Detail-heavy, solitary, or highly procedural work.',
+        'Data reconciliation and long independent analysis.',
+      ],
+    ],
+  },
+
+  S: {
+    style_name: 'You are Steadfast Anchor',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a calm, dependable professional who brings steadiness and trust to every team. You follow through consistently, support those around you, and keep the rhythm that others rely on.</p>`,
+    nature_suggestions:
+      'Operations Coordinator, Team Lead, Customer Success Manager, HR Generalist, Quality & Process Associate',
+    key_behaviours: [
+      'Follows through dependably and keeps commitments.',
+      'Supports colleagues patiently and listens well.',
+      'Maintains a steady, reliable working rhythm.',
+      'Brings harmony and stability to the team.',
+      'Values trust, cooperation, and a measured pace.',
+    ],
+    typical_scenarios: [
+      'Sustaining delivery on a long, demanding programme.',
+      'Supporting a team through a difficult transition.',
+      'Maintaining consistent service or product quality.',
+      'Mediating between colleagues to keep the team aligned.',
+    ],
+    trait_combinations: [
+      [
+        'Steadfast Anchor',
+        'Operations Coordinator, Team Lead, Customer Success Manager, HR Generalist, Quality & Process Associate',
+        'Reliable delivery, team support, steady execution.',
+        'High-pressure, rapid-pivot, or confrontational settings.',
+        'Aggressive sales targets and constant rapid change.',
+      ],
+    ],
+  },
+
+  C: {
+    style_name: 'You are Precise Perfectionist',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are an analytical, quality-driven professional who holds a high bar for accuracy and structure. You think things through, rely on evidence, and deliver work that stands up to scrutiny.</p>`,
+    nature_suggestions:
+      'Data Analyst, Quality Assurance Lead, Financial Analyst, Compliance Officer, Process Improvement Specialist',
+    key_behaviours: [
+      'Upholds high standards for accuracy and quality.',
+      'Relies on facts, data, and clear reasoning.',
+      'Thinks problems through before acting.',
+      'Brings structure and discipline to the work.',
+      'Ensures detail, fairness, and consistency.',
+    ],
+    typical_scenarios: [
+      'Ensuring accuracy on a complex, detail-heavy deliverable.',
+      'Designing a rigorous process or quality standard.',
+      'Analysing data to support an important decision.',
+      'Auditing work or systems for compliance and risk.',
+    ],
+    trait_combinations: [
+      [
+        'Precise Perfectionist',
+        'Data Analyst, Quality Assurance Lead, Financial Analyst, Compliance Officer, Process Improvement Specialist',
+        'Accuracy, structured analysis, quality assurance.',
+        'Ambiguous, improvised, or fast-and-loose work.',
+        'Snap decisions without data and constant context-switching.',
+      ],
+    ],
+  },
+
   DI: {
     style_name: 'You are Charismatic Leader',
     style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a bold and energetic leader who thrives on challenges and excels at inspiring others. Your charisma and drive for results make you a standout in dynamic, high-impact environments.</p>`,

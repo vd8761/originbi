@@ -896,8 +896,13 @@ export class SchoolShortReport extends BaseReport {
   // 1. ABOUT THIS REPORT
   // ------------------------------------------------------------
   private drawOverview(y: number, combo: string): number {
+    // Prefer the engine's resolved (pure-capable) headline for the style label;
+    // fall back to the passed top-two blend, then a safe default.
+    const headline = this.resolveHeadlineTrait(this.data);
     const block =
-      SCHOOL_BLENDED_STYLE_MAPPING[combo] || SCHOOL_BLENDED_STYLE_MAPPING.DI;
+      SCHOOL_BLENDED_STYLE_MAPPING[headline] ||
+      SCHOOL_BLENDED_STYLE_MAPPING[combo] ||
+      SCHOOL_BLENDED_STYLE_MAPPING.DI;
     const styleLabel = this.stripHtml(block.style_name || combo)
       .replace(/^you are\s+/i, '')
       .trim();

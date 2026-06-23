@@ -32,6 +32,13 @@ export interface CollegeData {
   program_type: number;
   agile_scores: AgileScore[];
   report_password?: string;
+  /**
+   * The headline trait code resolved by the exam engine (single source of truth),
+   * read from `personality_traits.code` via `dominant_trait_id`. Pure-capable
+   * (a single letter D/I/S/C) or a 2-letter blend. Optional: when absent (e.g. an
+   * attempt with no stored code) reports recompute with the same rule.
+   */
+  dominant_trait_code?: string;
 }
 
 export interface SchoolData {
@@ -54,6 +61,13 @@ export interface SchoolData {
   program_type: number;
   agile_scores: AgileScore[];
   report_password?: string;
+  /**
+   * The headline trait code resolved by the exam engine (single source of truth),
+   * read from `personality_traits.code` via `dominant_trait_id`. Pure-capable
+   * (a single letter D/I/S/C) or a 2-letter blend. Optional: when absent (e.g. an
+   * attempt with no stored code) reports recompute with the same rule.
+   */
+  dominant_trait_code?: string;
   dept_code?: string;
   group_name?: string;
   student_board?: string;
@@ -78,6 +92,13 @@ export interface EmployeeData {
   program_type: number;
   agile_scores: AgileScore[];
   report_password?: string;
+  /**
+   * The headline trait code resolved by the exam engine (single source of truth),
+   * read from `personality_traits.code` via `dominant_trait_id`. Pure-capable
+   * (a single letter D/I/S/C) or a 2-letter blend. Optional: when absent (e.g. an
+   * attempt with no stored code) reports recompute with the same rule.
+   */
+  dominant_trait_code?: string;
 }
 
 export interface CxoData {
@@ -99,6 +120,13 @@ export interface CxoData {
   program_type: number;
   agile_scores: AgileScore[];
   report_password?: string;
+  /**
+   * The headline trait code resolved by the exam engine (single source of truth),
+   * read from `personality_traits.code` via `dominant_trait_id`. Pure-capable
+   * (a single letter D/I/S/C) or a 2-letter blend. Optional: when absent (e.g. an
+   * attempt with no stored code) reports recompute with the same rule.
+   */
+  dominant_trait_code?: string;
 }
 
 export type MergedReportData =

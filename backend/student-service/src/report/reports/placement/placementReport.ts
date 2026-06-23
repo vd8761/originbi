@@ -26,6 +26,18 @@ import { logger } from '../../helpers/logger';
  * - Executive Summaries (Radar Charts, Personality Grids)
  * - Detailed Trait Sections (Profiles, Student Lists, Career Roadmaps)
  */
+/**
+ * Career-lookup code for a trait GROUP. A Pure-Trait group (single-letter code)
+ * has no `career_roles` of its own yet, so it borrows a representative blend
+ * (primary + highest-priority partner, tie-break C>D>I>S) — the group-level
+ * analogue of the per-student top-two fallback. Blend codes are unchanged.
+ */
+function groupCareerLookupCode(code: string): string {
+  if (!code || code.length !== 1) return code;
+  const partner = ['C', 'D', 'I', 'S'].find((f) => f !== code) || code;
+  return code + partner;
+}
+
 export class PlacementReport extends BaseReport {
   private data: PlacementData;
 
@@ -83,8 +95,11 @@ export class PlacementReport extends BaseReport {
     // Loop happens HERE
     for (const trait of this.data.trait_distribution) {
       if (trait.student_count > 0) {
+        // Pure-trait groups borrow a representative blend's career roles (none
+        // exist for single-letter codes yet); the section still shows the pure
+        // archetype name/description from `trait`.
         careerDataList = await getCareerGuidanceByTrait(
-          trait.trait_code,
+          groupCareerLookupCode(trait.trait_code),
           department_degree_id,
         );
 

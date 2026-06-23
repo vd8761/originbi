@@ -331,10 +331,12 @@ async function processSessionRows(
     // 2. For each session, fetch attempts (DISC + Agile usually)
     // We need COMPLETED attempts
     const attemptsQuery = `
-            SELECT status, metadata
-            FROM assessment_attempts
-            WHERE assessment_session_id = $1
-            AND status = 'COMPLETED'
+            SELECT aa.status, aa.metadata, aa.dominant_trait_id,
+                   pt.code AS dominant_trait_code
+            FROM assessment_attempts aa
+            LEFT JOIN personality_traits pt ON pt.id = aa.dominant_trait_id
+            WHERE aa.assessment_session_id = $1
+            AND aa.status = 'COMPLETED'
             `;
     const attemptsResult = await client.query(attemptsQuery, [
       session.session_id,
@@ -354,11 +356,15 @@ async function processSessionRows(
     // Merge Metadata
     let discData: any = null;
     let agileData: any = null;
+    // The engine's resolved headline code (pure-capable) lives on the DISC
+    // (Level 1) attempt via dominant_trait_id -> personality_traits.code.
+    let discTraitCode: string | null = null;
 
     for (const row of attemptsResult.rows) {
       const meta = row.metadata;
       if (meta.disc_scores) {
         discData = meta;
+        discTraitCode = row.dominant_trait_code ?? null;
       } else if (meta.agile_scores) {
         agileData = meta;
       }
@@ -471,6 +477,7 @@ async function processSessionRows(
       program_type: programId,
       agile_scores: [transformedAgile],
       report_password: session.report_password,
+      dominant_trait_code: discTraitCode ?? undefined,
     };
 
     // --- PROGRAM LOGIC ---

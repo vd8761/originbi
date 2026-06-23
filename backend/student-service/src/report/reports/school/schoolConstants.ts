@@ -1884,6 +1884,151 @@ export const SCHOOL_DYNAMIC_CONTENT: Record<string, any> = {
 };
 
 export const SCHOOL_BLENDED_STYLE_MAPPING: Record<string, any> = {
+  // ── Pure Traits (a single dominant DISC dimension) ────────────────────────
+  D: {
+    style_name: 'You are Bold Driver',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a confident, goal-driven student who likes to take charge and make things happen. You set your sights high, act decisively, and aren't afraid of a challenge — qualities that mark you out as a natural leader among your peers.</p>`,
+    nature_suggestions:
+      'Science with Entrepreneurship or Commerce with Business Studies; take up debate, student council, and leadership or innovation clubs',
+    key_behaviours: [
+      'Takes the lead and sets ambitious goals.',
+      'Makes decisions quickly and acts on them.',
+      'Takes ownership of projects and sees them through.',
+      'Stays focused and determined under pressure.',
+      'Enjoys competition, challenge, and clear results.',
+    ],
+    typical_scenarios: [
+      'Leading a team for a project, event, or competition.',
+      'Captaining a club, house, or sports team.',
+      'Driving a group to finish a task against a deadline.',
+      'Stepping up to make the call when classmates are unsure.',
+    ],
+    trait_mapping1: [
+      [
+        'Bold Driver',
+        'Team Captain, Student Leader, Entrepreneur, Project Lead, Event Organiser',
+        'Impatience, taking on too much, needing to be in control',
+        'Leadership, initiative, goal-setting, decisiveness',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Bold Driver',
+        'Team Captain, Student Leader, Entrepreneur, Project Lead, Event Organiser',
+        'Slow, highly routine, or low-independence tasks.',
+        'Leading, deciding quickly, and driving results.',
+      ],
+    ],
+  },
+
+  I: {
+    style_name: 'You are Inspiring Motivator',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are an outgoing, expressive student who connects easily with others and lifts the mood of any group. Your enthusiasm and communication draw people in, making you a natural at rallying classmates and sparking ideas.</p>`,
+    nature_suggestions:
+      'Humanities with Media Studies or Psychology, or Commerce with Marketing; join theatre, content creation, school press, or public-speaking clubs',
+    key_behaviours: [
+      'Builds friendships and connects with people easily.',
+      'Communicates with energy and persuasion.',
+      'Encourages and motivates the people around them.',
+      'Adapts quickly to new people and situations.',
+      'Brings creativity, optimism, and team spirit.',
+    ],
+    typical_scenarios: [
+      'Hosting an event or presenting in front of the class.',
+      'Rallying classmates around a campaign or cause.',
+      'Bringing energy and ideas to group work.',
+      'Welcoming new students and building team morale.',
+    ],
+    trait_mapping1: [
+      [
+        'Inspiring Motivator',
+        'Anchor/Host, Campaign Lead, Content Creator, Class Representative, Public Speaker',
+        'Losing focus on detail, over-committing, needing approval',
+        'Communication, creativity, teamwork, persuasion',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Inspiring Motivator',
+        'Anchor/Host, Campaign Lead, Content Creator, Class Representative, Public Speaker',
+        'Detail-heavy, solitary, or strictly procedural tasks.',
+        'Inspiring people, communicating, and building connections.',
+      ],
+    ],
+  },
+
+  S: {
+    style_name: 'You are Steadfast Anchor',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a calm, dependable student whom others trust and rely on. You follow through on what you start, support your friends patiently, and bring a steady, reassuring presence to any team.</p>`,
+    nature_suggestions:
+      'Any stream with consistent, structured subjects (Science, Commerce, or Humanities); take up peer-support, NSS/NCC, sports teams, or community service',
+    key_behaviours: [
+      'Follows through dependably and keeps promises.',
+      'Supports classmates patiently and listens well.',
+      'Works at a steady, reliable pace.',
+      'Helps keep the group calm and united.',
+      'Values fairness, trust, and cooperation.',
+    ],
+    typical_scenarios: [
+      'Being the reliable member who finishes the group’s work.',
+      'Supporting a friend or teammate through a tough patch.',
+      'Keeping a long project on track week after week.',
+      'Helping settle disagreements within a team.',
+    ],
+    trait_mapping1: [
+      [
+        'Steadfast Anchor',
+        'Team Player, Peer Mentor, Coordinator, Support Lead, Reliable Organiser',
+        'Avoiding conflict, resisting sudden change, under-claiming credit',
+        'Reliability, teamwork, patience, follow-through',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Steadfast Anchor',
+        'Team Player, Peer Mentor, Coordinator, Support Lead, Reliable Organiser',
+        'High-pressure, rapidly changing, or confrontational tasks.',
+        'Steady delivery, supporting others, and dependable teamwork.',
+      ],
+    ],
+  },
+
+  C: {
+    style_name: 'You are Precise Perfectionist',
+    style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a careful, analytical student who values accuracy and doing things the right way. You think problems through, pay attention to detail, and take pride in work that is thorough and well-reasoned.</p>`,
+    nature_suggestions:
+      'Science with PCM or Computer Science; explore coding, robotics, research, quiz, or laboratory clubs',
+    key_behaviours: [
+      'Sets high standards for accuracy and quality.',
+      'Works from facts, logic, and careful thinking.',
+      'Plans and thinks things through before acting.',
+      'Brings structure and order to tasks.',
+      'Pays close attention to detail and fairness.',
+    ],
+    typical_scenarios: [
+      'Making sure a project or experiment is accurate and complete.',
+      'Researching carefully before reaching a conclusion.',
+      'Organising notes, data, or a process clearly.',
+      'Checking work for mistakes before it is submitted.',
+    ],
+    trait_mapping1: [
+      [
+        'Precise Perfectionist',
+        'Researcher, Analyst, Coder, Lab Lead, Quiz/Olympiad Participant',
+        'Over-analysing, hesitating to start, being hard on yourself',
+        'Analysis, attention to detail, planning, problem-solving',
+      ],
+    ],
+    trait_mapping2: [
+      [
+        'Precise Perfectionist',
+        'Researcher, Analyst, Coder, Lab Lead, Quiz/Olympiad Participant',
+        'Ambiguous, improvised, or fast-and-loose tasks.',
+        'Accuracy, structured thinking, and quality work.',
+      ],
+    ],
+  },
+
   DI: {
     style_name: 'You are Charismatic Leader',
     style_desc: `<p><b style="font-family:inter_18ptsemib;">Description: </b> You are a bold and energetic leader who thrives on challenges and excels at inspiring others. Your charisma and drive for results make you a standout in dynamic, high-impact environments.</p>`,

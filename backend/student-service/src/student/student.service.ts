@@ -12,6 +12,7 @@ import { getPlacementReportEmailTemplate } from '../mail/templates/placement-rep
 import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { User } from '../entities/student.entity';
+import { topTwoBlend } from '../report/helpers/discTrait';
 
 import { AssessmentSession } from '../entities/assessment_session.entity';
 import { AssessmentAttempt } from '../entities/assessment_attempt.entity';
@@ -442,11 +443,12 @@ export class StudentService {
 
     // Fetch the dominant trait from the latest completed assessment attempt
     const traitQuery = `
-      SELECT 
-        pt.id, 
-        pt.blended_style_name as name, 
+      SELECT
+        pt.id,
+        pt.blended_style_name as name,
         pt.code,
-        pt.color_rgb
+        pt.color_rgb,
+        aa.metadata->'disc_scores' as disc_scores
       FROM assessment_attempts aa
       JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
       WHERE aa.user_id = $1 AND aa.status = 'COMPLETED'
@@ -455,6 +457,37 @@ export class StudentService {
     `;
     const traitResult = await this.userRepo.query(traitQuery, [user.id]);
     const trait = traitResult && traitResult.length > 0 ? traitResult[0] : null;
+
+    if (trait) {
+      // The image/colour the UI should use. For a 2-letter blend it is the
+      // trait's own. A Pure Trait (single-letter code) has no dedicated artwork
+      // or colour yet (pending final assets), so it borrows the student's
+      // top-two blend for the superhero image + colour — while the headline
+      // still shows the Pure Trait name and its own score. Single seam, mirrors
+      // the report layer's PURE_CAREER_ROWS_AVAILABLE fallback.
+      trait.imageName = trait.name;
+      trait.colorRgb = trait.color_rgb;
+      if (typeof trait.code === 'string' && trait.code.length === 1) {
+        const ds = trait.disc_scores || {};
+        const blendCode = topTwoBlend({
+          D: Number(ds.D ?? ds.d) || 0,
+          I: Number(ds.I ?? ds.i) || 0,
+          S: Number(ds.S ?? ds.s) || 0,
+          C: Number(ds.C ?? ds.c) || 0,
+        });
+        if (blendCode && blendCode.length === 2) {
+          const blendRows = await this.userRepo.query(
+            `SELECT blended_style_name as name, color_rgb FROM personality_traits WHERE code = $1 LIMIT 1`,
+            [blendCode],
+          );
+          if (blendRows && blendRows[0]) {
+            trait.imageName = blendRows[0].name || trait.name;
+            trait.colorRgb = blendRows[0].color_rgb || trait.color_rgb;
+          }
+        }
+      }
+      delete trait.disc_scores;
+    }
 
     // Fetch program type and academic details from registration
     const programQuery = `

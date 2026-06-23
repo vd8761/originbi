@@ -2,6 +2,7 @@
 import * as PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveHeadlineFromReportData } from '../helpers/discTrait';
 
 // --- Shared Interfaces ---
 
@@ -387,6 +388,24 @@ export class BaseReport {
     });
 
     return [traitScores[0].type, traitScores[1].type];
+  }
+
+  /**
+   * Resolves the HEADLINE trait code (pure-capable: may return a single letter).
+   * Single source of truth is the exam engine — prefer the resolved code stored
+   * on the data (`dominant_trait_code`); only fall back to recomputing from raw
+   * DISC scores when that is absent (e.g. an attempt predating the engine change).
+   * Use `discTrait.careerLookupCode` for the trait_id-keyed career/compat lookups.
+   */
+  protected resolveHeadlineTrait(data: {
+    dominant_trait_code?: string;
+    most_answered_answer_type?: { ANSWER_TYPE: string; COUNT: number }[];
+    score_D: number;
+    score_I: number;
+    score_S: number;
+    score_C: number;
+  }): string {
+    return resolveHeadlineFromReportData(data);
   }
 
   /**
