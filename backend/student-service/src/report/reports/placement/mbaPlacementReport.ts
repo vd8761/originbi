@@ -738,12 +738,14 @@ export class MBAPlacementReport extends BaseReport {
   // }
 
   /**
-   * VARIANT B (active): specialization fit as a compact **table** sorted by this
-   * character's **fit ranking** (rank 1 at the top, down to 5). Columns: rank
-   * badge, specialization, a five-dot fit meter (filled = 6 - rank) and a
-   * colour-coded behavioural-alignment pill. The best-fit (rank 1) top row is
-   * pulled out with a tinted band and the spec accent so the winner reads at a
-   * glance. The bar-chart variant is kept above, commented out.
+   * VARIANT B (active): specialization fit as a compact **table** in the report's
+   * fixed **elective order** (HR, FIN, MKT, OPS, BA - so every character lists the
+   * five the same way and stays comparable). Columns: an S.No (1-5, the row's
+   * position in that order), specialization, a five-dot fit meter (filled = 6 -
+   * fit rank) and a colour-coded behavioural-alignment pill. The best-fit row (fit
+   * rank 1) is still pulled out with a tinted band and the spec accent so the
+   * winner reads at a glance without reordering the list. The bar-chart variant is
+   * kept above, commented out.
    */
   private drawElectiveRanking(c: MBACharacter): void {
     const x = this.MARGIN_STD;
@@ -752,10 +754,11 @@ export class MBAPlacementReport extends BaseReport {
       ['D', 'I', 'S', 'C'].includes(c.code[0]) ? c.code[0] : 'D'
     ) as DiscTrait;
 
-    // Rank each spec (best-first) and render the rows in that rank order (1..5).
-    const ranked = this.characterElectiveOrder(c);
+    // Fit rank per spec (best-first) - drives the dot meter and the best-fit
+    // highlight only. Rows stay in fixed elective order; the S.No column is just
+    // their 1..5 position in that order.
     const rankOf = {} as Record<SpecializationCode, number>;
-    ranked.forEach((code, i) => (rankOf[code] = i + 1));
+    this.characterElectiveOrder(c).forEach((code, i) => (rankOf[code] = i + 1));
 
     // Alignment pill styles - soft tint + saturated text per strength.
     const alignStyle: Record<string, { bg: string; fg: string }> = {
@@ -766,7 +769,7 @@ export class MBAPlacementReport extends BaseReport {
 
     const headH = 20;
     const rowH = 27;
-    const rows = ranked;
+    const rows = this.electiveDisplayOrder();
     const tableH = headH + rows.length * rowH;
 
     // Keep heading, intro and the whole table together on one page.
@@ -800,7 +803,7 @@ export class MBAPlacementReport extends BaseReport {
     // tables - COLOR_DEEP_BLUE fill with white text).
     this.doc.rect(x, top, fullW, headH).fill(this.COLOR_DEEP_BLUE);
     const heads: Array<[string, number, number, 'left' | 'center']> = [
-      ['RANK', xRank, cRank, 'center'],
+      ['S.No', xRank, cRank, 'center'],
       ['SPECIALIZATION', xSpec + 12, cSpec - 12, 'left'],
       ['FIT STRENGTH', xFit + 14, cFit - 14, 'left'],
       ['ALIGNMENT', xAlign, cAlign, 'center'],
@@ -833,14 +836,18 @@ export class MBAPlacementReport extends BaseReport {
       const rowY = top + headH + i * rowH;
       const cy = rowY + rowH / 2;
 
-      // Rank badge (spec accent disc + white number).
+      // S.No badge (spec accent disc + white number) - sequential 1..5 in
+      // elective order, NOT the fit rank.
       const bcx = xRank + cRank / 2;
       this.doc.circle(bcx, cy, 8.5).fill(meta.accent);
       this.doc
         .font(this.FONT_SORA_BOLD)
         .fontSize(9)
         .fillColor('#FFFFFF')
-        .text(String(rank), bcx - 10, cy - 5.6, { width: 20, align: 'center' });
+        .text(String(i + 1), bcx - 10, cy - 5.6, {
+          width: 20,
+          align: 'center',
+        });
 
       // Specialization name (best-fit row uses the spec accent colour).
       const nameFs = 10;
