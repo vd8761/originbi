@@ -50,10 +50,19 @@ export interface MBACharacter {
 }
 
 /**
- * Canonical display order: the 12 blends first (matching ORDERED_STYLES), then
- * the 4 Pure Traits. The report iterates this order and skips empty characters.
+ * Canonical display order: the **four Pure Traits first** (D, I, S, C), then the
+ * twelve blends grouped by dominant family (D blends, I blends, S blends, C
+ * blends). The radar, the headcount grid, the table of contents and the
+ * per-character sections all iterate this order; sections / TOC additionally
+ * skip characters with no students.
+ *
+ *   D · I · S · C   |   DI · DS · DC   |   ID · IS · IC   |   SD · SI · SC   |   CD · CI · CS
  */
 export const MBA_CHARACTER_ORDER: string[] = [
+  'D',
+  'I',
+  'S',
+  'C',
   'DI',
   'DS',
   'DC',
@@ -66,11 +75,51 @@ export const MBA_CHARACTER_ORDER: string[] = [
   'CD',
   'CI',
   'CS',
-  'D',
-  'I',
-  'S',
-  'C',
 ];
+
+/**
+ * The headcount grid laid out as **two rows of eight** (the "8 + 8" variant) -
+ * the same 16 in `MBA_CHARACTER_ORDER`, split into a top and bottom table.
+ */
+export const MBA_GRID_ROWS: string[][] = [
+  MBA_CHARACTER_ORDER.slice(0, 8),
+  MBA_CHARACTER_ORDER.slice(8, 16),
+];
+
+/**
+ * When a Pure Trait has no illustration of its own, it borrows the art of its
+ * **top-two combination** - the dominant trait paired with its strongest
+ * partner (D→DI, I→ID, S→SD, C→CD). The persona, data and copy stay Pure; only
+ * the image falls back.
+ */
+const PURE_TRAIT_ART_SOURCE: Record<string, string> = {
+  D: 'DI',
+  I: 'ID',
+  S: 'SD',
+  C: 'CD',
+};
+
+const artFileForName = (name: string): string =>
+  `${name.replace(/\s+/g, '_')}.png`;
+
+/**
+ * Ordered comic-art filename candidates (under
+ * public/assets/images/student_traits/) for a character, best first. Blends
+ * resolve to their own archetype illustration. Pure Traits try their own
+ * illustration first, then fall back to their top-two combination's art (see
+ * PURE_TRAIT_ART_SOURCE). The caller picks the first file that exists.
+ */
+export function getCharacterArtCandidates(code: string): string[] {
+  const c = getMBACharacter(code);
+  if (c.code.length === 1) {
+    const combo = MBA_CHARACTERS[PURE_TRAIT_ART_SOURCE[c.code] || 'DI'];
+    return [
+      artFileForName(c.name),
+      artFileForName((combo || MBA_CHARACTERS.DI).name),
+    ];
+  }
+  return [artFileForName(c.name)];
+}
 
 export const MBA_CHARACTERS: Record<string, MBACharacter> = {
   // ── High-D blends ─────────────────────────────────────────────────────────
