@@ -165,67 +165,108 @@ export const reportQueueService = {
 
       logger.info(`[JOB:${jobId}] Fetching placement details...`);
 
-      // 1. Fetch Data
-      const placementData = await getPlacementDetails(deptDegreeId, groupId);
+      let filePath: string;
 
-      if (!placementData) {
-        jobStore.set(jobId, {
-          status: 'ERROR',
-          error:
-            'No placement data found for this group/department combination.',
-        });
-        return;
-      }
-
-      jobStore.set(jobId, {
-        status: 'PROCESSING',
-        progress: 'Generating PDF...',
-      });
-
-      // Detect MBA departments - they get a specialization-based handbook by
-      // default. An explicit reportTypeOverride from the API (e.g. the admin
-      // chose "Standard Placement Report" for an MBA dept) wins over auto-detect.
-      const autoIsMBA =
-        placementData.department_name?.toUpperCase().includes('MBA') ||
-        placementData.group_name?.toUpperCase().includes('MBA') ||
-        placementData.report_title?.toUpperCase().includes('MBA');
-      const isMBA =
-        reportTypeOverride === 'mba'
-          ? true
-          : reportTypeOverride === 'standard'
-            ? false
-            : autoIsMBA;
-
-      // 2. Generate PDF Name
-      const safeGroup = placementData.group_name.replace(/[^a-zA-Z0-9]/g, '_');
-      const safeDept = placementData.department_name.replace(
-        /[^a-zA-Z0-9]/g,
-        '_',
-      );
-      const fileName = `${
-        isMBA ? 'MBA_Placement' : 'Placement_Handbook'
-      }_${safeGroup}_${safeDept}.pdf`;
-      const filePath = path.join(jobDir, fileName);
-
-      logger.info(`[JOB:${jobId}] Generating ${fileName}...`);
-
-      // 3. Generate Report - MBA cohorts use the specialization-based report;
-      // all others use the standard DISC-style placement handbook.
-      if (isMBA) {
+      // ── Special MBA Report (explicit) ────────────────────────────────────
+      // The MBA handbook only needs Level-1 (DISC) data and has its OWN cohort
+      // fetch (getMBAPlacementDetails, which includes Level-1-only students). Do
+      // NOT gate it on getPlacementDetails: that fetch inner-joins a consolidated
+      // assessment_reports row (≈ full completion / backfill) and would wrongly
+      // abort an MBA report whose students have only finished Level 1.
+      if (reportTypeOverride === 'mba') {
         const mbaData = await getMBAPlacementDetails(deptDegreeId, groupId);
-        if (mbaData && mbaData.total_students > 0) {
-          logger.info(
-            `[JOB:${jobId}] MBA department detected - using MBAPlacementReport (${mbaData.total_students} students).`,
-          );
-          await new MBAPlacementReport(mbaData).generate(filePath);
+        if (!mbaData || mbaData.total_students === 0) {
+          jobStore.set(jobId, {
+            status: 'ERROR',
+            error:
+              'No students with a completed Level 1 assessment were found for this MBA group/department.',
+          });
+          return;
+        }
+
+        jobStore.set(jobId, {
+          status: 'PROCESSING',
+          progress: 'Generating PDF...',
+        });
+
+        const safeGroup = (mbaData.group_name || 'Group').replace(
+          /[^a-zA-Z0-9]/g,
+          '_',
+        );
+        const safeDept = (mbaData.department_name || 'Dept').replace(
+          /[^a-zA-Z0-9]/g,
+          '_',
+        );
+        filePath = path.join(
+          jobDir,
+          `MBA_Placement_${safeGroup}_${safeDept}.pdf`,
+        );
+        logger.info(
+          `[JOB:${jobId}] MBA report - MBAPlacementReport (${mbaData.total_students} students). Generating ${path.basename(filePath)}...`,
+        );
+        await new MBAPlacementReport(mbaData).generate(filePath);
+      } else {
+        // ── Standard Placement Report (and legacy auto-detect) ──────────────
+        // 1. Fetch Data
+        const placementData = await getPlacementDetails(deptDegreeId, groupId);
+
+        if (!placementData) {
+          jobStore.set(jobId, {
+            status: 'ERROR',
+            error:
+              'No placement data found for this group/department combination.',
+          });
+          return;
+        }
+
+        jobStore.set(jobId, {
+          status: 'PROCESSING',
+          progress: 'Generating PDF...',
+        });
+
+        // No explicit override -> auto-detect MBA from naming and still prefer
+        // the MBA handbook when it has scored students. An explicit "standard"
+        // override forces the standard handbook even for an MBA department.
+        const autoIsMBA =
+          placementData.department_name?.toUpperCase().includes('MBA') ||
+          placementData.group_name?.toUpperCase().includes('MBA') ||
+          placementData.report_title?.toUpperCase().includes('MBA');
+        const isMBA = reportTypeOverride === 'standard' ? false : autoIsMBA;
+
+        // 2. Generate PDF Name
+        const safeGroup = placementData.group_name.replace(
+          /[^a-zA-Z0-9]/g,
+          '_',
+        );
+        const safeDept = placementData.department_name.replace(
+          /[^a-zA-Z0-9]/g,
+          '_',
+        );
+        filePath = path.join(
+          jobDir,
+          `${isMBA ? 'MBA_Placement' : 'Placement_Handbook'}_${safeGroup}_${safeDept}.pdf`,
+        );
+
+        logger.info(`[JOB:${jobId}] Generating ${path.basename(filePath)}...`);
+
+        // 3. Generate Report - MBA cohorts use the specialization-based report;
+        // all others use the standard DISC-style placement handbook.
+        if (isMBA) {
+          const mbaData = await getMBAPlacementDetails(deptDegreeId, groupId);
+          if (mbaData && mbaData.total_students > 0) {
+            logger.info(
+              `[JOB:${jobId}] MBA department detected - using MBAPlacementReport (${mbaData.total_students} students).`,
+            );
+            await new MBAPlacementReport(mbaData).generate(filePath);
+          } else {
+            logger.warn(
+              `[JOB:${jobId}] MBA detected but no scored students; falling back to standard placement report.`,
+            );
+            await new PlacementReport(placementData).generate(filePath);
+          }
         } else {
-          logger.warn(
-            `[JOB:${jobId}] MBA detected but no scored students; falling back to standard placement report.`,
-          );
           await new PlacementReport(placementData).generate(filePath);
         }
-      } else {
-        await new PlacementReport(placementData).generate(filePath);
       }
 
       // 4. Complete

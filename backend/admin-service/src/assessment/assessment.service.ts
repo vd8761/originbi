@@ -1514,18 +1514,46 @@ export class AssessmentService {
 
   async findGroupDepartmentStats(groupId: number) {
     try {
+      // Resolve the attempt level ids for DISC (Level 1) and ACI (Level 2) so we
+      // can report completion PER report-type level requirement, not just the
+      // session's overall status. A report only needs the levels it consumes:
+      //   - Level 1 Placement & Special MBA -> Level 1 only
+      //   - Standard Placement              -> Level 1 + Level 2
+      // (kept in sync with the frontend REPORT_REQUIRED_LEVELS map and the
+      // report-cohort SQL in student-service).
+      const levels = await this.levelRepo.find();
+      const l1 = levels.find((l) => l.levelNumber === 1)?.id ?? -1;
+      const l2 = levels.find((l) => l.levelNumber === 2)?.id ?? -1;
+
       const stats = await this.sessionRepo
         .createQueryBuilder('s')
         .leftJoin('s.registration', 'r')
         .leftJoin(DepartmentDegree, 'dd', 'dd.id = r.departmentDegreeId')
         .leftJoin(Department, 'd', 'd.id = dd.departmentId')
         .leftJoin(DegreeType, 'dt', 'dt.id = dd.degreeTypeId')
+        // These attempt joins fan a session out into multiple rows, so every
+        // aggregate below counts DISTINCT session ids. a1/a2 are non-null only
+        // when that session has a COMPLETED Level-1 / Level-2 attempt.
+        .leftJoin(
+          AssessmentAttempt,
+          'a1',
+          'a1.assessmentSessionId = s.id AND a1.assessmentLevelId = :l1 AND a1.status = :done',
+          { l1, done: 'COMPLETED' },
+        )
+        .leftJoin(
+          AssessmentAttempt,
+          'a2',
+          'a2.assessmentSessionId = s.id AND a2.assessmentLevelId = :l2 AND a2.status = :done',
+          { l2, done: 'COMPLETED' },
+        )
         .select([
           'r.departmentDegreeId AS "id"',
           'd.name AS "departmentName"',
           'dt.name AS "degreeName"',
-          'COUNT(s.id) AS "total"',
-          `SUM(CASE WHEN s.status = 'COMPLETED' THEN 1 ELSE 0 END) AS "completed"`,
+          'COUNT(DISTINCT s.id) AS "total"',
+          `COUNT(DISTINCT CASE WHEN s.status = 'COMPLETED' THEN s.id END) AS "completed"`,
+          'COUNT(DISTINCT CASE WHEN a1.id IS NOT NULL THEN s.id END) AS "completedL1"',
+          'COUNT(DISTINCT CASE WHEN a1.id IS NOT NULL AND a2.id IS NOT NULL THEN s.id END) AS "completedL1L2"',
         ])
         .where('s.groupAssessmentId = :groupId', { groupId })
         .andWhere('r.departmentDegreeId IS NOT NULL')
@@ -1549,7 +1577,13 @@ export class AssessmentService {
                 ? deptName
                 : `${degreeName} ${deptName}`,
             total: Number(s.total),
+            // Legacy session-status completion (full assessment). Kept for any
+            // existing consumers; the popup now uses the per-level counts below.
             completed: Number(s.completed),
+            // Completion per level requirement: completedL1 = finished Level 1
+            // (DISC); completedL1L2 = finished Level 1 AND Level 2 (DISC + ACI).
+            completedL1: Number(s.completedL1),
+            completedL1L2: Number(s.completedL1L2),
           };
         }),
       };
