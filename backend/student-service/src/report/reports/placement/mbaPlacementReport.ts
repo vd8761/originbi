@@ -738,14 +738,12 @@ export class MBAPlacementReport extends BaseReport {
   // }
 
   /**
-   * VARIANT B (active): specialization fit as a compact **table** in the
-   * report's fixed **elective order** (HR, FIN, MKT, OPS, BA - so every character
-   * lists the five the same way and stays comparable). Columns: rank badge,
-   * specialization, a five-dot fit meter (filled = 6 - rank) and a colour-coded
-   * behavioural-alignment pill. The best-fit (rank 1) row is pulled out with a
-   * tinted band, the spec accent and a star - so the winner reads at a glance
-   * without breaking the elective order. The bar-chart variant is kept above,
-   * commented out.
+   * VARIANT B (active): specialization fit as a compact **table** sorted by this
+   * character's **fit ranking** (rank 1 at the top, down to 5). Columns: rank
+   * badge, specialization, a five-dot fit meter (filled = 6 - rank) and a
+   * colour-coded behavioural-alignment pill. The best-fit (rank 1) top row is
+   * pulled out with a tinted band and the spec accent so the winner reads at a
+   * glance. The bar-chart variant is kept above, commented out.
    */
   private drawElectiveRanking(c: MBACharacter): void {
     const x = this.MARGIN_STD;
@@ -754,9 +752,10 @@ export class MBAPlacementReport extends BaseReport {
       ['D', 'I', 'S', 'C'].includes(c.code[0]) ? c.code[0] : 'D'
     ) as DiscTrait;
 
-    // Rank each spec (best-first), then render in fixed elective order.
+    // Rank each spec (best-first) and render the rows in that rank order (1..5).
+    const ranked = this.characterElectiveOrder(c);
     const rankOf = {} as Record<SpecializationCode, number>;
-    this.characterElectiveOrder(c).forEach((code, i) => (rankOf[code] = i + 1));
+    ranked.forEach((code, i) => (rankOf[code] = i + 1));
 
     // Alignment pill styles - soft tint + saturated text per strength.
     const alignStyle: Record<string, { bg: string; fg: string }> = {
@@ -767,7 +766,7 @@ export class MBAPlacementReport extends BaseReport {
 
     const headH = 20;
     const rowH = 27;
-    const rows = this.electiveDisplayOrder();
+    const rows = ranked;
     const tableH = headH + rows.length * rowH;
 
     // Keep heading, intro and the whole table together on one page.
