@@ -23,7 +23,7 @@ export const MBA_PLACEMENT_CONTENT = {
   // ── Per-character specialization-fit ranking ───────────────────────────────
   elective_rank_title: 'Specialization Fit Ranking',
   elective_rank_intro:
-    'All five MBA specializations in their standard order, each scored for this character. The longer the bar (and lower the rank number), the stronger the fit - the highlighted row is the best fit.',
+    'All five MBA specializations in their standard elective order. The more filled dots, the stronger the fit for this character - the highlighted row is the best fit.',
 
   spec_chart_title: 'Specialization Fitment Overview',
   spec_chart_description:

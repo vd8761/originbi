@@ -473,9 +473,10 @@ FROM TraitGrouped;
  * returns a FLAT per-student list so the report can bucket students by best-fit
  * MBA specialization via mbaConstants.rankSpecializations.
  *
- * One row per student: a session has multiple completed attempts, but only the
- * attempt carrying `dominant_trait_id` is kept, which dedupes to exactly one
- * scored row per student.
+ * One row per student: `dominant_trait_id IS NOT NULL` keeps the Level-1
+ * (DISC) attempt, and a `DISTINCT ON (user_id)` (latest completed attempt)
+ * collapses retakes / duplicate `assessment_reports` rows so a student is never
+ * listed twice.
  *
  * Inclusion rule - this report only requires **Level 1 (DISC)**. A student
  * qualifies as soon as their Level-1 attempt is COMPLETED: the exam engine sets
@@ -524,7 +525,7 @@ export async function getMBAPlacementDetails(
         HAVING COUNT(*) > 1
       ),
       RawStudentData AS (
-        SELECT
+        SELECT DISTINCT ON (aa.user_id)
           aa.user_id,
           dpt.name AS department_name,
           dpt.short_name AS dept_code,
@@ -562,6 +563,11 @@ export async function getMBAPlacementDetails(
           AND r.department_degree_id = $2
           AND aa.status = 'COMPLETED'
           AND aa.dominant_trait_id IS NOT NULL
+        -- One row per student. A session can have multiple COMPLETED Level-1
+        -- attempts (retakes) and/or multiple assessment_reports rows; either
+        -- fans this query out and would list the student more than once. Keep
+        -- only the latest completed attempt per user.
+        ORDER BY aa.user_id, aa.completed_at DESC NULLS LAST, aa.id DESC
       )
       SELECT JSON_BUILD_OBJECT(
         'department_name', MAX(department_name),

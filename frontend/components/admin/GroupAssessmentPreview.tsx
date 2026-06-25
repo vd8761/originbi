@@ -27,6 +27,32 @@ const formatDate = (dateStr?: string) => {
     }
 };
 
+type AdminReportType = 'mba' | 'standard' | 'level1';
+
+/**
+ * Levels each placement report consumes. A candidate counts as "completed" for a
+ * report - and is included when it is generated - only if they finished ALL of
+ * these levels. Kept in sync with the backend: admin-service
+ * findGroupDepartmentStats (per-level counts) and the student-service cohort SQL
+ * (getMBAPlacementDetails / getPlacementDetails / fetchLevel1Cohort).
+ */
+const REPORT_REQUIRED_LEVELS: Record<AdminReportType, number[]> = {
+    mba: [1],       // Special MBA handbook - Level 1 (DISC) only.
+    level1: [1],    // Level 1 Placement Report - Level 1 (DISC) only.
+    standard: [1, 2], // Standard Placement handbook - Level 1 + Level 2.
+};
+
+/**
+ * Candidates in a department who completed the levels the chosen report needs.
+ * Falls back to the legacy session-status `completed` count if an older backend
+ * hasn't sent the per-level fields yet.
+ */
+const completedForReport = (dept: any, rt: AdminReportType): number => {
+    const needsL2 = REPORT_REQUIRED_LEVELS[rt].includes(2);
+    const v = needsL2 ? dept?.completedL1L2 : dept?.completedL1;
+    return Number(v ?? dept?.completed ?? 0);
+};
+
 const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ sessionId, onBack, onViewSession }) => {
     const [groupData, setGroupData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -220,7 +246,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                             departmentId: selectedDepartment,
                             toEmail: reportEmail,
                             downloadUrl: buildReportApiUrl(statusData.downloadUrl),
-                            studentCount: selectedDept?.completed || 0,
+                            studentCount: completedForReport(selectedDept, reportType),
                             degreeType,
                             departmentName: deptName,
                         }),
@@ -745,8 +771,10 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                             // backend isMBA detection in reportQueueService.processPlacementReport.
                                             const isMBA = (dept.name || '').toUpperCase().includes('MBA');
                                             const isSelected = selectedDepartment === dept.id;
-                                            const pct = Math.round((dept.completed / (dept.total || 1)) * 100);
-                                            const isComplete = dept.completed === dept.total && dept.total > 0;
+                                            // Count only candidates who finished the levels THIS report type needs.
+                                            const completedCount = completedForReport(dept, reportType);
+                                            const pct = Math.round((completedCount / (dept.total || 1)) * 100);
+                                            const isComplete = completedCount === dept.total && dept.total > 0;
                                             return (
                                                 <div
                                                     key={dept.id}
@@ -783,7 +811,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                                                                     )}
                                                                 </div>
                                                                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                                                                    {dept.completed} of {dept.total || 0} candidates completed
+                                                                    {completedCount} of {dept.total || 0} candidates completed
                                                                 </p>
                                                             </div>
                                                         </div>
