@@ -20,6 +20,11 @@ export const MBA_PLACEMENT_CONTENT = {
   character_grid_description:
     'The same distribution as a colour-coded count under each character - the four pure traits (D, I, S, C) first, then the twelve blends.',
 
+  // ── Per-character specialization-fit ranking ───────────────────────────────
+  elective_rank_title: 'Specialization Fit Ranking',
+  elective_rank_intro:
+    'All five MBA specializations in their standard order, each scored for this character. The longer the bar (and lower the rank number), the stronger the fit - the highlighted row is the best fit.',
+
   spec_chart_title: 'Specialization Fitment Overview',
   spec_chart_description:
     'Each character maps to a best-fit MBA specialization; this pie rolls the cohort up to that specialization. It shows where the batch’s strengths concentrate across Finance, HR, Business Analytics, Operations, and Marketing.',

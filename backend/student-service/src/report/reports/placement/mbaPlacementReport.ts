@@ -56,16 +56,15 @@ const TRAIT_ART_DIR = 'public/assets/images/student_traits';
 const ICON_DIR = 'public/assets/images/icons';
 
 /**
- * Service-card icon vector paths (Font Awesome Free v7, viewBox 0 0 640 640),
- * keyed by the END_PAGE.services `icon` value. Rendered scaled + filled.
+ * Service-card icons, keyed by the END_PAGE.services `icon` value. Each maps to
+ * a vector SVG in ICON_DIR; the paths are read at runtime and stroked (outline
+ * style), so swapping the SVG file is all that's needed to update an icon.
  */
-const SERVICE_ICON_PATHS: Record<string, string> = {
-  school:
-    'M32 256C32 220.7 60.7 192 96 192L160 192L287.9 76.9C306.2 60.5 333.9 60.5 352.1 76.9L480 192L544 192C579.3 192 608 220.7 608 256L608 512C608 547.3 579.3 576 544 576L96 576C60.7 576 32 547.3 32 512L32 256zM256 440L256 528L384 528L384 440C384 417.9 366.1 400 344 400L296 400C273.9 400 256 417.9 256 440zM144 448C152.8 448 160 440.8 160 432L160 400C160 391.2 152.8 384 144 384L112 384C103.2 384 96 391.2 96 400L96 432C96 440.8 103.2 448 112 448L144 448zM160 304L160 272C160 263.2 152.8 256 144 256L112 256C103.2 256 96 263.2 96 272L96 304C96 312.8 103.2 320 112 320L144 320C152.8 320 160 312.8 160 304zM528 448C536.8 448 544 440.8 544 432L544 400C544 391.2 536.8 384 528 384L496 384C487.2 384 480 391.2 480 400L480 432C480 440.8 487.2 448 496 448L528 448zM544 304L544 272C544 263.2 536.8 256 528 256L496 256C487.2 256 480 263.2 480 272L480 304C480 312.8 487.2 320 496 320L528 320C536.8 320 544 312.8 544 304zM320 320C355.3 320 384 291.3 384 256C384 220.7 355.3 192 320 192C284.7 192 256 220.7 256 256C256 291.3 284.7 320 320 320z',
-  cap: 'M80 259.8L289.2 345.9C299 349.9 309.4 352 320 352C330.6 352 341 349.9 350.8 345.9L593.2 246.1C602.2 242.4 608 233.7 608 224C608 214.3 602.2 205.6 593.2 201.9L350.8 102.1C341 98.1 330.6 96 320 96C309.4 96 299 98.1 289.2 102.1L46.8 201.9C37.8 205.6 32 214.3 32 224L32 520C32 533.3 42.7 544 56 544C69.3 544 80 533.3 80 520L80 259.8zM128 331.5L128 448C128 501 214 544 320 544C426 544 512 501 512 448L512 331.4L369.1 390.3C353.5 396.7 336.9 400 320 400C303.1 400 286.5 396.7 270.9 390.3L128 331.4z',
-  people:
-    'M320 80C377.4 80 424 126.6 424 184C424 241.4 377.4 288 320 288C262.6 288 216 241.4 216 184C216 126.6 262.6 80 320 80zM96 152C135.8 152 168 184.2 168 224C168 263.8 135.8 296 96 296C56.2 296 24 263.8 24 224C24 184.2 56.2 152 96 152zM0 480C0 409.3 57.3 352 128 352C140.8 352 153.2 353.9 164.9 357.4C132 394.2 112 442.8 112 496L112 512C112 523.4 114.4 534.2 118.7 544L32 544C14.3 544 0 529.7 0 512L0 480zM521.3 544C525.6 534.2 528 523.4 528 512L528 496C528 442.8 508 394.2 475.1 357.4C486.8 353.9 499.2 352 512 352C582.7 352 640 409.3 640 480L640 512C640 529.7 625.7 544 608 544L521.3 544zM472 224C472 184.2 504.2 152 544 152C583.8 152 616 184.2 616 224C616 263.8 583.8 296 544 296C504.2 296 472 263.8 472 224zM160 496C160 407.6 231.6 336 320 336C408.4 336 480 407.6 480 496L480 512C480 529.7 465.7 544 448 544L192 544C174.3 544 160 529.7 160 512L160 496z',
-  exec: 'M320 312C253.7 312 200 258.3 200 192C200 125.7 253.7 72 320 72C386.3 72 440 125.7 440 192C440 258.3 386.3 312 320 312zM289.5 368L350.5 368C360.2 368 368 375.8 368 385.5C368 389.7 366.5 393.7 363.8 396.9L336.4 428.9L367.4 544L368 544L402.6 405.5C404.8 396.8 413.7 391.5 422.1 394.7C484 418.3 528 478.3 528 548.5C528 563.6 515.7 575.9 500.6 575.9L139.4 576C124.3 576 112 563.7 112 548.6C112 478.4 156 418.4 217.9 394.8C226.3 391.6 235.2 396.9 237.4 405.6L272 544.1L272.6 544.1L303.6 429L276.2 397C273.5 393.8 272 389.8 272 385.6C272 375.9 279.8 368.1 289.5 368.1z',
+const SERVICE_ICON_FILES: Record<string, string> = {
+  school: 'school.svg',
+  cap: 'college.svg',
+  people: 'employee.svg',
+  exec: 'cxo.svg',
 };
 
 /**
@@ -84,15 +83,17 @@ const SERVICE_ICON_PATHS: Record<string, string> = {
  *   headcount grid across all 16 characters) → specialization fitment (pie +
  *   "who fits where" reveal) → elective-wise fit → one section per present
  *   character, Pure Traits first then the blends (persona + comic art +
- *   best-fit elective chip + narrative + grooming + roster whose merged column
- *   lists the combination's future-fit roles). Closing pages and the landscape
- *   master grid are implemented but disabled - see generate().
+ *   narrative + five-way specialization-fit ranking + grooming + roster whose
+ *   merged column lists the combination's future-fit roles). Closing pages and
+ *   the landscape master grid are implemented but disabled - see generate().
  */
 export class MBAPlacementReport extends BaseReport {
   private data: MBAPlacementData;
   private students: ScoredStudent[] = [];
   /** Students bucketed by their resolved 16-character code. */
   private characterBuckets: Record<string, ScoredStudent[]> = {};
+  /** Cache of parsed SVG icons: filename -> { path d strings, viewBox size }. */
+  private svgIconCache: Record<string, { paths: string[]; size: number }> = {};
 
   constructor(data: MBAPlacementData) {
     super();
@@ -589,16 +590,330 @@ export class MBAPlacementReport extends BaseReport {
 
   // ── Per-character section ────────────────────────────────────────────────────
 
+  /**
+   * Character-level specialization ranking (best-fit first): rank 1 & 2 are the
+   * authored primary / secondary specs, the remaining three ordered by the
+   * character's DISC behavioural alignment - the character-level analogue of
+   * `electiveRanks`, so the section ranking agrees with the master grid.
+   */
+  private characterElectiveOrder(c: MBACharacter): SpecializationCode[] {
+    const trait = (
+      ['D', 'I', 'S', 'C'].includes(c.code[0]) ? c.code[0] : 'D'
+    ) as DiscTrait;
+    const score = (code: SpecializationCode): number => {
+      const a = DISC_ALIGNMENT[trait][code];
+      return a === 'Strong' ? 3 : a === 'Moderate' ? 2 : 1;
+    };
+    const rest = SPECIALIZATION_ORDER.filter(
+      (s) => s !== c.primarySpec && s !== c.secondarySpec,
+    ).sort(
+      (a, b) =>
+        score(b) - score(a) ||
+        SPECIALIZATION_ORDER.indexOf(a) - SPECIALIZATION_ORDER.indexOf(b),
+    );
+    return [c.primarySpec, c.secondarySpec, ...rest];
+  }
+
+  /** Specializations in the report's canonical elective order (HR, FIN, …). */
+  private electiveDisplayOrder(): SpecializationCode[] {
+    return ELECTIVES.map((e) => ELECTIVE_TO_SPEC[e.key]);
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // VARIANT A (kept for reference): horizontal bar-chart ranking.
+  // The active drawElectiveRanking below is VARIANT B (table). To switch back,
+  // restore this body and comment out the table version.
+  // ───────────────────────────────────────────────────────────────────────────
+  // /**
+  //  * Specialization fit shown as a horizontal bar chart in the report's fixed
+  //  * **elective order** (so every character lists the five the same way and they
+  //  * stay comparable). Each row carries a rank badge, the spec name and a fit bar
+  //  * whose length tracks the rank; the **best-fit** row is pulled out with a
+  //  * tinted band, the spec accent and a "BEST FIT" tag - so the winner reads at a
+  //  * glance without breaking the elective order.
+  //  */
+  // private drawElectiveRanking(c: MBACharacter): void {
+  //   const x = this.MARGIN_STD;
+  //   const fullW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+  //   const trait = (
+  //     ['D', 'I', 'S', 'C'].includes(c.code[0]) ? c.code[0] : 'D'
+  //   ) as DiscTrait;
+  //
+  //   // Rank each spec (best-first), then render in fixed elective order.
+  //   const rankOf = {} as Record<SpecializationCode, number>;
+  //   this.characterElectiveOrder(c).forEach((code, i) => (rankOf[code] = i + 1));
+  //
+  //   const rowH = 24;
+  //   const blockH = this.electiveDisplayOrder().length * rowH;
+  //
+  //   // Keep the heading, intro and bars together on one page.
+  //   this.ensureSpace(blockH + 76);
+  //   this.h2(MBA_PLACEMENT_CONTENT.elective_rank_title, { ensureSpace: 0.04 });
+  //   this.doc
+  //     .font(this.FONT_REGULAR)
+  //     .fontSize(8.5)
+  //     .fillColor('#58595b')
+  //     .text(MBA_PLACEMENT_CONTENT.elective_rank_intro, x, this.doc.y + 2, {
+  //       width: fullW,
+  //       align: 'left',
+  //     });
+  //
+  //   const top = this.doc.y + 8;
+  //   const badgeCx = x + 12;
+  //   const nameX = x + 28;
+  //   const nameW = 150;
+  //   const barX = nameX + nameW + 8;
+  //   const labelW = 56;
+  //   const barW = x + fullW - labelW - barX;
+  //   const barH = 10;
+  //
+  //   this.electiveDisplayOrder().forEach((code, i) => {
+  //     const meta = SPECIALIZATIONS[code];
+  //     const rank = rankOf[code];
+  //     const best = rank === 1;
+  //     const align = DISC_ALIGNMENT[trait][code];
+  //     const rowY = top + i * rowH;
+  //     const cy = rowY + rowH / 2;
+  //     const frac = (100 - (rank - 1) * 16) / 100; // 1.0, .84, .68, .52, .36
+  //
+  //     // Tinted band behind the best-fit row.
+  //     if (best) {
+  //       this.doc
+  //         .roundedRect(x, rowY + 1, fullW, rowH - 2, 6)
+  //         .fill(meta.accentSoft);
+  //     }
+  //
+  //     // Rank badge (always the spec's accent for colour identity).
+  //     this.doc.circle(badgeCx, cy, 8).fill(meta.accent);
+  //     this.doc
+  //       .font(this.FONT_SORA_BOLD)
+  //       .fontSize(8.5)
+  //       .fillColor('#FFFFFF')
+  //       .text(String(rank), badgeCx - 9, cy - 5.2, {
+  //         width: 18,
+  //         align: 'center',
+  //       });
+  //
+  //     // Elective name + (best only) a small "BEST FIT" pill.
+  //     const nameFs = best ? 9.5 : 9;
+  //     this.doc
+  //       .font(this.FONT_BOLD)
+  //       .fontSize(nameFs)
+  //       .fillColor(best ? meta.accent : '#2A2A33');
+  //     this.doc.text(meta.name, nameX, cy - nameFs * 0.58, {
+  //       width: nameW,
+  //       lineBreak: false,
+  //     });
+  //     if (best) {
+  //       const pillX = nameX + this.doc.widthOfString(meta.name) + 6;
+  //       this.doc.roundedRect(pillX, cy - 6.5, 42, 13, 6.5).fill(meta.accent);
+  //       this.doc
+  //         .font(this.FONT_BOLD)
+  //         .fontSize(5.8)
+  //         .fillColor('#FFFFFF')
+  //         .text('BEST FIT', pillX, cy - 2.9, { width: 42, align: 'center' });
+  //     }
+  //
+  //     // Fit bar: light track + accent fill sized by rank.
+  //     this.doc
+  //       .roundedRect(barX, cy - barH / 2, barW, barH, barH / 2)
+  //       .fill('#ECEEF3');
+  //     this.doc
+  //       .roundedRect(barX, cy - barH / 2, barW * frac, barH, barH / 2)
+  //       .fill(meta.accent);
+  //
+  //     // Behavioural-alignment tag at the right.
+  //     this.doc
+  //       .font(this.FONT_SEMIBOLD)
+  //       .fontSize(7)
+  //       .fillColor('#6B6B76')
+  //       .text(align, x + fullW - labelW + 6, cy - 4, {
+  //         width: labelW - 6,
+  //         align: 'left',
+  //       });
+  //   });
+  //
+  //   this.doc.y = top + blockH + 4;
+  //   this.doc.x = x;
+  // }
+
+  /**
+   * VARIANT B (active): specialization fit as a compact **table** in the
+   * report's fixed **elective order** (HR, FIN, MKT, OPS, BA - so every character
+   * lists the five the same way and stays comparable). Columns: rank badge,
+   * specialization, a five-dot fit meter (filled = 6 - rank) and a colour-coded
+   * behavioural-alignment pill. The best-fit (rank 1) row is pulled out with a
+   * tinted band, the spec accent and a star - so the winner reads at a glance
+   * without breaking the elective order. The bar-chart variant is kept above,
+   * commented out.
+   */
+  private drawElectiveRanking(c: MBACharacter): void {
+    const x = this.MARGIN_STD;
+    const fullW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+    const trait = (
+      ['D', 'I', 'S', 'C'].includes(c.code[0]) ? c.code[0] : 'D'
+    ) as DiscTrait;
+
+    // Rank each spec (best-first), then render in fixed elective order.
+    const rankOf = {} as Record<SpecializationCode, number>;
+    this.characterElectiveOrder(c).forEach((code, i) => (rankOf[code] = i + 1));
+
+    // Alignment pill styles - soft tint + saturated text per strength.
+    const alignStyle: Record<string, { bg: string; fg: string }> = {
+      Strong: { bg: '#E4F4EA', fg: '#1E8A4C' },
+      Moderate: { bg: '#FBF0D9', fg: '#B07A12' },
+      Low: { bg: '#EEF0F4', fg: '#7A828F' },
+    };
+
+    const headH = 20;
+    const rowH = 27;
+    const rows = this.electiveDisplayOrder();
+    const tableH = headH + rows.length * rowH;
+
+    // Keep heading, intro and the whole table together on one page.
+    this.ensureSpace(tableH + 76);
+    this.h2(MBA_PLACEMENT_CONTENT.elective_rank_title, { ensureSpace: 0.04 });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(8.5)
+      .fillColor('#58595b')
+      .text(MBA_PLACEMENT_CONTENT.elective_rank_intro, x, this.doc.y + 2, {
+        width: fullW,
+        align: 'left',
+      });
+
+    // Column geometry.
+    const top = this.doc.y + 10;
+    const cRank = 52;
+    const cAlign = 104;
+    const cMid = fullW - cRank - cAlign;
+    const cSpec = cMid * 0.52;
+    const cFit = cMid - cSpec;
+    const xRank = x;
+    const xSpec = x + cRank;
+    const xFit = xSpec + cSpec;
+    const xAlign = x + fullW - cAlign;
+
+    const border = '#DCE0E7';
+    const divider = '#ECEEF3';
+
+    // Header band + column labels (deep-blue header matching the report's other
+    // tables - COLOR_DEEP_BLUE fill with white text).
+    this.doc.rect(x, top, fullW, headH).fill(this.COLOR_DEEP_BLUE);
+    const heads: Array<[string, number, number, 'left' | 'center']> = [
+      ['RANK', xRank, cRank, 'center'],
+      ['SPECIALIZATION', xSpec + 12, cSpec - 12, 'left'],
+      ['FIT STRENGTH', xFit + 14, cFit - 14, 'left'],
+      ['ALIGNMENT', xAlign, cAlign, 'center'],
+    ];
+    this.doc.font(this.FONT_SEMIBOLD).fontSize(7).fillColor('#FFFFFF');
+    for (const [label, hx, hw, al] of heads) {
+      this.doc.text(label, hx, top + headH / 2 - 4, {
+        width: hw,
+        align: al,
+        characterSpacing: 0.4,
+      });
+    }
+
+    // Row backgrounds (best-fit tint) - drawn first so grid lines sit on top.
+    rows.forEach((code, i) => {
+      if (rankOf[code] === 1) {
+        const rowY = top + headH + i * rowH;
+        this.doc
+          .rect(x, rowY, fullW, rowH)
+          .fill(SPECIALIZATIONS[code].accentSoft);
+      }
+    });
+
+    // Row content.
+    rows.forEach((code, i) => {
+      const meta = SPECIALIZATIONS[code];
+      const rank = rankOf[code];
+      const best = rank === 1;
+      const align = DISC_ALIGNMENT[trait][code];
+      const rowY = top + headH + i * rowH;
+      const cy = rowY + rowH / 2;
+
+      // Rank badge (spec accent disc + white number).
+      const bcx = xRank + cRank / 2;
+      this.doc.circle(bcx, cy, 8.5).fill(meta.accent);
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(9)
+        .fillColor('#FFFFFF')
+        .text(String(rank), bcx - 10, cy - 5.6, { width: 20, align: 'center' });
+
+      // Specialization name (best-fit row uses the spec accent colour).
+      const nameFs = 10;
+      this.doc
+        .font(this.FONT_BOLD)
+        .fontSize(nameFs)
+        .fillColor(best ? meta.accent : '#2A2A33')
+        .text(meta.name, xSpec + 12, cy - nameFs * 0.58, {
+          width: cSpec - 16,
+          lineBreak: false,
+        });
+
+      // Five-dot fit meter (filled = 6 - rank).
+      const filled = 6 - rank;
+      const dotR = 3.7;
+      const dotGap = 15;
+      const dotX0 = xFit + 14;
+      for (let d = 0; d < 5; d++) {
+        this.doc
+          .circle(dotX0 + d * dotGap, cy, dotR)
+          .fill(d < filled ? meta.accent : '#D7DBE2');
+      }
+
+      // Behavioural-alignment pill, centred in its column.
+      const aStyle = alignStyle[align] ?? alignStyle.Low;
+      this.doc.font(this.FONT_SEMIBOLD).fontSize(7.5);
+      const pw = this.doc.widthOfString(align) + 16;
+      const px = xAlign + (cAlign - pw) / 2;
+      this.doc.roundedRect(px, cy - 8, pw, 16, 8).fill(aStyle.bg);
+      this.doc
+        .fillColor(aStyle.fg)
+        .text(align, px, cy - 3.6, { width: pw, align: 'center' });
+    });
+
+    // Grid lines (drawn last, on top of fills).
+    this.doc.lineWidth(0.8);
+    this.doc
+      .moveTo(x, top + headH)
+      .lineTo(x + fullW, top + headH)
+      .stroke(border);
+    this.doc.lineWidth(0.6);
+    for (let i = 1; i < rows.length; i++) {
+      const ly = top + headH + i * rowH;
+      this.doc
+        .moveTo(x, ly)
+        .lineTo(x + fullW, ly)
+        .stroke(divider);
+    }
+    for (const cx of [xSpec, xFit, xAlign]) {
+      this.doc
+        .moveTo(cx, top + headH)
+        .lineTo(cx, top + tableH)
+        .stroke(divider);
+    }
+    this.doc.lineWidth(1).rect(x, top, fullW, tableH).stroke(border);
+
+    this.doc.y = top + tableH + 6;
+    this.doc.x = x;
+  }
+
   private generateCharacterSection(code: string): void {
     const c = getMBACharacter(code);
     const bucket = this.characterBuckets[code];
-    const primaryName = SPECIALIZATIONS[c.primarySpec].name;
 
-    // Header card: comic art + persona identity + best-fit chip + narrative.
-    this.drawCharacterHeader(c, primaryName);
+    // Header card: comic art + persona identity + narrative.
+    this.drawCharacterHeader(c);
 
     // Why we point this character at these roles (brief reasoning).
     this.p(c.reasoning, { align: 'justify' });
+
+    // All five MBA specializations, ranked for this character (best-fit first).
+    this.drawElectiveRanking(c);
 
     // Grooming focus - the "some grooming" the senior asked to keep.
     this.h2('Grooming Focus');
@@ -793,38 +1108,11 @@ export class MBAPlacementReport extends BaseReport {
   }
 
   /**
-   * Draws a rounded "pill" chip at (x, y) and returns its width, so callers can
-   * place several in a row. Used for the best-fit elective in section headers.
-   */
-  private chip(
-    x: number,
-    y: number,
-    text: string,
-    bg: string,
-    fg: string,
-    h = 21,
-    fontSize = 11,
-  ): number {
-    this.doc.font(this.FONT_SEMIBOLD).fontSize(fontSize);
-    const tw = this.doc.widthOfString(text);
-    const w = tw + 20;
-    this.doc.roundedRect(x, y, w, h, h / 2).fill(bg);
-    this.doc
-      .fillColor(fg)
-      .font(this.FONT_SEMIBOLD)
-      .fontSize(fontSize)
-      .text(text, x + 10, y + (h - fontSize) / 2 - 1.5, {
-        width: tw + 2,
-        lineBreak: false,
-      });
-    return w;
-  }
-
-  /**
    * Section header: the character's comic illustration on the left, with the
-   * persona title, DISC identity, best-fit line and narrative beside it.
+   * persona title, DISC identity and narrative beside it. (The best-fit elective
+   * is shown in the five-way ranking block that follows the header.)
    */
-  private drawCharacterHeader(c: MBACharacter, primaryName: string): void {
+  private drawCharacterHeader(c: MBACharacter): void {
     const imgW = 190;
     const imgH = Math.round(imgW / 1.638); // illustrations are ~1.64:1
     this.ensureSpace(Math.max(imgH, 150) + 24);
@@ -876,20 +1164,13 @@ export class MBAPlacementReport extends BaseReport {
       .fillColor('#6B6B76')
       .text(`Trait ${c.code}  ·  ${c.name}`, tx, this.doc.y + 1, { width: tw });
 
-    // Best-fit elective as a standalone chip (the future roles live in the
-    // table); no label or secondary text per request.
-    const meta = SPECIALIZATIONS[c.primarySpec];
-    const chipH = 21;
-    const chipY = this.doc.y + 6;
-    this.chip(tx, chipY, primaryName, meta.accent, '#FFFFFF', chipH);
-    this.doc.y = chipY + chipH;
-    this.doc.x = tx;
-
+    // Narrative directly under the identity line; the best-fit elective now
+    // lives in the full five-way ranking block below (drawElectiveRanking).
     this.doc
       .font(this.FONT_REGULAR)
       .fontSize(9.5)
       .fillColor('#33333b')
-      .text(c.narrative, tx, this.doc.y + 5, { width: tw, align: 'justify' });
+      .text(c.narrative, tx, this.doc.y + 6, { width: tw, align: 'justify' });
 
     // Continue below the taller of the illustration and the text column.
     this.doc.y = Math.max(this.doc.y, startY + imgH) + 8;
@@ -925,8 +1206,31 @@ export class MBAPlacementReport extends BaseReport {
   }
 
   /**
-   * Service-card icon: the category's Font Awesome vector path, scaled into an
-   * `size` box and filled. `kind` matches the END_PAGE.services `icon` value.
+   * Reads an SVG icon from ICON_DIR and returns its path `d` strings plus the
+   * (square) viewBox size, cached so each file is parsed once.
+   */
+  private loadSvgIcon(file: string): { paths: string[]; size: number } | null {
+    if (this.svgIconCache[file]) return this.svgIconCache[file];
+    const full = `${ICON_DIR}/${file}`;
+    if (!fs.existsSync(full)) return null;
+    const svg = fs.readFileSync(full, 'utf8');
+    const vb = svg.match(/viewBox="([\d.\s-]+)"/);
+    const size = vb ? parseFloat(vb[1].trim().split(/\s+/)[2]) || 512 : 512;
+    const paths: string[] = [];
+    const re = /<path[^>]*\sd="([^"]+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(svg)) !== null) paths.push(m[1]);
+    const parsed = { paths, size };
+    this.svgIconCache[file] = parsed;
+    return parsed;
+  }
+
+  /**
+   * Service-card icon: the category's vector SVG, scaled into a `size` box and
+   * filled - so the glyph shows its own detail (windows, holes, internal lines)
+   * exactly as designed, rather than a traced contour. Each `<path>` is filled
+   * independently with the non-zero rule, matching how the SVG itself renders.
+   * `kind` matches the END_PAGE.services `icon` value.
    */
   private drawServiceIcon(
     kind: string,
@@ -935,18 +1239,11 @@ export class MBAPlacementReport extends BaseReport {
     size: number,
     color = '#68B569',
   ): void {
-    const d = SERVICE_ICON_PATHS[kind];
-    if (!d) return;
+    const icon = this.loadSvgIcon(SERVICE_ICON_FILES[kind]);
+    if (!icon || icon.paths.length === 0) return;
     this.doc.save();
-    this.doc.translate(ox, oy).scale(size / 640);
-    // Outline style: stroke the glyph contour instead of filling it. Line width
-    // is set in the 640-unit space, so divide by the scale to get a ~2px stroke.
-    this.doc
-      .lineWidth((2 * 640) / size)
-      .lineJoin('round')
-      .lineCap('round')
-      .path(d)
-      .stroke(color);
+    this.doc.translate(ox, oy).scale(size / icon.size);
+    for (const d of icon.paths) this.doc.path(d).fill(color);
     this.doc.restore();
   }
 
@@ -961,7 +1258,7 @@ export class MBAPlacementReport extends BaseReport {
     bw: number,
     bh: number,
   ): void {
-    const file = `${ICON_DIR}/${kind === 'vision' ? 'vision-white.png' : 'target-white.png'}`;
+    const file = `${ICON_DIR}/${kind === 'vision' ? 'vision-white.png' : 'mission-white.png'}`;
     if (!fs.existsSync(file)) return;
     const sz = bh * 0.58;
     const ix = bx + bw - sz - 22;
