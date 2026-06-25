@@ -2858,11 +2858,12 @@ export class BaseReport {
     this.doc.x = this.MARGIN_STD;
   }
 
-  protected addFooters(text: string): void {
+  protected addFooters(text: string, skipLastPage = false): void {
     const range = this.doc.bufferedPageRange();
     const totalPages = range.count;
+    const lastFootered = skipLastPage ? totalPages - 1 : totalPages;
 
-    for (let i = 1; i < totalPages; i++) {
+    for (let i = 1; i < lastFootered; i++) {
       this.doc.switchToPage(range.start + i);
       this.doc.save();
 

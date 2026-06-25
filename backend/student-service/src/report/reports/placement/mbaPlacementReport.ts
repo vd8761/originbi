@@ -3,48 +3,42 @@
 import * as fs from 'fs';
 import { BaseReport, PieSlice } from '../BaseReport';
 import { MBAPlacementData, MBAStudentRow } from '../../types/placementTypes';
-import { TABLE_STYLES } from './placementConstants';
-import { FIT_BANDS, MBA_PLACEMENT_CONTENT } from './mbaPlacementConstants';
+import { DISC_COLORS, TABLE_STYLES } from './placementConstants';
+import {
+  CHARACTER_GRID_COLORS,
+  END_PAGE,
+  MBA_PLACEMENT_CONTENT,
+} from './mbaPlacementConstants';
 import {
   MBACharacter,
   MBA_CHARACTER_ORDER,
+  MBA_GRID_ROWS,
+  getCharacterArtCandidates,
   getMBACharacter,
 } from './mbaCharacterConstants';
-import { ELECTIVES, FitKey } from '../college/specializationConstants';
 import {
-  BEHAVIORAL_ORIENTATION,
+  ELECTIVES,
+  FitKey,
+  SPEC_MAP,
+} from '../college/specializationConstants';
+import {
+  BehavioralAlignment,
+  DISC_ALIGNMENT,
   DiscTrait,
-  normalizeReadiness,
-  rankSpecializations,
-  READINESS_ORDER,
-  ReadinessKey,
   SPECIALIZATIONS,
   SPECIALIZATION_ORDER,
   SpecializationCode,
-  SpecRanking,
 } from '../college/mbaConstants';
 import { logger } from '../../helpers/logger';
 
-/** A single student with their resolved character + computed specialization ranking. */
+/** A single student with their resolved 16-character DISC identity. */
 interface ScoredStudent {
   row: MBAStudentRow;
   primaryTrait: DiscTrait;
   /** Resolved 16-character code (2-letter blend or single-letter Pure Trait). */
   characterCode: string;
   character: MBACharacter;
-  readinessPct: Record<ReadinessKey, number>;
-  rankings: SpecRanking[];
-  /**
-   * Suitability ranking for the character's primary specialization - the fit
-   * shown throughout the report. Organizing by character means the cohort-level
-   * specialization (pie, glance table, priorities) is character-driven, while
-   * this score captures how ready the student is for that specialization.
-   */
-  specFit: SpecRanking;
-  behavioralOrientation: string;
 }
-
-const DEPLOY_READY_FITS = new Set(['Excellent Fit', 'Good Fit']);
 
 /** Maps the level-1 elective keys to this report's specialization codes. */
 const ELECTIVE_TO_SPEC: Record<FitKey, SpecializationCode> = {
@@ -55,29 +49,44 @@ const ELECTIVE_TO_SPEC: Record<FitKey, SpecializationCode> = {
   analytics: 'BA',
 };
 
-/** Short column headers for the per-student raw-readiness data table. */
-const SHORT_READINESS_LABEL: Record<ReadinessKey, string> = {
-  commitment: 'Ownership',
-  focus: 'Goal Focus',
-  openness: 'Adaptability',
-  respect: 'Collaboration',
-  courage: 'Confidence',
+/** Folder holding the 12 blend illustrations (pure traits borrow a blend's art). */
+const TRAIT_ART_DIR = 'public/assets/images/student_traits';
+
+/** Folder for named UI icons (Vision/Mission glyphs). */
+const ICON_DIR = 'public/assets/images/icons';
+
+/**
+ * Service-card icon vector paths (Font Awesome Free v7, viewBox 0 0 640 640),
+ * keyed by the END_PAGE.services `icon` value. Rendered scaled + filled.
+ */
+const SERVICE_ICON_PATHS: Record<string, string> = {
+  school:
+    'M32 256C32 220.7 60.7 192 96 192L160 192L287.9 76.9C306.2 60.5 333.9 60.5 352.1 76.9L480 192L544 192C579.3 192 608 220.7 608 256L608 512C608 547.3 579.3 576 544 576L96 576C60.7 576 32 547.3 32 512L32 256zM256 440L256 528L384 528L384 440C384 417.9 366.1 400 344 400L296 400C273.9 400 256 417.9 256 440zM144 448C152.8 448 160 440.8 160 432L160 400C160 391.2 152.8 384 144 384L112 384C103.2 384 96 391.2 96 400L96 432C96 440.8 103.2 448 112 448L144 448zM160 304L160 272C160 263.2 152.8 256 144 256L112 256C103.2 256 96 263.2 96 272L96 304C96 312.8 103.2 320 112 320L144 320C152.8 320 160 312.8 160 304zM528 448C536.8 448 544 440.8 544 432L544 400C544 391.2 536.8 384 528 384L496 384C487.2 384 480 391.2 480 400L480 432C480 440.8 487.2 448 496 448L528 448zM544 304L544 272C544 263.2 536.8 256 528 256L496 256C487.2 256 480 263.2 480 272L480 304C480 312.8 487.2 320 496 320L528 320C536.8 320 544 312.8 544 304zM320 320C355.3 320 384 291.3 384 256C384 220.7 355.3 192 320 192C284.7 192 256 220.7 256 256C256 291.3 284.7 320 320 320z',
+  cap: 'M80 259.8L289.2 345.9C299 349.9 309.4 352 320 352C330.6 352 341 349.9 350.8 345.9L593.2 246.1C602.2 242.4 608 233.7 608 224C608 214.3 602.2 205.6 593.2 201.9L350.8 102.1C341 98.1 330.6 96 320 96C309.4 96 299 98.1 289.2 102.1L46.8 201.9C37.8 205.6 32 214.3 32 224L32 520C32 533.3 42.7 544 56 544C69.3 544 80 533.3 80 520L80 259.8zM128 331.5L128 448C128 501 214 544 320 544C426 544 512 501 512 448L512 331.4L369.1 390.3C353.5 396.7 336.9 400 320 400C303.1 400 286.5 396.7 270.9 390.3L128 331.4z',
+  people:
+    'M320 80C377.4 80 424 126.6 424 184C424 241.4 377.4 288 320 288C262.6 288 216 241.4 216 184C216 126.6 262.6 80 320 80zM96 152C135.8 152 168 184.2 168 224C168 263.8 135.8 296 96 296C56.2 296 24 263.8 24 224C24 184.2 56.2 152 96 152zM0 480C0 409.3 57.3 352 128 352C140.8 352 153.2 353.9 164.9 357.4C132 394.2 112 442.8 112 496L112 512C112 523.4 114.4 534.2 118.7 544L32 544C14.3 544 0 529.7 0 512L0 480zM521.3 544C525.6 534.2 528 523.4 528 512L528 496C528 442.8 508 394.2 475.1 357.4C486.8 353.9 499.2 352 512 352C582.7 352 640 409.3 640 480L640 512C640 529.7 625.7 544 608 544L521.3 544zM472 224C472 184.2 504.2 152 544 152C583.8 152 616 184.2 616 224C616 263.8 583.8 296 544 296C504.2 296 472 263.8 472 224zM160 496C160 407.6 231.6 336 320 336C408.4 336 480 407.6 480 496L480 512C480 529.7 465.7 544 448 544L192 544C174.3 544 160 529.7 160 512L160 496z',
+  exec: 'M320 312C253.7 312 200 258.3 200 192C200 125.7 253.7 72 320 72C386.3 72 440 125.7 440 192C440 258.3 386.3 312 320 312zM289.5 368L350.5 368C360.2 368 368 375.8 368 385.5C368 389.7 366.5 393.7 363.8 396.9L336.4 428.9L367.4 544L368 544L402.6 405.5C404.8 396.8 413.7 391.5 422.1 394.7C484 418.3 528 478.3 528 548.5C528 563.6 515.7 575.9 500.6 575.9L139.4 576C124.3 576 112 563.7 112 548.6C112 478.4 156 418.4 217.9 394.8C226.3 391.6 235.2 396.9 237.4 405.6L272 544.1L272.6 544.1L303.6 429L276.2 397C273.5 393.8 272 389.8 272 385.6C272 375.9 279.8 368.1 289.5 368.1z',
 };
 
 /**
  * MBAPlacementReport
  * ------------------
- * Consolidated MBA placement handbook. The cohort is organized around the
- * platform's 16-character behavioural framework (12 DISC blends + 4 Pure
- * Traits), and every character is given an MBA reading: an MBA persona, the
- * best-fit specialization(s), concrete future roles, recommendations, and the
- * reasoning behind the suggestions (see mbaCharacterConstants).
+ * Consolidated MBA placement handbook, built entirely from the **Level-1
+ * behavioural (DISC) assessment** - the Agile Compatibility Index (ACI) is not
+ * part of this report. Every student resolves to one of the platform's 16
+ * behavioural characters (12 DISC blends + 4 Pure Traits), and each character
+ * carries an authored MBA reading: an MBA persona, the best-fit
+ * specialization(s), concrete future roles, and grooming recommendations
+ * (see mbaCharacterConstants).
  *
- * Structure: cover → TOC → executive summary (specialization pie + cohort
- * readiness radar + per-character counts + readiness bands) → one section per
- * present character (persona, roster, role fitment, recommendations, reasoning,
- * and a raw-data table at the end) → cross-cutting placement priorities →
- * closing pages.
+ * Structure (modelled on the Standard Placement Report, groomed for MBA):
+ *   cover → TOC → executive summary (character-distribution radar + colour-coded
+ *   headcount grid across all 16 characters) → specialization fitment (pie +
+ *   "who fits where" reveal) → elective-wise fit → one section per present
+ *   character, Pure Traits first then the blends (persona + comic art +
+ *   best-fit elective chip + narrative + grooming + roster whose merged column
+ *   lists the combination's future-fit roles). Closing pages and the landscape
+ *   master grid are implemented but disabled - see generate().
  */
 export class MBAPlacementReport extends BaseReport {
   private data: MBAPlacementData;
@@ -97,66 +106,42 @@ export class MBAPlacementReport extends BaseReport {
     this.scoreCohort();
   }
 
-  // ── Scoring ────────────────────────────────────────────────────────────────
+  // ── Cohort resolution ───────────────────────────────────────────────────────
 
-  /** Scores each student's specialization fit, then buckets by 16-character code. */
+  /** Resolves each student's 16-character code, then buckets the cohort. */
   private scoreCohort(): void {
     const validTraits = new Set<DiscTrait>(['D', 'I', 'S', 'C']);
 
     this.students = (this.data.students || []).map((row) => {
-      const a = row.agile_score || ({} as MBAStudentRow['agile_score']);
-      const readinessPct: Record<ReadinessKey, number> = {
-        commitment: normalizeReadiness(a.Commitment),
-        focus: normalizeReadiness(a.Focus),
-        openness: normalizeReadiness(a.Openness),
-        respect: normalizeReadiness(a.Respect),
-        courage: normalizeReadiness(a.Courage),
-      };
-
       const character = getMBACharacter(row.trait_code);
       const characterCode = character.code;
       const primaryTrait = (
         validTraits.has(characterCode[0] as DiscTrait) ? characterCode[0] : 'D'
       ) as DiscTrait;
-      const secondaryChar =
-        characterCode[1] && validTraits.has(characterCode[1] as DiscTrait)
-          ? characterCode[1]
-          : '';
-
-      const behavioralOrientation =
-        BEHAVIORAL_ORIENTATION[`${primaryTrait}${secondaryChar}`] ||
-        BEHAVIORAL_ORIENTATION[primaryTrait] ||
-        'Balanced Professional';
-
-      const rankings = rankSpecializations(readinessPct, primaryTrait);
-
-      return {
-        row,
-        primaryTrait,
-        characterCode,
-        character,
-        readinessPct,
-        rankings,
-        specFit:
-          rankings.find((r) => r.code === character.primarySpec) ?? rankings[0],
-        behavioralOrientation,
-      };
+      return { row, primaryTrait, characterCode, character };
     });
 
     for (const s of this.students) {
       (this.characterBuckets[s.characterCode] ||= []).push(s);
     }
-    // Sort each character bucket by suitability score descending.
+    // No ACI score to rank by - order each character's roster alphabetically.
     Object.values(this.characterBuckets).forEach((bucket) =>
-      bucket.sort((x, y) => y.specFit.finalScore - x.specFit.finalScore),
+      bucket.sort((x, y) =>
+        this.studentLabel(x.row).localeCompare(this.studentLabel(y.row)),
+      ),
     );
   }
 
-  /** Present characters in canonical order (skips characters with no students). */
+  /** Present characters in canonical (Pure-first) order; skips empty ones. */
   private presentCharacters(): string[] {
     return MBA_CHARACTER_ORDER.filter(
       (code) => (this.characterBuckets[code]?.length ?? 0) > 0,
     );
+  }
+
+  /** Count of students resolved to character `code`. */
+  private countFor(code: string): number {
+    return this.characterBuckets[code]?.length ?? 0;
   }
 
   /** Count of students whose character maps to specialization `code`. */
@@ -185,33 +170,36 @@ export class MBAPlacementReport extends BaseReport {
     this.doc.addPage();
     this.generateTableOfContents();
 
-    // 3. Executive Summary onwards (standard margins + watermark background)
+    // 3. Executive Summary (character-distribution radar + headcount grid)
     this._currentBackground = 'public/assets/images/Watermark_Background.jpg';
     this._useStdMargins = true;
     this.doc.addPage();
     this.generateExecutiveSummary();
 
-    // 3b. Elective-wise placement fit (briefs + strongest-fit headcount)
+    // 4. Specialization fitment (pie + "who fits where" reveal)
+    this.generateSpecFitment();
+
+    // 5. Elective-wise placement fit (briefs + strongest-fit headcount)
     this.generateElectiveSummary();
 
-    // 4. Per-character sections (16-character framework)
+    // 6. Per-character sections (16-character framework, Pure-traits first)
     this.presentCharacters().forEach((code) =>
       this.generateCharacterSection(code),
     );
 
-    // 5. Cross-cutting placement priorities
-    this.generatePlacementPriorities();
+    // 7. Specialization master grid (landscape appendix) - disabled per request.
+    //     The implementation is kept below; re-enable by uncommenting.
+    // this.generateMasterGrid();
 
-    // 6. Specialization master grid (landscape appendix)
-    this.generateMasterGrid();
-
-    // 7. Closing pages (back to portrait)
-    this._currentBackground = 'public/assets/images/Watermark_Background.jpg';
+    // 8. End page (About Us / Vision / Mission / Core Values / Services).
+    //    Uses its own full-page background and carries no footer.
+    this._currentBackground = 'public/assets/images/background.png';
     this._useStdMargins = true;
     this.doc.addPage();
-    this.generateClosingPages();
+    this.generateEndPage();
 
-    this.addFooters(this.data.exam_ref_no || '');
+    // Footers on every page except the End page.
+    this.addFooters(this.data.exam_ref_no || '', true);
 
     this.doc.end();
     await streamFinished;
@@ -314,10 +302,11 @@ export class MBAPlacementReport extends BaseReport {
 
     const tocItems = [
       MBA_PLACEMENT_CONTENT.executive_summary_title,
+      MBA_PLACEMENT_CONTENT.spec_chart_title,
       MBA_PLACEMENT_CONTENT.elective_title,
       ...characterItems,
-      MBA_PLACEMENT_CONTENT.priorities_title,
-      MBA_PLACEMENT_CONTENT.master_grid_title,
+      END_PAGE.about_title,
+      // Master grid (landscape) disabled per request - omitted from the TOC.
     ];
 
     tocItems.forEach((item, index) => {
@@ -367,18 +356,110 @@ export class MBAPlacementReport extends BaseReport {
     this.h1(MBA_PLACEMENT_CONTENT.executive_summary_title);
     this.pHtml(
       MBA_PLACEMENT_CONTENT.executive_summary_text(this.data.total_students),
-      { fontSize: 12, font: this.FONT_REGULAR, align: 'justify' },
+      { fontSize: 11, font: this.FONT_REGULAR, align: 'justify' },
     );
-    this.doc.moveDown(0.5);
+    this.doc.moveDown(0.8);
 
-    // 1. Specialization fitment - pie chart (where the cohort's careers concentrate)
-    this.h2(MBA_PLACEMENT_CONTENT.spec_chart_title);
+    // 1. Character-distribution radar - one spoke per character (all 16 shown).
+    // No heading above it (the exec paragraph already frames it); the freed
+    // space lets the radar run a little larger.
+    const radarData: Record<string, number> = {};
+    MBA_CHARACTER_ORDER.forEach((code) => {
+      radarData[this.shortPersona(getMBACharacter(code))] = this.countFor(code);
+    });
+    const maxCount = Math.max(...Object.values(radarData), 1);
+    const radarRadius = 122;
+    this.drawRadarChart(radarData, {
+      radius: radarRadius,
+      // Anchor the centre explicitly so the top labels never ride up into the
+      // heading above, regardless of how full the page already is.
+      y: this.doc.y + radarRadius + 24,
+      maxValue: maxCount + 1,
+      levels: Math.min(5, maxCount + 1),
+      fontSize: 8,
+    });
+    this.doc.moveDown(0.2);
+    this.pHtml(MBA_PLACEMENT_CONTENT.character_radar_description, {
+      fontSize: 8,
+      color: '#58595b',
+      align: 'center',
+      font: this.FONT_ITALIC,
+    });
+
+    // 2. Character headcount grid - the colour-coded "8 + 8" two-table variant.
+    // Reserve the heading + grid + caption together so the heading never
+    // strands at a page bottom with the grid pushed to the next page.
+    this.ensureSpace(0.3, true);
+    this.h2(MBA_PLACEMENT_CONTENT.character_grid_title);
+    this.drawCharacterGrid();
+    this.pHtml(MBA_PLACEMENT_CONTENT.character_grid_description, {
+      fontSize: 8,
+      color: '#58595b',
+      align: 'center',
+      font: this.FONT_ITALIC,
+    });
+  }
+
+  /** MBA persona without the leading "The " - tighter for chart/grid labels. */
+  private shortPersona(c: MBACharacter): string {
+    return c.mbaPersona.replace(/^The\s+/i, '');
+  }
+
+  /**
+   * The 16-character headcount in the Standard Placement Report's personality-
+   * grid style: two stacked tables of eight columns each ("8 + 8" variant). Each
+   * header cell is the character's grid colour with the persona name; the single
+   * data row beneath holds the student count.
+   */
+  private drawCharacterGrid(): void {
+    const tableWidth = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+    const colWidths = Array(8).fill(tableWidth / 8) as number[];
+
+    MBA_GRID_ROWS.forEach((codes, idx) => {
+      if (idx > 0) this.doc.y += 6; // gap between the top and bottom tables
+
+      this.table(
+        codes.map((code) => this.shortPersona(getMBACharacter(code))),
+        [codes.map((code) => this.countFor(code))],
+        {
+          x: this.MARGIN_STD,
+          width: tableWidth,
+          colWidths,
+          headerColor: codes.map(
+            (code) =>
+              (CHARACTER_GRID_COLORS[code] || { bg: this.COLOR_DEEP_BLUE }).bg,
+          ),
+          headerTextColor: codes.map(
+            (code) => (CHARACTER_GRID_COLORS[code] || { text: '#FFFFFF' }).text,
+          ),
+          headerAlign: 'center',
+          headerFont: this.FONT_SORA_BOLD,
+          headerFontSize: 7,
+          headerHeight: 34,
+          headerVerticalAlign: 'middle',
+          rowAlign: 'center',
+          font: this.FONT_SORA_BOLD,
+          fontSize: 13,
+          rowHeight: 26,
+          borderWidth: 1,
+          borderColor: '#000000',
+          verticalAlign: 'middle',
+        },
+      );
+    });
+  }
+
+  // ── Specialization fitment (pie + reveal) ─────────────────────────────────────
+
+  private generateSpecFitment(): void {
+    this.h1(MBA_PLACEMENT_CONTENT.spec_chart_title, { ensureSpace: 0.45 });
+
     const pieSlices: PieSlice[] = SPECIALIZATION_ORDER.map((code) => ({
       label: SPECIALIZATIONS[code].name,
       value: this.specCount(code),
       color: this.SPEC_HEADER_COLOR[code],
     }));
-    this.drawPieChart(pieSlices, { radius: 72, innerRadiusRatio: 0.55 });
+    this.drawPieChart(pieSlices, { radius: 78, innerRadiusRatio: 0.55 });
     this.pHtml(MBA_PLACEMENT_CONTENT.spec_chart_description, {
       fontSize: 8,
       color: '#58595b',
@@ -386,103 +467,39 @@ export class MBAPlacementReport extends BaseReport {
       font: this.FONT_ITALIC,
     });
 
-    // 2. Cohort at a glance - how many students fall under each character
-    this.h2(MBA_PLACEMENT_CONTENT.cohort_glance_title);
-    const glanceRows = this.presentCharacters()
-      .map((code) => {
-        const c = getMBACharacter(code);
-        const count = this.characterBuckets[code].length;
-        return { c, count };
-      })
-      .sort((a, b) => b.count - a.count)
-      .map(({ c, count }, i) => [
-        i + 1,
-        c.mbaPersona,
-        SPECIALIZATIONS[c.primarySpec].name,
-        count,
-      ]);
-    this.table(
-      ['S.No', 'MBA Persona', 'Best-Fit Specialization', 'Students'],
-      glanceRows,
-      {
-        headerFontSize: 8,
-        fontSize: 9,
-        headerHeight: 22,
-        rowHeight: 24,
-        verticalAlign: 'middle',
-        headerFont: this.FONT_BOLD,
-        font: this.FONT_SEMIBOLD,
-        headerTextColor: TABLE_STYLES.headerTextColor,
-        borderColor: TABLE_STYLES.borderColor,
-        headerColor: TABLE_STYLES.headerColor,
-        rowColor: TABLE_STYLES.rowColor,
-        rowTextColor: TABLE_STYLES.rowTextColor,
-        alternateRowColor: TABLE_STYLES.alternateRowColor,
-        colWidths: ['fit', 'fill', 'fit', 'fit'],
-        headerAlign: ['center', 'left', 'left', 'center'],
-        rowAlign: ['center', 'left', 'left', 'center'],
-        mergeRepeatedHeaders: true,
-      },
-    );
+    // Reveal the headline result first, then list who sits where.
+    const ranked = SPECIALIZATION_ORDER.map((code) => ({
+      code,
+      name: SPECIALIZATIONS[code].name,
+      n: this.specCount(code),
+    })).sort((a, b) => b.n - a.n);
+    const top = ranked[0];
+    if (top && top.n > 0) {
+      this.pHtml(
+        MBA_PLACEMENT_CONTENT.spec_reveal_intro(
+          top.name,
+          top.n,
+          this.data.total_students,
+        ),
+        { fontSize: 11, font: this.FONT_REGULAR, align: 'justify' },
+      );
+    }
 
-    // 3. Cohort readiness profile - radar across the five readiness indicators.
-    // Reserve the heading + chart height up-front so the page break (if any)
-    // happens before the centre is fixed - otherwise the radar gets stranded at
-    // the page bottom and its axis labels scatter across blank pages.
-    this.ensureSpace(0.55, true);
-    this.h2(MBA_PLACEMENT_CONTENT.readiness_radar_title);
-    const avg = this.averageReadiness(this.students);
-    const radarData = READINESS_ORDER.reduce(
-      (acc, k) => {
-        acc[SHORT_READINESS_LABEL[k]] = Math.round(avg[k]);
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
-    this.drawRadarChart(radarData, {
-      radius: 105,
-      maxValue: 100,
-      levels: 5,
-      y: this.doc.y + 105 + 26,
-    });
-    this.doc.moveDown(1);
-    this.pHtml(MBA_PLACEMENT_CONTENT.readiness_radar_description, {
-      fontSize: 8,
-      color: '#58595b',
-      align: 'center',
-      font: this.FONT_ITALIC,
-    });
-
-    // 4. Placement-readiness band split
-    this.h2(MBA_PLACEMENT_CONTENT.readiness_band_title);
-    const bandCounts = FIT_BANDS.map(
-      (b) => this.students.filter((s) => s.specFit.fit === b.level).length,
-    );
-    const bandRows = FIT_BANDS.map((b, i) => ({
-      type: 'row' as const,
-      data: [b.level, bandCounts[i], b.meaning],
-      fill: b.color,
-    }));
-    this.table(['Fit Band', 'Students', 'What it means'], bandRows, {
-      headerFontSize: 9,
-      fontSize: 9,
-      headerHeight: 20,
-      rowHeight: 24,
-      verticalAlign: 'middle',
-      headerFont: this.FONT_BOLD,
-      font: this.FONT_SEMIBOLD,
-      headerTextColor: TABLE_STYLES.headerTextColor,
-      borderColor: TABLE_STYLES.borderColor,
-      headerColor: TABLE_STYLES.headerColor,
-      colWidths: ['fit', 'fit', 'fill'],
-      headerAlign: ['left', 'center', 'left'],
-      rowAlign: ['left', 'center', 'left'],
-    });
-    this.pHtml(MBA_PLACEMENT_CONTENT.readiness_band_description, {
-      fontSize: 8,
-      color: '#58595b',
-      font: this.FONT_ITALIC,
-    });
+    this.h3('Who Fits Where');
+    const present = this.presentCharacters();
+    const lines = SPECIALIZATION_ORDER.map((code) => {
+      const n = this.specCount(code);
+      if (n === 0) return null;
+      const personas = present
+        .filter((pc) => getMBACharacter(pc).primarySpec === code)
+        .map(
+          (pc) =>
+            `${this.shortPersona(getMBACharacter(pc))} (${this.countFor(pc)})`,
+        )
+        .join(', ');
+      return `<b>${SPECIALIZATIONS[code].name} - ${n}:</b> ${personas}`;
+    }).filter((l): l is string => l !== null);
+    this.list(lines, { indent: 20, gap: 4, fontSize: 10 });
   }
 
   // ── Elective-wise placement fit ───────────────────────────────────────────────
@@ -576,244 +593,570 @@ export class MBAPlacementReport extends BaseReport {
     const c = getMBACharacter(code);
     const bucket = this.characterBuckets[code];
     const primaryName = SPECIALIZATIONS[c.primarySpec].name;
-    const secondaryName = SPECIALIZATIONS[c.secondarySpec].name;
 
-    this.h1(c.mbaPersona, { ensureSpace: 0.35 });
+    // Header card: comic art + persona identity + best-fit chip + narrative.
+    this.drawCharacterHeader(c, primaryName);
 
-    // Best-fit specialization line - the reader sees the MBA role identity.
-    this.pHtml(
-      `<b>Best fit:</b> ${primaryName} (also strong in ${secondaryName})`,
-      { fontSize: 10, font: this.FONT_REGULAR, align: 'left' },
-    );
-    this.p(c.tagline, {
-      fontSize: 9,
-      color: '#58595b',
-      font: this.FONT_ITALIC,
-      align: 'left',
-    });
-    this.p(c.narrative);
-
-    // 1. Roster - the individuals under this character. Their best-fit
-    // specialization is the character's (stated above); the per-student columns
-    // show how ready each individual is for it.
-    this.h2(`Students in this Character (${bucket.length})`);
-    const rosterRows = bucket.map((s, i) => [
-      i + 1,
-      this.studentLabel(s.row),
-      `${primaryName} Fit`,
-      s.specFit.fit,
-      Math.round(s.specFit.finalScore),
-      s.behavioralOrientation,
-    ]);
-    this.table(
-      [
-        'S.No',
-        'Student',
-        'Specialization',
-        'Readiness Fit',
-        'Score',
-        'Working Style',
-      ],
-      rosterRows,
-      {
-        headerFontSize: 8,
-        fontSize: 9,
-        headerHeight: 22,
-        rowHeight: 26,
-        verticalAlign: 'middle',
-        headerFont: this.FONT_BOLD,
-        font: this.FONT_SEMIBOLD,
-        headerTextColor: TABLE_STYLES.headerTextColor,
-        borderColor: TABLE_STYLES.borderColor,
-        headerColor: TABLE_STYLES.headerColor,
-        rowColor: TABLE_STYLES.rowColor,
-        rowTextColor: TABLE_STYLES.rowTextColor,
-        alternateRowColor: TABLE_STYLES.alternateRowColor,
-        colWidths: ['fit', 'fill', 'fit', 'fit', 'fit', 'fit'],
-        headerAlign: ['center', 'left', 'left', 'center', 'center', 'left'],
-        rowAlign: ['center', 'left', 'left', 'center', 'center', 'left'],
-        mergeRepeatedHeaders: true,
-      },
-    );
-
-    // 2. Future role fitment - roles with the reasoning per role.
-    this.h2('Future Role Fitment');
-    this.list(
-      c.futureRoles.map((r) => `<b>${r.name}</b> - ${r.why}`),
-      { indent: 20, gap: 4 },
-    );
-
-    // 3. Specific recommendations (grooming / preparation focus).
-    this.h2('Recommendations');
-    this.list(c.recommendations, { type: 'number', indent: 20, gap: 4 });
-
-    // 4. Why these careers - the reasoning behind the suggestions.
-    this.h2('Why These Careers');
+    // Why we point this character at these roles (brief reasoning).
     this.p(c.reasoning, { align: 'justify' });
 
-    // 5. Raw data table - placed at the end of the section. Reserve enough
-    // space that the heading, note, and the start of the table stay together
-    // (never orphan the "Raw Data" heading at the bottom of a page).
-    this.ensureSpace(0.2, true);
-    this.h3('Raw Data');
-    this.p(
-      'Underlying work-readiness indicators (0–100) and best-fit suitability score for each student in this character.',
-      { fontSize: 8, color: '#58595b', font: this.FONT_ITALIC, align: 'left' },
-    );
-    this.renderRawDataTable(bucket);
+    // Grooming focus - the "some grooming" the senior asked to keep.
+    this.h2('Grooming Focus');
+    this.list(c.recommendations, { type: 'number', indent: 20, gap: 4 });
+
+    // Student roster (renders its own heading so it never strands on a page
+    // boundary) with the combination's future-fit roles spanning the rows.
+    const roles = SPEC_MAP[c.code]?.roles ?? c.futureRoles.map((r) => r.name);
+    this.renderCharacterRoster(bucket, roles, c.primarySpec);
   }
 
-  /** Per-student raw readiness indicators + fit score, shown at a section's end. */
-  private renderRawDataTable(bucket: ScoredStudent[]): void {
-    const headers = [
-      'Student',
-      ...READINESS_ORDER.map((k) => SHORT_READINESS_LABEL[k]),
-      'Fit Score',
-    ];
-    const rows = bucket.map((s) => [
-      this.studentLabel(s.row),
-      ...READINESS_ORDER.map((k) => `${Math.round(s.readinessPct[k])}%`),
-      Math.round(s.specFit.finalScore),
-    ]);
-    this.table(headers, rows, {
-      headerFontSize: 7.5,
-      fontSize: 8,
-      headerHeight: 24,
-      rowHeight: 20,
-      verticalAlign: 'middle',
-      headerVerticalAlign: 'middle',
-      headerFont: this.FONT_BOLD,
-      font: this.FONT_SEMIBOLD,
-      headerTextColor: TABLE_STYLES.headerTextColor,
-      borderColor: TABLE_STYLES.borderColor,
-      headerColor: TABLE_STYLES.headerColor,
-      rowColor: TABLE_STYLES.rowColor,
-      rowTextColor: TABLE_STYLES.rowTextColor,
-      alternateRowColor: TABLE_STYLES.alternateRowColor,
-      colWidths: ['fill', 'fit', 'fit', 'fit', 'fit', 'fit', 'fit'],
-      headerAlign: [
-        'left',
-        'center',
-        'center',
-        'center',
-        'center',
-        'center',
-        'center',
-      ],
-      rowAlign: [
-        'left',
-        'center',
-        'center',
-        'center',
-        'center',
-        'center',
-        'center',
-      ],
-      mergeRepeatedHeaders: true,
-    });
-  }
+  /**
+   * Renders the per-character roster: S.No + Student rows of equal height on the
+   * left, and a "Future-Fit Roles" cell on the right that spans (and centres its
+   * chips across) those rows. Hand-drawn rather than via `table()` because the
+   * table helper's vertical merge collapses a merged column onto its first row.
+   *
+   * The roster paginates: it fills the current page with as many rows as fit,
+   * then continues the remaining rows on the next page - re-drawing the table
+   * header AND the spanning roles cell on each page (the roles repeat per page,
+   * just like a merged column that crosses a page break). The "Students with
+   * this Profile" heading renders here too, so it never strands without its
+   * table.
+   */
+  private renderCharacterRoster(
+    bucket: ScoredStudent[],
+    roles: string[],
+    spec: SpecializationCode,
+  ): void {
+    const x = this.MARGIN_STD;
+    const fullW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+    const wSno = 40;
+    const wRoles = 224;
+    const wName = fullW - wSno - wRoles;
+    const widths = [wSno, wName, wRoles];
+    const headerH = 22;
+    const pad = 8;
+    const baseRowH = 26;
+    const bottomLimit = this.PAGE_HEIGHT - this.MARGIN_STD;
+    const n = bucket.length;
+    const rolesInnerW = wRoles - 2 * pad;
 
-  // ── Cross-cutting placement priorities ────────────────────────────────────────
+    // Height the roles chips need (measured once); each page group must be at
+    // least this tall so the full role set fits in its spanning cell.
+    const rolesH = this.layoutRoleChips(roles, 0, 0, rolesInnerW, spec, false);
+    const rolesBlockH = rolesH + 2 * pad;
+    const groupMin = Math.max(rolesBlockH, baseRowH);
 
-  private generatePlacementPriorities(): void {
-    this.h1(MBA_PLACEMENT_CONTENT.priorities_title, { ensureSpace: 0.35 });
+    // Keep the heading with the table header + the first group.
+    this.ensureSpace(34 + headerH + groupMin + 10);
+    this.h2('Students with this Profile');
 
-    // Placement priorities are driven by ACI readiness. When no student in the
-    // cohort has completed ACI, the rankings fall back to behavioural (DISC)
-    // fit only - surface a short note so the reader interprets them correctly.
-    const cohortHasAci = this.students.some((s) =>
-      Object.values(s.readinessPct).some((v) => v > 0),
-    );
-    if (!cohortHasAci) {
-      this.pHtml(
-        'Note: No ACI (Agile Compatibility Index) data is available for this ' +
-          'cohort. The shortlists below are based on behavioural fit only ' +
-          'and will sharpen once students complete the ACI assessment.',
-        { fontSize: 9, color: '#58595b', font: this.FONT_ITALIC },
-      );
-    }
-
-    // Deploy-ready shortlist
-    this.h2(MBA_PLACEMENT_CONTENT.deploy_ready_title);
-    this.p(MBA_PLACEMENT_CONTENT.deploy_ready_text);
-    const deployReady = this.students
-      .filter((s) => DEPLOY_READY_FITS.has(s.specFit.fit))
-      .sort((a, b) => b.specFit.finalScore - a.specFit.finalScore);
-    this.renderShortlistTable(deployReady);
-
-    // Grooming list
-    this.h2(MBA_PLACEMENT_CONTENT.grooming_title, { ensureSpace: 0.25 });
-    this.p(MBA_PLACEMENT_CONTENT.grooming_text);
-    const grooming = this.students
-      .filter((s) => !DEPLOY_READY_FITS.has(s.specFit.fit))
-      .sort((a, b) => b.specFit.finalScore - a.specFit.finalScore);
-    this.renderShortlistTable(grooming);
-  }
-
-  private renderShortlistTable(list: ScoredStudent[]): void {
-    if (list.length === 0) {
-      this.p('No students fall in this category for this cohort.', {
-        fontSize: 9,
-        color: '#58595b',
-        font: this.FONT_ITALIC,
-        align: 'left',
+    const drawHeaderRow = (hy: number): void => {
+      let hx = x;
+      this.doc.lineWidth(0.6);
+      widths.forEach((w, i) => {
+        this.doc
+          .rect(hx, hy, w, headerH)
+          .fillAndStroke(TABLE_STYLES.headerColor, TABLE_STYLES.borderColor);
+        this.doc
+          .font(this.FONT_BOLD)
+          .fontSize(8)
+          .fillColor(TABLE_STYLES.headerTextColor)
+          .text(
+            ['S.No', 'Student', 'Future-Fit Roles'][i],
+            hx + pad,
+            hy + (headerH - 9) / 2,
+            {
+              width: w - 2 * pad,
+              align: i === 0 ? 'center' : 'left',
+            },
+          );
+        hx += w;
       });
-      return;
+    };
+
+    let idx = 0;
+    let y = this.doc.y + 2;
+
+    while (idx < n) {
+      let avail = bottomLimit - y - headerH;
+      if (avail < groupMin) {
+        this.doc.addPage();
+        y = this.doc.y + 2;
+        avail = bottomLimit - y - headerH;
+      }
+
+      const rowsLeft = n - idx;
+      const kMax = Math.max(1, Math.floor(avail / baseRowH));
+      const k = Math.min(rowsLeft, kMax);
+      const groupRowH = Math.max(baseRowH, Math.ceil(rolesBlockH / k));
+      const groupH = groupRowH * k;
+
+      drawHeaderRow(y);
+      const rowsY = y + headerH;
+
+      for (let j = 0; j < k; j++) {
+        const s = bucket[idx + j];
+        const ry = rowsY + j * groupRowH;
+        const bg =
+          (idx + j) % 2 === 1
+            ? TABLE_STYLES.alternateRowColor
+            : TABLE_STYLES.rowColor;
+        this.doc.lineWidth(0.6);
+        this.doc
+          .rect(x, ry, wSno, groupRowH)
+          .fillAndStroke(bg, TABLE_STYLES.borderColor);
+        this.doc
+          .rect(x + wSno, ry, wName, groupRowH)
+          .fillAndStroke(bg, TABLE_STYLES.borderColor);
+        this.doc.font(this.FONT_SEMIBOLD).fontSize(9).fillColor('#222222');
+        this.doc.text(String(idx + j + 1), x + pad, ry + (groupRowH - 11) / 2, {
+          width: wSno - 2 * pad,
+          align: 'center',
+        });
+        this.doc.text(
+          this.studentLabel(s.row),
+          x + wSno + pad,
+          ry + (groupRowH - 11) / 2,
+          { width: wName - 2 * pad, align: 'left' },
+        );
+      }
+
+      // Roles cell spanning this page's group; chips vertically centred.
+      const rolesX = x + wSno + wName;
+      this.doc
+        .rect(rolesX, rowsY, wRoles, groupH)
+        .fillAndStroke('#FFFFFF', TABLE_STYLES.borderColor);
+      const chipsY = rowsY + Math.max(pad, (groupH - rolesH) / 2);
+      this.layoutRoleChips(
+        roles,
+        rolesX + pad,
+        chipsY,
+        rolesInnerW,
+        spec,
+        true,
+      );
+
+      y = rowsY + groupH;
+      idx += k;
     }
-    const rows = list.map((s, i) => [
-      i + 1,
-      this.studentLabel(s.row),
-      s.character.mbaPersona,
-      s.specFit.meta.name,
-      s.specFit.fit,
-      Math.round(s.specFit.finalScore),
-    ]);
-    this.table(
-      [
-        'S.No',
-        'Student',
-        'MBA Persona',
-        'Best-Fit Specialization',
-        'Fit Level',
-        'Score',
-      ],
-      rows,
-      this.shortlistTableOptions([
-        'center',
-        'left',
-        'left',
-        'left',
-        'center',
-        'center',
-      ]),
-    );
+
+    this.doc.y = y + this.DEFAULT_GAP;
+    this.doc.x = this.MARGIN_STD;
   }
 
-  private shortlistTableOptions(rowAlign: ('left' | 'center')[]) {
-    // Column widths derived from the column count: the "Student" column (index 1)
-    // fills remaining space, every other column fits its content.
-    const colWidths = rowAlign.map((_, i) => (i === 1 ? 'fill' : 'fit')) as (
-      | 'fit'
-      | 'fill'
-    )[];
-    return {
-      headerFontSize: 8,
-      fontSize: 9,
-      headerHeight: 22,
-      rowHeight: 24,
-      verticalAlign: 'middle' as const,
-      headerFont: this.FONT_BOLD,
-      font: this.FONT_SEMIBOLD,
-      headerTextColor: TABLE_STYLES.headerTextColor,
-      borderColor: TABLE_STYLES.borderColor,
-      headerColor: TABLE_STYLES.headerColor,
-      rowColor: TABLE_STYLES.rowColor,
-      rowTextColor: TABLE_STYLES.rowTextColor,
-      alternateRowColor: TABLE_STYLES.alternateRowColor,
-      colWidths,
-      rowAlign,
-      mergeRepeatedHeaders: true,
-    };
+  /**
+   * Lays out the role names as rounded chips that wrap within `width`, tinted
+   * with the specialization accent. When `render` is false it only measures
+   * (draws nothing) and returns the total block height; when true it draws and
+   * returns the same height. Lets the caller size the cell before drawing.
+   */
+  private layoutRoleChips(
+    roles: string[],
+    x: number,
+    y: number,
+    width: number,
+    spec: SpecializationCode,
+    render: boolean,
+  ): number {
+    const meta = SPECIALIZATIONS[spec];
+    const padX = 7;
+    const chipH = 17;
+    const gapX = 5;
+    const gapY = 5;
+    const fontSize = 8;
+
+    let cx = x;
+    let cy = y;
+    this.doc.font(this.FONT_SEMIBOLD).fontSize(fontSize);
+    roles.forEach((r) => {
+      const tw = this.doc.widthOfString(r);
+      const w = tw + 2 * padX;
+      if (cx > x && cx + w > x + width) {
+        cx = x;
+        cy += chipH + gapY;
+      }
+      if (render) {
+        this.doc.roundedRect(cx, cy, w, chipH, chipH / 2).fill(meta.accentSoft);
+        this.doc
+          .fillColor(meta.accent)
+          .font(this.FONT_SEMIBOLD)
+          .fontSize(fontSize)
+          .text(r, cx + padX, cy + (chipH - fontSize) / 2 - 1, {
+            width: tw + 2,
+            lineBreak: false,
+          });
+      }
+      cx += w + gapX;
+    });
+    return cy - y + chipH;
+  }
+
+  /**
+   * Draws a rounded "pill" chip at (x, y) and returns its width, so callers can
+   * place several in a row. Used for the best-fit elective in section headers.
+   */
+  private chip(
+    x: number,
+    y: number,
+    text: string,
+    bg: string,
+    fg: string,
+    h = 21,
+    fontSize = 11,
+  ): number {
+    this.doc.font(this.FONT_SEMIBOLD).fontSize(fontSize);
+    const tw = this.doc.widthOfString(text);
+    const w = tw + 20;
+    this.doc.roundedRect(x, y, w, h, h / 2).fill(bg);
+    this.doc
+      .fillColor(fg)
+      .font(this.FONT_SEMIBOLD)
+      .fontSize(fontSize)
+      .text(text, x + 10, y + (h - fontSize) / 2 - 1.5, {
+        width: tw + 2,
+        lineBreak: false,
+      });
+    return w;
+  }
+
+  /**
+   * Section header: the character's comic illustration on the left, with the
+   * persona title, DISC identity, best-fit line and narrative beside it.
+   */
+  private drawCharacterHeader(c: MBACharacter, primaryName: string): void {
+    const imgW = 190;
+    const imgH = Math.round(imgW / 1.638); // illustrations are ~1.64:1
+    this.ensureSpace(Math.max(imgH, 150) + 24);
+
+    // Match h1's leading gap so sections breathe like the rest of the report.
+    const topMargin = this.doc.page.margins.top;
+    if (this.doc.y > topMargin + 5) this.doc.y += this.DEFAULT_GAP;
+
+    const x = this.MARGIN_STD;
+    const startY = this.doc.y;
+    const accent = DISC_COLORS[c.code[0]] || this.COLOR_DEEP_BLUE;
+
+    // Illustration: the character's own art, else (Pure Traits) the top-two
+    // combination's art, else a tinted placeholder.
+    const artPath = getCharacterArtCandidates(c.code)
+      .map((file) => `${TRAIT_ART_DIR}/${file}`)
+      .find((p) => fs.existsSync(p));
+    if (artPath) {
+      this.doc.image(artPath, x, startY, {
+        fit: [imgW, imgH],
+        align: 'center',
+        valign: 'center',
+      });
+    } else {
+      this.doc.roundedRect(x, startY, imgW, imgH, 8).fill(accent);
+      this.doc
+        .font(this.FONT_SORA_BOLD)
+        .fontSize(20)
+        .fillColor('#FFFFFF')
+        .text(c.code, x, startY + imgH / 2 - 14, {
+          width: imgW,
+          align: 'center',
+        });
+    }
+
+    // Text column to the right of the illustration.
+    const tx = x + imgW + 16;
+    const tw = this.PAGE_WIDTH - this.MARGIN_STD - tx;
+
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(16)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(c.mbaPersona, tx, startY, { width: tw });
+
+    this.doc
+      .font(this.FONT_SORA_SEMIBOLD)
+      .fontSize(9.5)
+      .fillColor('#6B6B76')
+      .text(`Trait ${c.code}  ·  ${c.name}`, tx, this.doc.y + 1, { width: tw });
+
+    // Best-fit elective as a standalone chip (the future roles live in the
+    // table); no label or secondary text per request.
+    const meta = SPECIALIZATIONS[c.primarySpec];
+    const chipH = 21;
+    const chipY = this.doc.y + 6;
+    this.chip(tx, chipY, primaryName, meta.accent, '#FFFFFF', chipH);
+    this.doc.y = chipY + chipH;
+    this.doc.x = tx;
+
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(9.5)
+      .fillColor('#33333b')
+      .text(c.narrative, tx, this.doc.y + 5, { width: tw, align: 'justify' });
+
+    // Continue below the taller of the illustration and the text column.
+    this.doc.y = Math.max(this.doc.y, startY + imgH) + 8;
+    this.doc.x = this.MARGIN_STD;
+  }
+
+  // ── End page (About Us) ──────────────────────────────────────────────────────
+
+  /**
+   * SVG path for a "SIM-card" rounded rectangle: rounded on three corners with
+   * the top-right corner chamfered (cut diagonally) by `cut`.
+   */
+  private simCardPath(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number,
+    cut: number,
+  ): string {
+    return [
+      `M ${x + r} ${y}`,
+      `L ${x + w - cut} ${y}`,
+      `L ${x + w} ${y + cut}`,
+      `L ${x + w} ${y + h - r}`,
+      `Q ${x + w} ${y + h} ${x + w - r} ${y + h}`,
+      `L ${x + r} ${y + h}`,
+      `Q ${x} ${y + h} ${x} ${y + h - r}`,
+      `L ${x} ${y + r}`,
+      `Q ${x} ${y} ${x + r} ${y}`,
+      'Z',
+    ].join(' ');
+  }
+
+  /**
+   * Service-card icon: the category's Font Awesome vector path, scaled into an
+   * `size` box and filled. `kind` matches the END_PAGE.services `icon` value.
+   */
+  private drawServiceIcon(
+    kind: string,
+    ox: number,
+    oy: number,
+    size: number,
+    color = '#68B569',
+  ): void {
+    const d = SERVICE_ICON_PATHS[kind];
+    if (!d) return;
+    this.doc.save();
+    this.doc.translate(ox, oy).scale(size / 640);
+    // Outline style: stroke the glyph contour instead of filling it. Line width
+    // is set in the 640-unit space, so divide by the scale to get a ~2px stroke.
+    this.doc
+      .lineWidth((2 * 640) / size)
+      .lineJoin('round')
+      .lineCap('round')
+      .path(d)
+      .stroke(color);
+    this.doc.restore();
+  }
+
+  /**
+   * Large faint decorative glyph inside a Vision/Mission box, drawn from the
+   * white PNG icon assets (vision = eye/bulb, mission = target) at low opacity.
+   */
+  private drawBoxGlyph(
+    kind: 'vision' | 'mission',
+    bx: number,
+    by: number,
+    bw: number,
+    bh: number,
+  ): void {
+    const file = `${ICON_DIR}/${kind === 'vision' ? 'vision-white.png' : 'target-white.png'}`;
+    if (!fs.existsSync(file)) return;
+    const sz = bh * 0.58;
+    const ix = bx + bw - sz - 22;
+    const iy = by + (bh - sz) / 2;
+    this.doc.save();
+    this.doc.opacity(0.16);
+    this.doc.image(file, ix, iy, { fit: [sz, sz] });
+    this.doc.restore();
+    this.doc.opacity(1);
+  }
+
+  /**
+   * Closing "About Us" page: intro paragraph, side-by-side Vision/Mission
+   * boxes, Core Values bullets, a four-card "Our Services" row, and a footnote
+   * disclaimer. Laid out manually to fit a single page.
+   */
+  private generateEndPage(): void {
+    const x = this.MARGIN_STD;
+    const fullW = this.PAGE_WIDTH - 2 * this.MARGIN_STD;
+    const bottomY = this.PAGE_HEIGHT - this.MARGIN_STD;
+
+    // About Us.
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(16)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(END_PAGE.about_title, x, this.MARGIN_STD);
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(10.5)
+      .fillColor('#222222')
+      .text(END_PAGE.about_text, x, this.doc.y + 8, {
+        width: fullW,
+        align: 'justify',
+      });
+
+    // Vision / Mission - two touching half-width boxes, each with a faint glyph.
+    const boxW = fullW / 2;
+    const pad = 20;
+    const innerW = boxW - 2 * pad;
+    const titleH = 26;
+    this.doc.font(this.FONT_REGULAR).fontSize(11);
+    const bodyH = Math.max(
+      this.doc.heightOfString(END_PAGE.vision_text, { width: innerW }),
+      this.doc.heightOfString(END_PAGE.mission_text, { width: innerW }),
+    );
+    const boxH = pad + titleH + 6 + bodyH + pad + 10;
+    const top = this.doc.y + 18;
+
+    this.doc.rect(x, top, boxW, boxH).fill('#312A7B');
+    this.drawBoxGlyph('vision', x, top, boxW, boxH);
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(19)
+      .fillColor('#69B769')
+      .text(END_PAGE.vision_title, x + pad, top + pad, { width: innerW });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(11)
+      .fillColor('#FFFFFF')
+      .text(END_PAGE.vision_text, x + pad, top + pad + titleH + 6, {
+        width: innerW,
+      });
+
+    const gx = x + boxW;
+    this.doc.rect(gx, top, boxW, boxH).fill('#69B769');
+    this.drawBoxGlyph('mission', gx, top, boxW, boxH);
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(19)
+      .fillColor('#312A7B')
+      .text(END_PAGE.mission_title, gx + pad, top + pad, { width: innerW });
+    this.doc
+      .font(this.FONT_REGULAR)
+      .fontSize(11)
+      .fillColor('#FFFFFF')
+      .text(END_PAGE.mission_text, gx + pad, top + pad + titleH + 6, {
+        width: innerW,
+      });
+
+    this.doc.y = top + boxH + 18;
+    this.doc.x = x;
+
+    // Core Values.
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(14)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(END_PAGE.core_values_title, x, this.doc.y);
+    this.doc.y += 8;
+    // Rendered manually (not the shared `list` helper) so the small bullet sits
+    // on the text's optical centre and stays a tidy size.
+    const cvFontSize = 10.5;
+    const cvBulletR = 1.7;
+    const cvIndent = 8;
+    const cvLabelGap = 13;
+    const cvTextW = fullW - cvIndent - cvLabelGap;
+    this.doc.font(this.FONT_REGULAR).fontSize(cvFontSize);
+    END_PAGE.core_values.forEach((item) => {
+      const itemY = this.doc.y;
+      this.doc
+        .circle(x + cvIndent + cvBulletR, itemY + cvFontSize * 0.58, cvBulletR)
+        .fill('#222222');
+      this.doc
+        .fillColor('#222222')
+        .text(item, x + cvIndent + cvLabelGap, itemY, { width: cvTextW });
+      this.doc.y += 5;
+    });
+    this.doc.x = x;
+
+    // Divider.
+    this.doc.y += 12;
+    this.doc
+      .lineWidth(0.6)
+      .strokeColor('#cfcfe6')
+      .moveTo(x, this.doc.y)
+      .lineTo(x + fullW, this.doc.y)
+      .stroke();
+    this.doc.y += 16;
+
+    // Our Services (centered).
+    this.doc
+      .font(this.FONT_SORA_BOLD)
+      .fontSize(16)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(END_PAGE.services_title, x, this.doc.y, {
+        width: fullW,
+        align: 'center',
+      });
+    this.doc.y += 12;
+
+    // Disclaimer is anchored to the page bottom; the cards stretch down to it
+    // so the page fills evenly (text stays top-aligned in each card).
+    const discText = `*${END_PAGE.disclaimer_label} ${END_PAGE.disclaimer_text}`;
+    this.doc.font(this.FONT_ITALIC).fontSize(7.3);
+    const discH = this.doc.heightOfString(discText, { width: fullW });
+    const discY = bottomY - discH;
+
+    const cardGap = 12;
+    const cardW = (fullW - cardGap * 3) / 4;
+    const cardPad = 11;
+    const cardInnerW = cardW - 2 * cardPad;
+    const cardTop = this.doc.y;
+    const iconSize = 30;
+    const titleBlock = 18;
+    this.doc.font(this.FONT_REGULAR).fontSize(7.6);
+    const maxBodyH = Math.max(
+      ...END_PAGE.services.map((s) =>
+        this.doc.heightOfString(s.text, { width: cardInnerW }),
+      ),
+    );
+    const contentH =
+      cardPad + iconSize + 10 + titleBlock + 6 + maxBodyH + cardPad;
+    const cardH = Math.max(contentH, discY - 14 - cardTop);
+
+    END_PAGE.services.forEach((s, i) => {
+      const cx = x + i * (cardW + cardGap);
+      this.doc
+        .path(this.simCardPath(cx, cardTop, cardW, cardH, 7, 16))
+        .lineWidth(1)
+        .stroke('#b9c3df');
+      this.drawServiceIcon(s.icon, cx + cardPad, cardTop + cardPad, iconSize);
+      this.doc
+        .font(this.FONT_BOLD)
+        .fontSize(13)
+        .fillColor('#1B1B27')
+        .text(s.title, cx + cardPad, cardTop + cardPad + iconSize + 10, {
+          width: cardInnerW,
+        });
+      this.doc
+        .font(this.FONT_REGULAR)
+        .fontSize(7.6)
+        .fillColor('#555555')
+        .text(
+          s.text,
+          cx + cardPad,
+          cardTop + cardPad + iconSize + 10 + titleBlock + 6,
+          { width: cardInnerW, align: 'left' },
+        );
+    });
+
+    // Disclaimer at the very bottom of the page - same italic body style
+    // throughout; only the "*Disclaimer:" label is tinted blue.
+    this.doc
+      .font(this.FONT_ITALIC)
+      .fontSize(7.3)
+      .fillColor(this.COLOR_DEEP_BLUE)
+      .text(`*${END_PAGE.disclaimer_label} `, x, discY, {
+        width: fullW,
+        align: 'left',
+        continued: true,
+      });
+    this.doc.fillColor('#58595b').text(END_PAGE.disclaimer_text, {
+      continued: false,
+    });
   }
 
   // ── Closing pages ─────────────────────────────────────────────────────────────
@@ -893,18 +1236,25 @@ export class MBAPlacementReport extends BaseReport {
   }
 
   /**
-   * Per-student 1–5 specialization ranking, anchored to the character so rank 1
-   * is always the character's primary best-fit (matching the rest of the
-   * report); the remaining slots are ordered by readiness suitability.
+   * Per-student 1–5 specialization ranking. Rank 1 is always the character's
+   * primary best-fit and rank 2 its secondary (so it matches the rest of the
+   * report); the remaining three are ordered by the student's DISC behavioural
+   * alignment to each specialization.
    */
   private electiveRanks(s: ScoredStudent): Record<SpecializationCode, number> {
     const primary = s.character.primarySpec;
     const secondary = s.character.secondarySpec;
-    const scoreFor = (code: SpecializationCode) =>
-      s.rankings.find((r) => r.code === code)?.finalScore ?? 0;
+    const alignScore = (code: SpecializationCode): number => {
+      const a: BehavioralAlignment = DISC_ALIGNMENT[s.primaryTrait][code];
+      return a === 'Strong' ? 3 : a === 'Moderate' ? 2 : 1;
+    };
     const rest = SPECIALIZATION_ORDER.filter(
       (c) => c !== primary && c !== secondary,
-    ).sort((a, b) => scoreFor(b) - scoreFor(a));
+    ).sort(
+      (a, b) =>
+        alignScore(b) - alignScore(a) ||
+        SPECIALIZATION_ORDER.indexOf(a) - SPECIALIZATION_ORDER.indexOf(b),
+    );
     const order = [primary, secondary, ...rest];
     const ranks = {} as Record<SpecializationCode, number>;
     order.forEach((c, i) => (ranks[c] = i + 1));
@@ -1106,9 +1456,9 @@ export class MBAPlacementReport extends BaseReport {
   }
 
   /**
-   * Bright, vivid colors for the specialization pie + counts. These are
-   * lighter/punchier than the deep `accent` shades used elsewhere so the chart
-   * reads clearly with white text (matching the placement-handbook style).
+   * Bright, vivid colors for the specialization pie. These are lighter/punchier
+   * than the deep `accent` shades used elsewhere so the chart reads clearly with
+   * white text (matching the placement-handbook style).
    */
   private readonly SPEC_HEADER_COLOR: Record<SpecializationCode, string> = {
     FIN: '#2D5BD0', // bright blue
@@ -1117,22 +1467,4 @@ export class MBAPlacementReport extends BaseReport {
     OPS: '#E07B2E', // bright orange
     MKT: '#D63384', // bright magenta
   };
-
-  private averageReadiness(
-    bucket: ScoredStudent[],
-  ): Record<ReadinessKey, number> {
-    const sum: Record<ReadinessKey, number> = {
-      commitment: 0,
-      focus: 0,
-      openness: 0,
-      respect: 0,
-      courage: 0,
-    };
-    if (bucket.length === 0) return sum;
-    bucket.forEach((s) => {
-      READINESS_ORDER.forEach((k) => (sum[k] += s.readinessPct[k]));
-    });
-    READINESS_ORDER.forEach((k) => (sum[k] = sum[k] / bucket.length));
-    return sum;
-  }
 }
