@@ -474,8 +474,18 @@ FROM TraitGrouped;
  * MBA specialization via mbaConstants.rankSpecializations.
  *
  * One row per student: a session has multiple completed attempts, but only the
- * attempt carrying `dominant_trait_id` is kept (filter `pt.code IS NOT NULL`),
- * which dedupes to exactly one scored row per student - mirroring getPlacementDetails.
+ * attempt carrying `dominant_trait_id` is kept, which dedupes to exactly one
+ * scored row per student.
+ *
+ * Inclusion rule - this report only requires **Level 1 (DISC)**. A student
+ * qualifies as soon as their Level-1 attempt is COMPLETED: the exam engine sets
+ * `status='COMPLETED'` + `dominant_trait_id` on that attempt at L1 submission
+ * (see exam_service.go), independent of whether Levels 2-4 were taken. The
+ * `assessment_reports` row is created later by the report pipeline (and only ever
+ * backfilled for L1+L2 completers), so it is LEFT-joined here - requiring it would
+ * wrongly drop students who finished only Level 1. `report_number`/`agile_scores`
+ * are therefore optional and may be null (this report doesn't render them per
+ * student; the cohort ref no falls back to MAX over whoever does have a report).
  */
 export async function getMBAPlacementDetails(
   department_degree_id: number,
@@ -539,7 +549,10 @@ export async function getMBAPlacementDetails(
         JOIN departments dpt ON dd.department_id = dpt.id
         JOIN degree_types dt ON dd.degree_type_id = dt.id
         JOIN groups gp ON a1.group_id = gp.id
-        JOIN assessment_reports ar ON aa.assessment_session_id = ar.assessment_session_id
+        -- LEFT JOIN: the consolidated report row may not exist yet for students
+        -- who completed only Level 1; we still want them in the cohort (this
+        -- report needs Level-1 DISC data, which lives on the attempt above).
+        LEFT JOIN assessment_reports ar ON aa.assessment_session_id = ar.assessment_session_id
         JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
         LEFT JOIN DuplicateCheck dc
           ON r.full_name = dc.full_name
