@@ -1478,9 +1478,19 @@ export class AssessmentService {
 
   async getLevels() {
     try {
+      // Return every real assessment-ladder level - not just the mandatory
+      // ones. Opt-in levels like Level 3 (IAT Gen) are is_mandatory = false
+      // because eligibility is now driven per-registration by the levels.*
+      // settings (see migration 025), not by the global mandatory flag. The
+      // candidate preview still needs them in this list so it can match a
+      // candidate's actual attempts to their level and render the right tab /
+      // report - otherwise the IAT Gen tab never appears even after the
+      // candidate completes it. Only inert "TBD" placeholder rows are excluded.
       return await this.levelRepo
         .createQueryBuilder('al')
-        .where('al.is_mandatory = :isMandatory', { isMandatory: true })
+        .where("UPPER(COALESCE(al.pattern_type, '')) <> :placeholder", {
+          placeholder: 'TBD',
+        })
         .orderBy('al.sort_order', 'ASC')
         .getMany();
     } catch (error) {
