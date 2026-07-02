@@ -274,7 +274,7 @@ export class AdminService {
       },
       relations: ['user', 'program', 'registration'],
       order: { validTo: 'DESC' },
-      take: 5,
+      take: 20,
     });
   }
 

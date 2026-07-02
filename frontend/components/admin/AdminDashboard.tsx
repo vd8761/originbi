@@ -589,12 +589,12 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Recent Expired Assessments */}
-        <div className="dashboard-glass-card flex flex-col overflow-hidden min-h-[400px]">
+        <div className="dashboard-glass-card flex flex-col overflow-hidden min-h-[400px] max-h-[520px]">
           <div className="px-6 pt-6 pb-4 flex justify-between items-center">
             <h3 className="font-semibold text-[#19211C] dark:text-white text-lg">
               Recent Expired Assessments
             </h3>
-            <Link href="/admin/registrations?tab=individual" className="font-medium text-brand-green text-xs hover:underline">
+            <Link href="/admin/extend-assessments" className="font-medium text-brand-green text-xs hover:underline">
               View All
             </Link>
           </div>

@@ -147,6 +147,32 @@ export interface IatReportStatus {
     } | null;
 }
 
+export interface ExamPreviewLevel {
+    levelNumber: number;
+    name: string;
+    title: string;
+    patternType: string | null;
+    status: "enabled" | "disabled" | "unavailable";
+    reason: string | null;
+    items: Array<{ label: string; value: string }>;
+    tags: string[];
+    note: string | null;
+}
+
+export interface ExamPatternPreview {
+    program: { id: number; name: string; assessmentTitle: string | null } | null;
+    levels: ExamPreviewLevel[];
+}
+
+export interface ExamPatternPreviewParams {
+    programId: number | string;
+    departmentDegreeId?: number | string | null;
+    studentBoard?: string | null;
+    employeeLevel?: string | null;
+    schoolLevel?: string | null;
+    currentYear?: string | number | null;
+}
+
 export const assessmentService = {
     async getSessions(
         page: number,
@@ -588,6 +614,87 @@ export const assessmentService = {
         if (!res.ok) {
             const err = await res.json().catch(() => null);
             throw new Error(err?.message || "Failed to assign exam");
+        }
+        return res.json();
+    },
+
+    /** Extend a single (individual) session to a new end date and reopen it. */
+    async extendSession(
+        sessionId: number | string,
+        newDateISO: string,
+    ): Promise<{ sessionId: number; validTo: string; status: string }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/sessions/${sessionId}/extend`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify({ newDate: newDateISO }),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to extend assessment");
+        }
+        return res.json();
+    },
+
+    /** Extend a whole group assessment window (cascades to member sessions). */
+    async extendGroupAssessment(
+        groupAssessmentId: number | string,
+        newDateISO: string,
+    ): Promise<{
+        groupAssessmentId: number;
+        validTo: string;
+        status: string;
+        sessionsUpdated: number;
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group/${groupAssessmentId}/extend`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify({ newDate: newDateISO }),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to extend group assessment");
+        }
+        return res.json();
+    },
+
+    /** Live per-level exam pattern preview for the Add-Registration form. */
+    async getExamPatternPreview(
+        params: ExamPatternPreviewParams,
+    ): Promise<ExamPatternPreview> {
+        const token = AuthService.getToken();
+        const qs = new URLSearchParams();
+        qs.set("programId", String(params.programId));
+        if (params.departmentDegreeId)
+            qs.set("departmentDegreeId", String(params.departmentDegreeId));
+        if (params.studentBoard) qs.set("studentBoard", params.studentBoard);
+        if (params.employeeLevel) qs.set("employeeLevel", params.employeeLevel);
+        if (params.schoolLevel) qs.set("schoolLevel", params.schoolLevel);
+        if (params.currentYear != null && params.currentYear !== "")
+            qs.set("currentYear", String(params.currentYear));
+
+        const res = await fetch(
+            `${API_URL}/admin/assessments/exam-pattern-preview?${qs.toString()}`,
+            {
+                headers: { Authorization: token ? `Bearer ${token}` : "" },
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to load exam preview");
         }
         return res.json();
     },

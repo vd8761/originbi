@@ -259,6 +259,149 @@ export class AssessmentService {
     });
   }
 
+  /** Split a `status` query param into a clean list (single value or CSV). */
+  private parseStatusList(status?: string): string[] {
+    if (!status) return [];
+    return status
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  /**
+   * Reopen the session-level attempts for a set of sessions so a candidate can
+   * actually resume after an extension. Attempts carry their own `expires_at`
+   * (set on level unlock in the exam-engine) and are re-expired by the
+   * scheduler, so extending only the session/group window is not enough:
+   *  - EXPIRED (never started)      -> NOT_STARTED, expires_at = newDate
+   *  - PARTIALLY_EXPIRED (started)  -> IN_PROGRESS,  expires_at = newDate
+   *  - any still-open attempt with an expiry -> push expires_at to newDate
+   * COMPLETED attempts are left untouched.
+   */
+  private async reopenSessionAttempts(
+    manager: EntityManager,
+    sessionIds: number[],
+    newDate: Date,
+  ): Promise<void> {
+    if (!sessionIds.length) return;
+    const repo = manager.getRepository(AssessmentAttempt);
+
+    await repo
+      .createQueryBuilder()
+      .update()
+      .set({ status: 'NOT_STARTED', expiresAt: newDate })
+      .where('assessment_session_id IN (:...ids)', { ids: sessionIds })
+      .andWhere('status = :s', { s: 'EXPIRED' })
+      .execute();
+
+    await repo
+      .createQueryBuilder()
+      .update()
+      .set({ status: 'IN_PROGRESS', expiresAt: newDate })
+      .where('assessment_session_id IN (:...ids)', { ids: sessionIds })
+      .andWhere('status = :s', { s: 'PARTIALLY_EXPIRED' })
+      .execute();
+
+    // Push the expiry on any attempt that already had a window so the scheduler
+    // does not immediately re-expire it. Never invents a window where none
+    // existed (a not-yet-unlocked level keeps expires_at NULL).
+    await repo
+      .createQueryBuilder()
+      .update()
+      .set({ expiresAt: newDate })
+      .where('assessment_session_id IN (:...ids)', { ids: sessionIds })
+      .andWhere('status IN (:...open)', { open: ['NOT_STARTED', 'IN_PROGRESS'] })
+      .andWhere('expires_at IS NOT NULL')
+      .execute();
+  }
+
+  /**
+   * New status for a session/group being extended out of a terminal state.
+   * An extended exam is reactivated as ONGOING (IN_PROGRESS) so it never shows
+   * as "Not Yet Started" - it is a live, in-flight assessment again.
+   */
+  private reopenStatus(current: string): string {
+    if (current === 'EXPIRED' || current === 'PARTIALLY_EXPIRED') {
+      return 'IN_PROGRESS';
+    }
+    return current;
+  }
+
+  /**
+   * Extend a single (individual) assessment session to a new end date and
+   * reopen it + its attempts so the candidate can resume.
+   */
+  async extendSession(sessionId: number, newDate: string) {
+    const parsed = new Date(newDate);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid extension date.');
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const session = await manager
+        .getRepository(AssessmentSession)
+        .findOne({ where: { id: sessionId as any } });
+      if (!session) {
+        throw new BadRequestException('Assessment session not found.');
+      }
+      session.validTo = parsed;
+      session.status = this.reopenStatus(session.status);
+      await manager.save(session);
+      await this.reopenSessionAttempts(manager, [Number(session.id)], parsed);
+      return {
+        sessionId: Number(session.id),
+        validTo: parsed,
+        status: session.status,
+      };
+    });
+  }
+
+  /**
+   * Extend a whole group assessment window to a new end date. Updates the
+   * group_assessments row and cascades the reopen to every member session +
+   * their attempts.
+   */
+  async extendGroupAssessment(groupAssessmentId: number, newDate: string) {
+    const parsed = new Date(newDate);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('Invalid extension date.');
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const group = await manager
+        .getRepository(GroupAssessment)
+        .findOne({ where: { id: groupAssessmentId as any } });
+      if (!group) {
+        throw new BadRequestException('Group assessment not found.');
+      }
+      group.validTo = parsed;
+      group.status = this.reopenStatus(group.status);
+      await manager.save(group);
+
+      const sessions = await manager
+        .getRepository(AssessmentSession)
+        .find({ where: { groupAssessmentId: groupAssessmentId as any } });
+
+      for (const s of sessions) {
+        s.validTo = parsed;
+        s.status = this.reopenStatus(s.status);
+      }
+      if (sessions.length) {
+        await manager.getRepository(AssessmentSession).save(sessions);
+        await this.reopenSessionAttempts(
+          manager,
+          sessions.map((s) => Number(s.id)),
+          parsed,
+        );
+      }
+
+      return {
+        groupAssessmentId: Number(group.id),
+        validTo: parsed,
+        status: group.status,
+        sessionsUpdated: sessions.length,
+      };
+    });
+  }
+
   async findAllSessions(
     page: number,
     limit: number,
@@ -312,7 +455,17 @@ export class AssessmentService {
           qb.andWhere('ga.validFrom <= :endDate', {
             endDate: `${endDate} 23:59:59`,
           });
-        if (status) qb.andWhere('ga.status = :status', { status });
+        // `status` accepts a single value OR a comma-separated list (e.g. the
+        // Extend page passes "EXPIRED,PARTIALLY_EXPIRED"). Falls back to a plain
+        // equality when only one status is supplied.
+        const groupStatuses = this.parseStatusList(status);
+        if (groupStatuses.length === 1) {
+          qb.andWhere('ga.status = :status', { status: groupStatuses[0] });
+        } else if (groupStatuses.length > 1) {
+          qb.andWhere('ga.status IN (:...statuses)', {
+            statuses: groupStatuses,
+          });
+        }
 
         // Sort
         if (sortBy) {
@@ -382,7 +535,7 @@ export class AssessmentService {
       if (search) {
         const s = `%${search.toLowerCase()}%`;
         qb.andWhere(
-          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s OR LOWER(r.fullName) LIKE :s)',
+          '(LOWER(p.name) LIKE :s OR LOWER(p.assessment_title) LIKE :s OR LOWER(u.email) LIKE :s OR LOWER(r.fullName) LIKE :s OR r.mobileNumber LIKE :s)',
           { s },
         );
       }
@@ -398,8 +551,11 @@ export class AssessmentService {
         });
       }
 
-      if (status) {
-        qb.andWhere('as.status = :status', { status });
+      const indStatuses = this.parseStatusList(status);
+      if (indStatuses.length === 1) {
+        qb.andWhere('as.status = :status', { status: indStatuses[0] });
+      } else if (indStatuses.length > 1) {
+        qb.andWhere('as.status IN (:...statuses)', { statuses: indStatuses });
       }
 
       if (userId) {

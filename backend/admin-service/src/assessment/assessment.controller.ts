@@ -1,10 +1,23 @@
-import { Body, Controller, Get, Post, Query, Param, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Query,
+  Param,
+  Res,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { AssessmentService } from './assessment.service';
+import { ExamPatternPreviewService } from './exam-pattern-preview.service';
 
 @Controller('admin/assessments')
 export class AssessmentController {
-  constructor(private readonly assessmentService: AssessmentService) {}
+  constructor(
+    private readonly assessmentService: AssessmentService,
+    private readonly examPatternPreviewService: ExamPatternPreviewService,
+  ) {}
 
   @Post('assign-group-exam')
   async assignGroupExam(
@@ -29,6 +42,29 @@ export class AssessmentController {
   @Get('individual-exam-preview')
   async previewIndividualExam(@Query('registrationId') registrationId: string) {
     return this.assessmentService.previewIndividualExam(Number(registrationId));
+  }
+
+  // Live per-level exam pattern for the Add-Registration form. Computed from the
+  // chosen scope (no registration exists yet).
+  @Get('exam-pattern-preview')
+  async examPatternPreview(
+    @Query('programId') programId: string,
+    @Query('departmentDegreeId') departmentDegreeId?: string,
+    @Query('studentBoard') studentBoard?: string,
+    @Query('employeeLevel') employeeLevel?: string,
+    @Query('schoolLevel') schoolLevel?: string,
+    @Query('currentYear') currentYear?: string,
+  ) {
+    return this.examPatternPreviewService.preview({
+      programId: Number(programId),
+      departmentDegreeId: departmentDegreeId
+        ? Number(departmentDegreeId)
+        : null,
+      studentBoard: studentBoard || null,
+      employeeLevel: employeeLevel || null,
+      schoolLevel: schoolLevel || null,
+      currentYear: currentYear || null,
+    });
   }
 
   @Post('assign-individual-exam')
@@ -122,6 +158,24 @@ export class AssessmentController {
   @Get('group/:id/department-stats')
   async getGroupDepartmentStats(@Param('id') id: string) {
     return this.assessmentService.findGroupDepartmentStats(Number(id));
+  }
+
+  // Extend a whole group assessment window (cascades to member sessions).
+  @Put('group/:id/extend')
+  async extendGroupAssessment(
+    @Param('id') id: string,
+    @Body('newDate') newDate: string,
+  ) {
+    return this.assessmentService.extendGroupAssessment(Number(id), newDate);
+  }
+
+  // Extend a single (individual) session window and reopen it.
+  @Put('sessions/:id/extend')
+  async extendSession(
+    @Param('id') id: string,
+    @Body('newDate') newDate: string,
+  ) {
+    return this.assessmentService.extendSession(Number(id), newDate);
   }
 
   @Get('sessions/:id')
