@@ -25,6 +25,7 @@ import { DepartmentDegree } from '../departments/department-degree.entity';
 import { AssessmentGenerationService } from './assessment-generation.service';
 import { MetaphorGenerationService } from './metaphor-generation.service';
 import { AssessmentService } from './assessment.service';
+import { ExamPatternPreviewService } from './exam-pattern-preview.service';
 import { AssessmentController } from './assessment.controller';
 import { LevelEligibilityService } from '../levels/level-eligibility.service';
 import { SettingsModule } from '../settings/settings.module';
@@ -60,6 +61,7 @@ import { SettingsModule } from '../settings/settings.module';
     AssessmentGenerationService,
     MetaphorGenerationService,
     AssessmentService,
+    ExamPatternPreviewService,
     LevelEligibilityService,
   ],
   exports: [
@@ -67,6 +69,7 @@ import { SettingsModule } from '../settings/settings.module';
     AssessmentGenerationService,
     MetaphorGenerationService,
     AssessmentService,
+    ExamPatternPreviewService,
   ],
 })
 export class AssessmentModule {}
