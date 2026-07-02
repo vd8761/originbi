@@ -16,6 +16,7 @@ import { CreateRegistrationDto } from '../../lib/services/registration.service';
 import { Program, Department } from '../../lib/types';
 import { normalizeDepartmentDisplayName } from '../../lib/utils';
 import BulkUploadRegistration from "./BulkUploadRegistration";
+import ExamPreviewSection from "./ExamPreviewSection";
 import { getEnabledBoards } from '../../lib/constants';
 
 interface AddRegistrationFormProps {
@@ -877,6 +878,23 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
               )}
             </div>
           </div>
+        </div>
+
+        {/* --- Section 3: Exam Preview --- */}
+        <div>
+          <h2 className={baseSectionTitleClasses}>Exam Preview</h2>
+          <ExamPreviewSection
+            programId={formData.program_id || null}
+            departmentDegreeId={
+              isCollegeProgram ? formData.department_degree_id || null : null
+            }
+            studentBoard={isSchoolProgram ? formData.student_board || null : null}
+            employeeLevel={
+              isEmployeeProgram ? formData.employee_level || null : null
+            }
+            schoolLevel={isSchoolProgram ? formData.school_level || null : null}
+            currentYear={formData.current_year || null}
+          />
         </div>
       </div>
 

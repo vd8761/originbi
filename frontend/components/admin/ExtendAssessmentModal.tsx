@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { api } from '../../lib/api';
-import { 
-  ArrowLeftWithoutLineIcon, 
+import { assessmentService } from '../../lib/services/assessment.service';
+import {
+  ArrowLeftWithoutLineIcon,
   ArrowRightWithoutLineIcon,
-  CalendarIcon 
+  CalendarIcon
 } from '../icons';
 
 interface ExtendAssessmentModalProps {
@@ -46,7 +46,7 @@ export const ExtendAssessmentModal: React.FC<ExtendAssessmentModalProps> = ({
       if (endTime.period === 'AM' && h === 12) h = 0;
       finalDate.setHours(h, endTime.m, 0, 0);
 
-      await api.put(`/admin/assessments/${session.id}/extend`, { newDate: finalDate.toISOString() });
+      await assessmentService.extendSession(session.id, finalDate.toISOString());
       onSuccess();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to update date');
