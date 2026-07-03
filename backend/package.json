@@ -10,7 +10,7 @@
         "student-service"
     ],
     "dependencies": {
-        "@nestjs/platform-express": "^11.1.14",
+        "@nestjs/platform-express": "^11.1.27",
         "@wavezync/nestjs-pgboss": "^5.1.1",
         "pg": "^8.11.3",
         "pg-boss": "^12.13.0",
