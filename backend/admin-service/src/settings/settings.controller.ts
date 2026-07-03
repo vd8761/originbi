@@ -2,13 +2,16 @@ import {
   Controller,
   Get,
   Put,
+  Post,
   Patch,
   Param,
   Body,
   Query,
+  Req,
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { SettingsService } from './settings.service';
 import { AdminLoginGuard } from '../adminlogin/adminlogin.guard';
 
@@ -35,6 +38,30 @@ export class SettingsController {
   @Get('metaphor/claude-models')
   async getClaudeModels() {
     return this.settingsService.getClaudeModels();
+  }
+
+  // ---------------------------------------------------------
+  // GET /settings/export - Portable JSON snapshot of all settings
+  // Query: ?includeSensitive=true to include API keys / passwords
+  // NOTE: declared before ':category' so it is not captured by it.
+  // ---------------------------------------------------------
+  @Get('export')
+  async exportSettings(@Query('includeSensitive') includeSensitive?: string) {
+    return this.settingsService.exportSettings(includeSensitive === 'true');
+  }
+
+  // ---------------------------------------------------------
+  // POST /settings/import - Apply a previously-exported snapshot
+  // Body: the export envelope ({ settings: [...] })
+  // Returns a report of what was applied vs. skipped.
+  // ---------------------------------------------------------
+  @Post('import')
+  async importSettings(
+    @Body() body: any,
+    @Req() req: Request & { user?: { email?: string } },
+  ) {
+    const updatedBy = req?.user?.email;
+    return this.settingsService.importSettings(body, updatedBy);
   }
 
   // ---------------------------------------------------------

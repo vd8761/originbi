@@ -354,6 +354,192 @@ export class SettingsService {
   }
 
   // ---------------------------------------------------------
+  // EXPORT: Portable JSON snapshot of every setting
+  //
+  // Produces a versioned envelope suitable for backup or moving config
+  // between environments. Secret values (API keys, passwords) are omitted
+  // by default and flagged so import knows to leave them untouched.
+  // ---------------------------------------------------------
+  async exportSettings(includeSensitive = false): Promise<{
+    format: string;
+    version: number;
+    exportedAt: string;
+    includesSensitive: boolean;
+    count: number;
+    settings: Array<{
+      category: string;
+      key: string;
+      valueType: string;
+      value: any;
+      sensitive?: boolean;
+      omitted?: boolean;
+    }>;
+  }> {
+    const rows = await this.settingsRepo.find({
+      order: { category: 'ASC', displayOrder: 'ASC' },
+    });
+
+    const settings = rows.map((row) => {
+      const omit = row.isSensitive && !includeSensitive;
+      return {
+        category: row.category,
+        key: row.settingKey,
+        valueType: row.valueType,
+        value: omit ? null : row.value,
+        ...(row.isSensitive ? { sensitive: true } : {}),
+        ...(omit ? { omitted: true } : {}),
+      };
+    });
+
+    return {
+      format: 'originbi.settings',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      includesSensitive: includeSensitive,
+      count: settings.length,
+      settings,
+    };
+  }
+
+  // ---------------------------------------------------------
+  // IMPORT: Apply a previously-exported snapshot
+  //
+  // Best-effort but safe: unknown keys, read-only settings, type
+  // mismatches, and intentionally-omitted secrets are skipped and
+  // reported rather than throwing. Everything that is applied is written
+  // inside a single transaction, so an import is all-or-nothing.
+  // ---------------------------------------------------------
+  async importSettings(
+    payload: any,
+    updatedBy?: string,
+  ): Promise<{
+    total: number;
+    applied: string[];
+    unchanged: string[];
+    skippedReadonly: string[];
+    skippedUnknown: string[];
+    skippedInvalid: string[];
+    skippedOmitted: string[];
+  }> {
+    const incoming = payload?.settings;
+    if (!Array.isArray(incoming)) {
+      throw new BadRequestException(
+        'Invalid settings file: expected a "settings" array.',
+      );
+    }
+
+    const rows = await this.settingsRepo.find();
+    const byKey = new Map<string, OriginbiSetting>();
+    for (const row of rows) {
+      byKey.set(`${row.category}::${row.settingKey}`, row);
+    }
+
+    const report = {
+      total: incoming.length,
+      applied: [] as string[],
+      unchanged: [] as string[],
+      skippedReadonly: [] as string[],
+      skippedUnknown: [] as string[],
+      skippedInvalid: [] as string[],
+      skippedOmitted: [] as string[],
+    };
+
+    const toSave: OriginbiSetting[] = [];
+
+    for (const item of incoming) {
+      const category = item?.category;
+      const key = item?.key;
+      if (typeof category !== 'string' || typeof key !== 'string') {
+        report.skippedInvalid.push(String(key ?? 'unknown'));
+        continue;
+      }
+      const id = `${category}::${key}`;
+
+      // Secret intentionally omitted from the export - leave the DB value as-is.
+      if (item?.omitted === true) {
+        report.skippedOmitted.push(id);
+        continue;
+      }
+
+      const row = byKey.get(id);
+      if (!row) {
+        report.skippedUnknown.push(id);
+        continue;
+      }
+      if (row.isReadonly) {
+        report.skippedReadonly.push(id);
+        continue;
+      }
+      if (!this.isValidForType(row.valueType, item.value)) {
+        report.skippedInvalid.push(id);
+        continue;
+      }
+      if (this.valuesEqual(row.value, item.value)) {
+        report.unchanged.push(id);
+        continue;
+      }
+
+      this.applyTypedValue(row, item.value);
+      row.updatedBy = updatedBy || null;
+      toSave.push(row);
+      report.applied.push(id);
+    }
+
+    if (toSave.length > 0) {
+      await this.settingsRepo.manager.transaction(async (em) => {
+        for (const row of toSave) {
+          await em.save(OriginbiSetting, row);
+        }
+      });
+      this.logger.log(
+        `Settings import: ${report.applied.length} applied by ${updatedBy || 'system'}`,
+      );
+    }
+
+    return report;
+  }
+
+  private isValidForType(valueType: string, value: any): boolean {
+    switch (valueType) {
+      case 'string':
+        return typeof value === 'string';
+      case 'boolean':
+        return typeof value === 'boolean';
+      case 'number':
+        return typeof value === 'number' && Number.isFinite(value);
+      case 'json':
+        return typeof value === 'object' && value !== null;
+      default:
+        return false;
+    }
+  }
+
+  private applyTypedValue(row: OriginbiSetting, value: any): void {
+    switch (row.valueType) {
+      case 'string':
+        row.valueString = value;
+        break;
+      case 'boolean':
+        row.valueBoolean = value;
+        break;
+      case 'json':
+        row.valueJson = value;
+        break;
+      case 'number':
+        row.valueNumber = value;
+        break;
+    }
+  }
+
+  private valuesEqual(a: any, b: any): boolean {
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      return a === b;
+    }
+  }
+
+  // ---------------------------------------------------------
   // Private: Map entity to API response DTO
   // ---------------------------------------------------------
   private toDto(row: OriginbiSetting) {

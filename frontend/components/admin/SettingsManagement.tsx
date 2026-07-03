@@ -6,11 +6,11 @@ import { api } from "../../lib/api";
 import {
     CheckCircleIcon,
     SettingsIcon,
-    EmailIcon,
     ProfileIcon,
     EyeIcon,
     EyeOffIcon,
     WhatsappIcon,
+    SearchIcon,
 } from "../icons";
 
 // Type definitions matching backend OriginbiSetting
@@ -62,6 +62,174 @@ interface IatRuleConfig {
     rules?: IatRule[];
 }
 
+// ------------------------------------------------------------------
+// Category icons - a small, consistent stroke set so each category
+// reads at a glance (mic = voice assessment, target = IAT, doc =
+// reports, etc.). Kept local so the metaphors stay purpose-built
+// rather than reusing loosely-related shared glyphs.
+// ------------------------------------------------------------------
+type IconProps = { className?: string };
+const strokeIcon = (paths: React.ReactNode) =>
+    function StrokeIcon({ className = 'w-5 h-5' }: IconProps) {
+        return (
+            <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                {paths}
+            </svg>
+        );
+    };
+
+const EnvelopeIcon = strokeIcon(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></>);
+const ChatBubbleIcon = strokeIcon(<><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1Z" /><path d="M8 10h8M8 13.5h5" /></>);
+const PeopleIcon = strokeIcon(<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>);
+const LayersIcon = strokeIcon(<><path d="M12 2 2 7l10 5 10-5-10-5Z" /><path d="m2 12 10 5 10-5" /><path d="m2 17 10 5 10-5" /></>);
+const SparkleIcon = strokeIcon(<><path d="M9 4l1.6 3.9L14.5 9.5 10.6 11 9 15l-1.6-4L3.5 9.5 7.4 7.9 9 4Z" /><path d="M17.5 13l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8 .8-2Z" /></>);
+const TargetIcon = strokeIcon(<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.4" /></>);
+const MicIcon = strokeIcon(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3M8.5 21h7" /></>);
+const DocumentIcon = strokeIcon(<><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h6M9 9h1.5" /></>);
+const DownloadIcon = strokeIcon(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /><path d="M12 15V3" /></>);
+const UploadIcon = strokeIcon(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" /><path d="M12 3v12" /></>);
+const TransferIcon = strokeIcon(<><path d="M8 3v18" /><path d="m4 7 4-4 4 4" /><path d="M16 21V3" /><path d="m12 17 4 4 4-4" /></>);
+
+// ------------------------------------------------------------------
+// Presentation-only information architecture for the settings panel.
+//
+// This maps the raw DB (category, key) taxonomy to friendly groups,
+// human labels, icons, and in-category sections. It NEVER renames or
+// moves the stored category/key - saving still uses each item's real
+// category + key, so functionality is completely unchanged. Any key
+// that isn't listed in a section falls through to a "More settings"
+// card, so a future migration can add settings without them vanishing.
+// ------------------------------------------------------------------
+interface CategorySection {
+    id: string;
+    title: string;
+    keys: string[];
+}
+
+interface CategoryMeta {
+    label: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+    sections: CategorySection[];
+}
+
+// Top-level sidebar groups. `categories` lists the raw DB category names
+// in the order they should appear under each heading.
+const SETTINGS_GROUPS: { id: string; label: string; categories: string[] }[] = [
+    { id: 'communications', label: 'Communications', categories: ['email', 'sms', 'whatsapp', 'affiliate'] },
+    { id: 'assessment_engine', label: 'Assessment engine', categories: ['levels', 'assessment', 'iat', 'metaphor'] },
+    { id: 'reports_access', label: 'Reports & access', categories: ['report'] },
+];
+
+const CATEGORY_META: Record<string, CategoryMeta> = {
+    email: {
+        label: 'Email',
+        description: 'Sender identity and the triggers for outgoing email.',
+        icon: EnvelopeIcon,
+        sections: [
+            { id: 'sender', title: 'Sender identity', keys: ['from_address', 'from_name', 'reply_to_address', 'cc_addresses', 'bcc_addresses'] },
+            { id: 'triggers', title: 'Email triggers', keys: ['send_registration_email', 'send_report_email', 'send_corporate_welcome_email', 'send_affiliate_email', 'manual_report_email_config'] },
+        ],
+    },
+    sms: {
+        label: 'SMS',
+        description: 'DLT sender, templates, and SMS fallback delivery.',
+        icon: ChatBubbleIcon,
+        sections: [
+            { id: 'sender', title: 'Sender and templates', keys: ['sender_id', 'template_id_instructions', 'template_id_expiry', 'template_id_completion', 'template_id_report_sent'] },
+            { id: 'triggers', title: 'SMS triggers', keys: ['send_assessment_instructions', 'send_expiry_reminder', 'send_completion_notification', 'send_report_sent_notification'] },
+        ],
+    },
+    whatsapp: {
+        label: 'WhatsApp',
+        description: 'Student WhatsApp template content and delivery.',
+        icon: WhatsappIcon,
+        sections: [
+            { id: 'content', title: 'Content and links', keys: ['student_template_image_url', 'instructions_youtube_url', 'student_portal_url'] },
+            { id: 'triggers', title: 'WhatsApp triggers', keys: ['send_assessment_instructions', 'send_expiry_reminder', 'send_completion_notification', 'send_report_sent_notification'] },
+        ],
+    },
+    affiliate: {
+        label: 'Affiliate',
+        description: 'Notification preferences for affiliate activity.',
+        icon: PeopleIcon,
+        sections: [
+            { id: 'notifications', title: 'Affiliate notifications', keys: ['send_whatsapp_welcome_posters', 'send_affiliate_email'] },
+        ],
+    },
+    levels: {
+        label: 'Levels',
+        description: 'Enable each level and route it to the right cohorts.',
+        icon: LayersIcon,
+        sections: [
+            { id: 'level1', title: 'Level 1', keys: ['level1_enabled', 'level1_scope_rules'] },
+            { id: 'level2', title: 'Level 2', keys: ['level2_enabled', 'level2_scope_rules'] },
+            { id: 'level3', title: 'Level 3', keys: ['level3_enabled', 'level3_scope_rules'] },
+            { id: 'level4', title: 'Level 4', keys: ['level4_enabled', 'level4_scope_rules'] },
+        ],
+    },
+    assessment: {
+        label: 'Question generation',
+        description: 'How Level 1 assessment questions are assembled.',
+        icon: SparkleIcon,
+        sections: [
+            { id: 'generation', title: 'Question generation', keys: ['open_question_distribution', 'question_generation_mode'] },
+        ],
+    },
+    iat: {
+        label: 'Level 2 · IAT',
+        description: 'Implicit Association Test generation, routing, and reports.',
+        icon: TargetIcon,
+        sections: [
+            { id: 'generation', title: 'Generation and routing', keys: ['enabled', 'min_retake_days', 'level2_replacement_rules', 'module_sets'] },
+            { id: 'report', title: 'AI report', keys: ['claude_api_key', 'claude_report_model', 'report_skill_markdown'] },
+        ],
+    },
+    metaphor: {
+        label: 'Level 3 · Metaphor',
+        description: 'Voice assessment, transcription, and AI report generation.',
+        icon: MicIcon,
+        sections: [
+            { id: 'ai', title: 'AI and transcription', keys: ['gemini_api_key', 'gemini_model', 'claude_api_key', 'claude_report_model', 'audio_transcription_enabled'] },
+            { id: 'timing', title: 'Exam timing and flow', keys: ['duration_override', 'duration_minutes', 'question_count', 'segment_limit', 'checkpoint_label', 'limit_behavior', 'allow_typing', 'question_selection_mode'] },
+            { id: 'languages', title: 'Languages and speech', keys: ['stt_provider', 'stt_secret', 'supported_languages'] },
+            { id: 'media', title: 'Media and report', keys: ['image_base_url', 'report_skill_markdown'] },
+        ],
+    },
+    report: {
+        label: 'Reports',
+        description: 'Report access, student preview, and visibility.',
+        icon: DocumentIcon,
+        sections: [
+            { id: 'delivery', title: 'Report delivery', keys: ['send_report_email', 'manual_report_email_config'] },
+            { id: 'access', title: 'Access and security', keys: ['report_password_enabled', 'report_admin_password'] },
+            { id: 'preview', title: 'Student preview', keys: ['show_report_preview_after_exam', 'student_preview_variant_mba', 'student_preview_variant_non_mba', 'student_preview_blocked_message', 'show_iat_metaphor_to_student'] },
+        ],
+    },
+};
+
+// Fallback for any category not described above (e.g. added by a later
+// migration) so it still renders with a sensible label and no sections.
+const getCategoryMeta = (category: string): CategoryMeta =>
+    CATEGORY_META[category] || {
+        label: category.charAt(0).toUpperCase() + category.slice(1),
+        description: '',
+        icon: SettingsIcon,
+        sections: [],
+    };
+
+// Titled card wrapper used to group a category's fields into sections.
+function SettingsSectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white/50 shadow-sm dark:border-white/[0.06] dark:bg-white/[0.02]">
+            <div className="border-b border-gray-100 bg-gray-50/70 px-5 py-3.5 dark:border-white/[0.06] dark:bg-white/[0.02] sm:px-6">
+                <h3 className="text-sm font-semibold tracking-wide text-gray-700 dark:text-gray-200">{title}</h3>
+            </div>
+            <div className="px-5 py-1 sm:px-6">{children}</div>
+        </section>
+    );
+}
+
 export default function SettingsManagement() {
     const [settingsGrouped, setSettingsGrouped] = useState<Record<string, SettingItem[]>>({});
     const [activeCategory, setActiveCategory] = useState<string>("");
@@ -82,6 +250,10 @@ export default function SettingsManagement() {
     const [activeOverrideKey, setActiveOverrideKey] = useState<string | null>(null);
     const [activeMarkdownSkill, setActiveMarkdownSkill] = useState<SettingItem | null>(null);
     const [visibleSensitiveFields, setVisibleSensitiveFields] = useState<Record<string, boolean>>({});
+    const [search, setSearch] = useState("");
+    // Import / Export ("Backup & restore") modal + mobile nav drawer.
+    const [transferOpen, setTransferOpen] = useState(false);
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
     const toggleToConfigMap: Record<string, string> = {
         'send_registration_email': 'registration_email_config',
@@ -313,16 +485,6 @@ export default function SettingsManagement() {
             });
             return newGrouped;
         });
-    };
-
-    // Helper for category icons
-    const getCategoryIcon = (catName: string) => {
-        const lowerCat = catName.toLowerCase();
-        if (lowerCat.includes("whatsapp")) return <WhatsappIcon className="w-5 h-5 flex-shrink-0" />;
-        if (lowerCat.includes("email")) return <EmailIcon className="w-5 h-5 flex-shrink-0" />;
-        if (lowerCat.includes("report")) return <ProfileIcon className="w-5 h-5 flex-shrink-0" />;
-        if (lowerCat.includes("system")) return <SettingsIcon className="w-5 h-5 flex-shrink-0" />;
-        return <ProfileIcon className="w-5 h-5 flex-shrink-0" />;
     };
 
     // Render exact input type based on valueType
@@ -611,6 +773,173 @@ export default function SettingsManagement() {
         return <span className="text-sm text-gray-500">Unsupported type</span>;
     };
 
+    // The keys of the override-config items that are attached to a toggle
+    // (rendered as a gear next to that toggle) rather than as their own row.
+    const overrideConfigKeys = Object.values(toggleToConfigMap);
+
+    // Fields actually shown as rows for a tab (drops the attached configs).
+    const visibleItemsFor = (cat: string): SettingItem[] =>
+        (settingsGrouped[cat] || []).filter((item) => !overrideConfigKeys.includes(item.key));
+
+    // Renders a single setting row. `tabItems` is the array the item is
+    // displayed under, used for override-config and cross-field lookups so
+    // this works identically whether shown in a category tab or in search.
+    const renderSettingRow = (item: SettingItem, tabItems: SettingItem[]) => {
+        const overrideKey = toggleToConfigMap[item.key];
+        const overrideItem = overrideKey
+            ? tabItems?.find((s) => s.key === overrideKey)
+            : null;
+
+        // Conditional visibility: dim report_admin_password when report_password_enabled is OFF
+        const isReportPasswordField = item.key === 'report_admin_password';
+        const reportPasswordEnabled = isReportPasswordField
+            ? tabItems?.find((s) => s.key === 'report_password_enabled')?.value
+            : true;
+        const isDimmed = isReportPasswordField && !reportPasswordEnabled;
+
+        // Wide editors (e.g. the distribution table) render full-width,
+        // stacked below the label - not squeezed into the side input column.
+        // The Claude/Gemini model pickers pair a dropdown with a Refresh
+        // button, which gets clipped in the narrow side column - give them
+        // the full-width treatment too.
+        const isModelSelect = (item.category === 'metaphor' || item.category === 'iat')
+            && (item.key === 'claude_report_model' || item.key === 'gemini_model');
+        const isFullWidth = isModelSelect || (item.valueType === 'json'
+            && (
+                // Both assessment editors are wide tables (open-question
+                // distribution + the per-program generation-mode grid) and
+                // must render full-width, not squeezed into the side column.
+                item.category === 'assessment'
+                || (item.category === 'metaphor' && (item.key === 'stt_provider' || item.key === 'supported_languages'))
+            ));
+
+        return (
+            <div key={item.id} className={`${isFullWidth ? 'flex flex-col gap-4' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-6'} py-5 border-b border-gray-50 dark:border-white/[0.04] last:border-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className="sm:max-w-md">
+                    <label htmlFor={item.key} className="flex items-center text-[15px] font-semibold leading-6 text-gray-900 dark:text-white">
+                        {item.label}
+                        {overrideItem && (
+                            <button
+                                onClick={() => setActiveOverrideKey(overrideKey)}
+                                className={`ml-3 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors ${
+                                    overrideItem.value && typeof overrideItem.value === 'object' && overrideItem.value.mode === 'local'
+                                        ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300'
+                                        : 'text-gray-400 hover:text-brand-green'
+                                }`}
+                                title="Configure specific email overrides"
+                            >
+                                <SettingsIcon className="w-4 h-4" />
+                            </button>
+                        )}
+                        {item.isReadonly && (
+                            <span className="ml-2 inline-flex items-center rounded-md bg-gray-100 dark:bg-white/10 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300 ring-1 ring-inset ring-gray-500/10 dark:ring-white/10">
+                                Read-only
+                            </span>
+                        )}
+                        {item.isSensitive && (
+                            <span className="ml-2 inline-flex items-center rounded-md bg-red-50 dark:bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/10 dark:ring-red-500/20">
+                                Secret
+                            </span>
+                        )}
+                    </label>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
+                        {item.description}
+                        {isDimmed && (
+                            <span className="block mt-1 text-xs text-yellow-600 dark:text-yellow-400">Enable "Report Password Protection" above to configure this.</span>
+                        )}
+                    </p>
+                </div>
+                <div className={isFullWidth ? 'w-full' : 'mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]'}>
+                    {renderInput(item)}
+                </div>
+            </div>
+        );
+    };
+
+    // Renders one category as a stack of titled section cards. Any field
+    // not claimed by a section is collected into a trailing "More settings"
+    // card so nothing is ever hidden.
+    const renderCategoryBody = (cat: string) => {
+        const tabItems = settingsGrouped[cat] || [];
+        const visible = visibleItemsFor(cat);
+        const meta = getCategoryMeta(cat);
+        const assigned = new Set<string>();
+
+        const sectionCards = meta.sections
+            .map((section) => {
+                const rows = visible.filter((item) => section.keys.includes(item.key));
+                rows.forEach((r) => assigned.add(r.key));
+                if (rows.length === 0) return null;
+                return (
+                    <SettingsSectionCard key={section.id} title={section.title}>
+                        {rows.map((item) => renderSettingRow(item, tabItems))}
+                    </SettingsSectionCard>
+                );
+            })
+            .filter(Boolean);
+
+        const leftovers = visible.filter((item) => !assigned.has(item.key));
+
+        return (
+            <div className="space-y-6">
+                {sectionCards}
+                {leftovers.length > 0 && (
+                    <SettingsSectionCard title={meta.sections.length ? 'More settings' : 'Settings'}>
+                        {leftovers.map((item) => renderSettingRow(item, tabItems))}
+                    </SettingsSectionCard>
+                )}
+            </div>
+        );
+    };
+
+    // Global search across every category. Skips mirrored duplicates (the
+    // affiliate/report tabs re-show some email fields) so each field only
+    // appears once, under its real category.
+    const renderSearchResults = (q: string) => {
+        const blocks = Object.keys(settingsGrouped)
+            .map((cat) => {
+                const tabItems = settingsGrouped[cat] || [];
+                const matched = visibleItemsFor(cat).filter((item) => {
+                    const originalCategory = (item as any).originalCategory;
+                    if (originalCategory && originalCategory !== cat) return false; // shown under its real category
+                    return (
+                        (item.label || '').toLowerCase().includes(q) ||
+                        (item.description || '').toLowerCase().includes(q) ||
+                        (item.key || '').toLowerCase().includes(q)
+                    );
+                });
+                if (matched.length === 0) return null;
+                return (
+                    <SettingsSectionCard key={cat} title={getCategoryMeta(cat).label}>
+                        {matched.map((item) => renderSettingRow(item, tabItems))}
+                    </SettingsSectionCard>
+                );
+            })
+            .filter(Boolean);
+
+        if (blocks.length === 0) {
+            return (
+                <div className="rounded-2xl border border-dashed border-gray-200 dark:border-white/10 px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                    No settings match "{search}".
+                </div>
+            );
+        }
+        return <div className="space-y-6">{blocks}</div>;
+    };
+
+    // Switch category, guarding unsaved changes and clearing any search.
+    const switchCategory = (category: string) => {
+        if (hasModifications && activeCategory !== category) {
+            if (!window.confirm("You have unsaved changes in the current tab. Switching tabs will discard them. Proceed?")) {
+                return;
+            }
+            setModifiedSettings({});
+        }
+        setSearch("");
+        setActiveCategory(category);
+        setMobileNavOpen(false);
+    };
+
     if (loading) {
         return (
             <div className="flex h-full w-full items-center justify-center min-h-[500px]">
@@ -619,7 +948,26 @@ export default function SettingsManagement() {
         );
     }
 
-    const categories = Object.keys(settingsGrouped);
+    const query = search.trim().toLowerCase();
+    const isSearching = query.length > 0;
+    const activeMeta = getCategoryMeta(activeCategory);
+    const ActiveIcon = activeMeta.icon;
+
+    // Build the grouped sidebar from SETTINGS_GROUPS, keeping only categories
+    // that actually exist in the data. Any category not covered by a group
+    // (e.g. added by a later migration) is collected under a trailing "Other"
+    // heading so it is always reachable.
+    const coveredCategories = new Set(SETTINGS_GROUPS.flatMap((g) => g.categories));
+    const uncoveredCategories = Object.keys(settingsGrouped).filter((c) => !coveredCategories.has(c));
+    const navGroups = [
+        ...SETTINGS_GROUPS.map((g) => ({
+            ...g,
+            categories: g.categories.filter((c) => settingsGrouped[c]),
+        })),
+        ...(uncoveredCategories.length
+            ? [{ id: 'other', label: 'Other', categories: uncoveredCategories }]
+            : []),
+    ].filter((g) => g.categories.length > 0);
 
     return (
         <div className="flex flex-col h-full rounded-2xl w-full max-w-[1600px] mx-auto pt-4 animate-fade-in custom-scrollbar">
@@ -637,7 +985,7 @@ export default function SettingsManagement() {
                     </p>
                 </div>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
                     {/* Status Feedback */}
                     {saveStatus === 'success' && (
                         <span className="flex items-center text-sm font-medium text-brand-green animate-pulse">
@@ -650,6 +998,16 @@ export default function SettingsManagement() {
                             {errorMessage}
                         </span>
                     )}
+
+                    <button
+                        type="button"
+                        onClick={() => setTransferOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-white/70 dark:bg-white/5 ring-1 ring-inset ring-gray-200 dark:ring-white/10 shadow-sm transition-all hover:bg-white hover:ring-gray-300 dark:hover:bg-white/10 dark:hover:ring-white/20 focus:outline-none focus:ring-2 focus:ring-brand-green/50"
+                    >
+                        <TransferIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">Import / Export</span>
+                        <span className="sm:hidden">Backup</span>
+                    </button>
 
                     <button
                         onClick={handleSave}
@@ -670,118 +1028,114 @@ export default function SettingsManagement() {
 
             <div className="flex flex-col lg:flex-row gap-8 pb-12 w-full h-full min-h-[600px]">
                 {/* Left Sidebar Layout */}
-                <div className="w-full lg:w-72 flex-shrink-0">
-                    <nav className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 hide-scrollbar" aria-label="Settings Categories">
-                        {categories.map((category) => (
+                <div className="w-full lg:w-72 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
+                    {/* Search */}
+                    <div className="relative mb-6">
+                        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
+                            <SearchIcon className="w-4 h-4" />
+                        </span>
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search settings"
+                            aria-label="Search settings"
+                            className="block w-full rounded-xl border-0 py-2.5 pl-10 pr-9 bg-white/70 dark:bg-white/5 text-sm text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green transition-all"
+                        />
+                        {search && (
                             <button
-                                key={category}
-                                onClick={() => {
-                                    if (hasModifications && activeCategory !== category) {
-                                        if (!window.confirm("You have unsaved changes in the current tab. Switching tabs will discard them. Proceed?")) {
-                                            return;
-                                        }
-                                        setModifiedSettings({}); // Clear them so they aren't accidentally saved later
-                                    }
-                                    setActiveCategory(category);
-                                }}
-                                className={`group flex items-center px-4 py-3.5 text-sm font-medium rounded-2xl transition-all duration-200 cursor-pointer min-w-max lg:min-w-0 ${
-                                    activeCategory === category
-                                        ? 'bg-white dark:bg-white/10 text-brand-green dark:text-white shadow-sm ring-1 ring-gray-200 dark:ring-white/10'
-                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
-                                }`}
+                                type="button"
+                                onClick={() => setSearch("")}
+                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                aria-label="Clear search"
                             >
-                                <span className={`mr-3 transition-colors ${activeCategory === category ? 'text-brand-green' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300'}`}>
-                                    {getCategoryIcon(category)}
-                                </span>
-                                <span className="capitalize text-[15px] font-semibold tracking-wide">
-                                    {category}
-                                </span>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
+                        )}
+                    </div>
+
+                    {/* Mobile: current category picker that toggles the nav drawer */}
+                    <button
+                        type="button"
+                        onClick={() => setMobileNavOpen((o) => !o)}
+                        aria-expanded={mobileNavOpen}
+                        className="lg:hidden mb-4 flex w-full items-center gap-3 rounded-xl bg-white/70 dark:bg-white/5 px-4 py-3 text-left shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10"
+                    >
+                        <span className="text-brand-green">
+                            {isSearching ? <SearchIcon className="w-5 h-5" /> : <ActiveIcon className="w-5 h-5" />}
+                        </span>
+                        <span className="flex-1 truncate text-sm font-semibold text-gray-900 dark:text-white">
+                            {isSearching ? 'Search results' : activeMeta.label}
+                        </span>
+                        <svg className={`w-4 h-4 flex-shrink-0 text-gray-400 transition-transform ${mobileNavOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                        </svg>
+                    </button>
+
+                    <nav className={`${mobileNavOpen ? 'flex' : 'hidden'} lg:flex flex-col gap-6`} aria-label="Settings categories">
+                        {navGroups.map((group) => (
+                            <div key={group.id}>
+                                <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
+                                    {group.label}
+                                </p>
+                                <div className="flex flex-col gap-1">
+                                    {group.categories.map((category) => {
+                                        const meta = getCategoryMeta(category);
+                                        const Icon = meta.icon;
+                                        const count = visibleItemsFor(category).length;
+                                        const isActive = !isSearching && activeCategory === category;
+                                        return (
+                                            <button
+                                                key={category}
+                                                onClick={() => switchCategory(category)}
+                                                className={`group flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+                                                    isActive
+                                                        ? 'bg-white dark:bg-white/10 text-brand-green dark:text-white shadow-sm ring-1 ring-gray-200 dark:ring-white/10'
+                                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
+                                                }`}
+                                            >
+                                                <span className={`transition-colors ${isActive ? 'text-brand-green' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300'}`}>
+                                                    <Icon className="w-5 h-5 flex-shrink-0" />
+                                                </span>
+                                                <span className="flex-1 text-left text-[14px] font-semibold tracking-wide truncate">
+                                                    {meta.label}
+                                                </span>
+                                                <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
+                                                    isActive
+                                                        ? 'bg-brand-green/10 text-brand-green'
+                                                        : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400'
+                                                }`}>
+                                                    {count}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         ))}
                     </nav>
                 </div>
 
                 {/* Right Pane (Fields) */}
                 <div className="flex-1 min-w-0">
-                    <div className="bg-white/60 dark:bg-[#1f2823]/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-gray-900/5 dark:ring-white/5 overflow-hidden border border-white dark:border-white/[0.05]">
-                        <div className="px-6 py-8 sm:p-10">
-                            <h2 className="text-xl font-bold leading-7 text-gray-900 dark:text-white capitalize mb-8 pb-4 border-b border-gray-100 dark:border-white/5">
-                                {activeCategory} Settings
+                    {/* Pane header - friendly label + description */}
+                    <div className="mb-6 flex items-start gap-4">
+                        <div className="p-2.5 rounded-2xl bg-brand-green/10 text-brand-green flex-shrink-0">
+                            {isSearching ? <SearchIcon className="w-6 h-6" /> : <ActiveIcon className="w-6 h-6" />}
+                        </div>
+                        <div className="min-w-0">
+                            <h2 className="text-xl font-bold leading-7 text-gray-900 dark:text-white">
+                                {isSearching ? 'Search results' : activeMeta.label}
                             </h2>
-                            
-                            <div className="space-y-10">
-                                {settingsGrouped[activeCategory]
-                                    ?.filter(item => !Object.values(toggleToConfigMap).includes(item.key))
-                                    .map((item) => {
-                                        const overrideKey = toggleToConfigMap[item.key];
-                                        const overrideItem = overrideKey 
-                                            ? settingsGrouped[activeCategory]?.find(s => s.key === overrideKey) 
-                                            : null;
-
-                                        // Conditional visibility: dim report_admin_password when report_password_enabled is OFF
-                                        const isReportPasswordField = item.key === 'report_admin_password';
-                                        const reportPasswordEnabled = isReportPasswordField
-                                            ? settingsGrouped[activeCategory]?.find(s => s.key === 'report_password_enabled')?.value
-                                            : true;
-                                        const isDimmed = isReportPasswordField && !reportPasswordEnabled;
-
-                                        // Wide editors (e.g. the distribution table) render full-width,
-                                        // stacked below the label - not squeezed into the side input column.
-                                        // The Claude/Gemini model pickers pair a dropdown with a Refresh
-                                        // button, which gets clipped in the narrow side column - give them
-                                        // the full-width treatment too.
-                                        const isModelSelect = (item.category === 'metaphor' || item.category === 'iat')
-                                            && (item.key === 'claude_report_model' || item.key === 'gemini_model');
-                                        const isFullWidth = isModelSelect || (item.valueType === 'json'
-                                            && (
-                                                (item.category === 'assessment' && item.key === 'open_question_distribution')
-                                                || (item.category === 'metaphor' && (item.key === 'stt_provider' || item.key === 'supported_languages'))
-                                            ));
-
-                                        return (
-                                        <div key={item.id} className={`${isFullWidth ? 'flex flex-col gap-4' : 'flex flex-col sm:flex-row sm:items-center justify-between gap-6'} pb-8 border-b border-gray-50 dark:border-white/[0.02] last:border-0 last:pb-0 transition-opacity duration-200 ${isDimmed ? 'opacity-40 pointer-events-none' : ''}`}>
-                                            <div className="sm:max-w-md">
-                                                <label htmlFor={item.key} className="flex items-center text-[15px] font-semibold leading-6 text-gray-900 dark:text-white">
-                                                    {item.label}
-                                                    {overrideItem && (
-                                                        <button 
-                                                            onClick={() => setActiveOverrideKey(overrideKey)}
-                                                            className={`ml-3 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors ${
-                                                                overrideItem.value && typeof overrideItem.value === 'object' && overrideItem.value.mode === 'local'
-                                                                    ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300' 
-                                                                    : 'text-gray-400 hover:text-brand-green'
-                                                            }`}
-                                                            title="Configure specific email overrides"
-                                                        >
-                                                            <SettingsIcon className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                    {item.isReadonly && (
-                                                        <span className="ml-2 inline-flex items-center rounded-md bg-gray-100 dark:bg-white/10 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300 ring-1 ring-inset ring-gray-500/10 dark:ring-white/10">
-                                                            Read-only
-                                                        </span>
-                                                    )}
-                                                {item.isSensitive && (
-                                                    <span className="ml-2 inline-flex items-center rounded-md bg-red-50 dark:bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/10 dark:ring-red-500/20">
-                                                        Secret
-                                                    </span>
-                                                )}
-                                            </label>
-                                            <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                                                {item.description}
-                                                {isDimmed && (
-                                                    <span className="block mt-1 text-xs text-yellow-600 dark:text-yellow-400">Enable "Report Password Protection" above to configure this.</span>
-                                                )}
-                                            </p>
-                                        </div>
-                                        <div className={isFullWidth ? 'w-full' : 'mt-2 sm:mt-0 flex-shrink-0 w-full sm:w-auto sm:max-w-[300px]'}>
-                                            {renderInput(item)}
-                                        </div>
-                                    </div>
-                                )})}
-                            </div>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                {isSearching ? `Settings matching "${search}"` : activeMeta.description}
+                            </p>
                         </div>
                     </div>
+
+                    {isSearching ? renderSearchResults(query) : renderCategoryBody(activeCategory)}
                 </div>
             </div>
 
@@ -802,6 +1156,349 @@ export default function SettingsManagement() {
                     onChange={(next) => handleValueChange(activeMarkdownSkill.category, activeMarkdownSkill.key, next)}
                 />
             )}
+
+            {transferOpen && (
+                <ImportExportModal
+                    settingsGrouped={settingsGrouped}
+                    hasModifications={hasModifications}
+                    onClose={() => setTransferOpen(false)}
+                    onImported={async () => { await fetchSettings(false); }}
+                />
+            )}
+        </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// Import / Export ("Backup & restore") modal.
+// Export downloads a versioned JSON snapshot (secrets optional). Import
+// parses a file, shows a client-side diff preview, then applies it via
+// the backend which re-validates and writes atomically.
+// ------------------------------------------------------------------
+function ImportExportModal({
+    settingsGrouped,
+    hasModifications,
+    onClose,
+    onImported,
+}: {
+    settingsGrouped: Record<string, SettingItem[]>;
+    hasModifications: boolean;
+    onClose: () => void;
+    onImported: () => Promise<void> | void;
+}) {
+    const [tab, setTab] = useState<'export' | 'import'>('export');
+    const [includeSensitive, setIncludeSensitive] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const [fileName, setFileName] = useState<string | null>(null);
+    const [parsed, setParsed] = useState<any | null>(null);
+    const [parseError, setParseError] = useState<string | null>(null);
+    const [report, setReport] = useState<any | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
+    // Flat map of current settings, for building the import diff preview
+    // client-side. The backend re-validates authoritatively on apply.
+    const currentMap = React.useMemo(() => {
+        const m = new Map<string, SettingItem>();
+        Object.values(settingsGrouped).forEach((items) => {
+            (items || []).forEach((item) => m.set(`${item.category}::${item.key}`, item));
+        });
+        return m;
+    }, [settingsGrouped]);
+
+    const totalSettings = currentMap.size;
+    const totalCategories = new Set(Array.from(currentMap.values()).map((i) => i.category)).size;
+    const secretCount = Array.from(currentMap.values()).filter((i) => i.isSensitive).length;
+
+    const validForType = (valueType: string, value: any): boolean => {
+        switch (valueType) {
+            case 'string': return typeof value === 'string';
+            case 'boolean': return typeof value === 'boolean';
+            case 'number': return typeof value === 'number' && Number.isFinite(value);
+            case 'json': return typeof value === 'object' && value !== null;
+            default: return false;
+        }
+    };
+
+    const preview = React.useMemo(() => {
+        if (!parsed || !Array.isArray(parsed.settings)) return null;
+        const res = {
+            willChange: [] as { id: string; label: string }[],
+            unchanged: 0, unknown: 0, readonly: 0, omitted: 0, invalid: 0,
+        };
+        for (const it of parsed.settings) {
+            const id = `${it?.category}::${it?.key}`;
+            if (it && it.omitted === true) { res.omitted++; continue; }
+            const cur = currentMap.get(id);
+            if (!cur) { res.unknown++; continue; }
+            if (cur.isReadonly) { res.readonly++; continue; }
+            if (!validForType(cur.valueType, it.value)) { res.invalid++; continue; }
+            if (JSON.stringify(cur.value) === JSON.stringify(it.value)) { res.unchanged++; continue; }
+            res.willChange.push({ id, label: cur.label });
+        }
+        return res;
+    }, [parsed, currentMap]);
+
+    const handleExport = async () => {
+        setBusy(true); setError(null);
+        try {
+            const { data } = await api.get('/settings/export', {
+                params: { includeSensitive: includeSensitive ? 'true' : 'false' },
+            });
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `originbi-settings-${stamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (e: any) {
+            setError(e?.response?.data?.message || 'Failed to export settings.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const readFile = (file: File) => {
+        setFileName(file.name); setReport(null); setError(null);
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const json = JSON.parse(String(reader.result || ''));
+                if (!json || !Array.isArray(json.settings)) {
+                    throw new Error('missing a "settings" array');
+                }
+                setParsed(json); setParseError(null);
+            } catch (e: any) {
+                setParsed(null);
+                setParseError(`This doesn't look like a settings file (${e.message}).`);
+            }
+        };
+        reader.onerror = () => { setParsed(null); setParseError('Could not read the file.'); };
+        reader.readAsText(file);
+    };
+
+    const handleApply = async () => {
+        if (!parsed) return;
+        if (hasModifications && !window.confirm('You have unsaved changes. Importing reloads settings from the server and those unsaved edits will be lost. Continue?')) {
+            return;
+        }
+        setBusy(true); setError(null);
+        try {
+            const { data } = await api.post('/settings/import', parsed);
+            setReport(data);
+            await onImported();
+        } catch (e: any) {
+            setError(e?.response?.data?.message || 'Failed to import settings.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center px-4 py-6" onMouseDown={onClose}>
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <div
+                className="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-2xl dark:border-white/10 dark:bg-[#1b241f]"
+                onMouseDown={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-6 py-5 dark:border-white/10">
+                    <div className="flex items-center gap-2.5">
+                        <span className="text-brand-green"><TransferIcon className="w-5 h-5" /></span>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Import / Export settings</h3>
+                    </div>
+                    <button onClick={onClose} className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-200" aria-label="Close">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="flex gap-1 border-b border-gray-100 px-4 pt-3 dark:border-white/10">
+                    {(['export', 'import'] as const).map((t) => (
+                        <button
+                            key={t}
+                            onClick={() => setTab(t)}
+                            className={`relative rounded-t-lg px-4 py-2.5 text-sm font-semibold capitalize transition-colors ${
+                                tab === t ? 'text-brand-green' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                            }`}
+                        >
+                            {t}
+                            {tab === t && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-green" />}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto p-6 custom-scrollbar">
+                    {error && (
+                        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                            {error}
+                        </div>
+                    )}
+
+                    {tab === 'export' ? (
+                        <div className="space-y-5">
+                            <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+                                Download a JSON backup of all settings - {totalSettings} settings across {totalCategories} categories. Use it to restore later or move configuration to another environment.
+                            </p>
+
+                            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/5">
+                                <input
+                                    type="checkbox"
+                                    checked={includeSensitive}
+                                    onChange={(e) => setIncludeSensitive(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-green focus:ring-brand-green"
+                                />
+                                <span className="min-w-0">
+                                    <span className="block text-sm font-semibold text-gray-900 dark:text-white">Include secret values</span>
+                                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                                        {secretCount} secret{secretCount === 1 ? '' : 's'} (API keys, passwords). {includeSensitive
+                                            ? 'The file will contain these in plain text - store it securely.'
+                                            : 'Left out by default; import keeps existing secrets untouched.'}
+                                    </span>
+                                </span>
+                            </label>
+
+                            {includeSensitive && (
+                                <div className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                                    <span aria-hidden>⚠</span>
+                                    <span>This export will contain plain-text secrets. Don't share or commit the file.</span>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleExport}
+                                disabled={busy}
+                                className="inline-flex items-center gap-2 rounded-xl bg-brand-green px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
+                            >
+                                <DownloadIcon className="w-4 h-4" />
+                                {busy ? 'Preparing…' : 'Download JSON'}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-5">
+                            {report ? (
+                                <ImportReportView report={report} onClose={onClose} />
+                            ) : (
+                                <>
+                                    <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+                                        Upload a settings JSON file. You'll see exactly what changes before anything is written. Read-only, unknown, and omitted-secret entries are skipped automatically.
+                                    </p>
+
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="application/json,.json"
+                                        className="hidden"
+                                        onChange={(e) => { const f = e.target.files?.[0]; if (f) readFile(f); e.target.value = ''; }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/50 px-6 py-8 text-center transition-colors hover:border-brand-green/50 hover:bg-brand-green/5 dark:border-white/10 dark:bg-white/5"
+                                    >
+                                        <span className="text-brand-green"><UploadIcon className="w-7 h-7" /></span>
+                                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                            {fileName || 'Choose a settings file'}
+                                        </span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">JSON exported from this panel</span>
+                                    </button>
+
+                                    {parseError && (
+                                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+                                            {parseError}
+                                        </div>
+                                    )}
+
+                                    {preview && (
+                                        <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/5">
+                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                                <PreviewStat label="Will change" value={preview.willChange.length} tone="green" />
+                                                <PreviewStat label="Unchanged" value={preview.unchanged} />
+                                                <PreviewStat label="Read-only" value={preview.readonly} />
+                                                <PreviewStat label="Secrets kept" value={preview.omitted} />
+                                                <PreviewStat label="Unknown" value={preview.unknown} />
+                                                <PreviewStat label="Invalid" value={preview.invalid} tone={preview.invalid ? 'red' : undefined} />
+                                            </div>
+                                            {preview.willChange.length > 0 && (
+                                                <div className="max-h-40 overflow-y-auto rounded-lg border border-gray-100 bg-white p-2 dark:border-white/10 dark:bg-black/10">
+                                                    {preview.willChange.map((c) => (
+                                                        <div key={c.id} className="flex items-center gap-2 px-2 py-1 text-xs text-gray-600 dark:text-gray-300">
+                                                            <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-green" />
+                                                            <span className="truncate">{c.label}</span>
+                                                            <span className="ml-auto flex-shrink-0 font-mono text-[10px] text-gray-400">{c.id}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {preview && (
+                                        <button
+                                            onClick={handleApply}
+                                            disabled={busy || preview.willChange.length === 0}
+                                            className="inline-flex items-center gap-2 rounded-xl bg-brand-green px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {busy
+                                                ? 'Applying…'
+                                                : preview.willChange.length === 0
+                                                    ? 'Nothing to apply'
+                                                    : `Apply ${preview.willChange.length} change${preview.willChange.length === 1 ? '' : 's'}`}
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>,
+        document.body,
+    );
+}
+
+function PreviewStat({ label, value, tone }: { label: string; value: number; tone?: 'green' | 'red' }) {
+    const color = tone === 'green'
+        ? 'text-brand-green'
+        : tone === 'red'
+            ? 'text-red-500'
+            : 'text-gray-900 dark:text-white';
+    return (
+        <div className="rounded-lg bg-white px-3 py-2 dark:bg-black/10">
+            <p className={`text-lg font-bold ${color}`}>{value}</p>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">{label}</p>
+        </div>
+    );
+}
+
+function ImportReportView({ report, onClose }: { report: any; onClose: () => void }) {
+    const applied = report?.applied?.length || 0;
+    const unchanged = report?.unchanged?.length || 0;
+    const skipped = (report?.skippedReadonly?.length || 0)
+        + (report?.skippedUnknown?.length || 0)
+        + (report?.skippedInvalid?.length || 0)
+        + (report?.skippedOmitted?.length || 0);
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-xl border border-brand-green/30 bg-brand-green/10 px-4 py-3">
+                <CheckCircleIcon className="w-6 h-6 text-brand-green" />
+                <div>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Import complete</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{applied} applied · {unchanged} unchanged · {skipped} skipped</p>
+                </div>
+            </div>
+            <button onClick={onClose} className="w-full rounded-xl bg-brand-green px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500">
+                Done
+            </button>
         </div>
     );
 }
