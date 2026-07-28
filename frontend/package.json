@@ -25,9 +25,9 @@
     "framer-motion": "^12.40.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.555.0",
-    "next": "^16.2.6",
+    "next": "^16.2.11",
     "pdfjs-dist": "^5.6.205",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.18",
     "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-country-flag": "^3.1.0",
@@ -43,9 +43,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "^16.1.6",
     "globals": "^16.5.0",
-    "typescript-eslint": "^8.50.0"
+    "typescript-eslint": "^8.65.0"
   }
 }
