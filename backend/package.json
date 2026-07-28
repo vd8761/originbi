@@ -15,7 +15,7 @@
         "pg": "^8.11.3",
         "pg-boss": "^12.13.0",
         "reflect-metadata": "^0.2.1",
-        "typeorm": "^0.3.30"
+        "typeorm": "^0.3.31"
     },
     "scripts": {
         "build:shared": "cd shared && npm run build",
