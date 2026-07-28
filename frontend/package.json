@@ -19,7 +19,7 @@
     "@types/react-dom": "^18.2.0",
     "autoprefixer": "^10.4.20",
     "aws-amplify": "^6.4.3",
-    "axios": "^1.16.0",
+    "axios": "^1.18.0",
     "date-fns": "^4.1.0",
     "flag-icons": "^7.5.0",
     "framer-motion": "^12.40.0",
