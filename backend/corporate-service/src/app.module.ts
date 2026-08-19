@@ -9,6 +9,7 @@ import { CorporateRegistrationsModule } from './registrations/corporate-registra
 import { AssessmentModule } from './assessment/assessment.module';
 import { JDMatchingModule } from './jd-matching/jd-matching.module';
 import { JobsModule } from './jobs/jobs.module';
+import { DosmembershipModule } from './dosmembership/dosmembership.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { JobsModule } from './jobs/jobs.module';
     AssessmentModule,
     JDMatchingModule,
     JobsModule,
+    DosmembershipModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [MailAssetsController, HealthController],
