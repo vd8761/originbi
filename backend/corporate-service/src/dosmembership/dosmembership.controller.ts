@@ -16,7 +16,7 @@ export class DosmembershipController {
   }
 
   @Post('decode-token')
-  async decodeToken(@Body('token') token: string) {
+  decodeToken(@Body('token') token: string) {
     if (!token) {
       throw new BadRequestException('Token is required');
     }

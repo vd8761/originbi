@@ -83,7 +83,7 @@ export class DosmembershipService {
     return { success: true, details: payload };
   }
 
-  async verifyPayment(body: {
+  verifyPayment(body: {
     token: string;
     razorpay_order_id: string;
     razorpay_payment_id: string;
