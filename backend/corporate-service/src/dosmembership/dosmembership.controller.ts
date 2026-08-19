@@ -24,7 +24,7 @@ export class DosmembershipController {
   }
 
   @Post('verify-payment')
-  async verifyPayment(
+  verifyPayment(
     @Body()
     body: {
       token: string;
