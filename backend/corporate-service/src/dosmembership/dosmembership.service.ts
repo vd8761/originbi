@@ -99,6 +99,10 @@ export class DosmembershipService {
     }
 
     const secret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
+    if (!secret) {
+      throw new BadRequestException('Razorpay is not configured properly');
+    }
+
     const generatedSignature = crypto
       .createHmac('sha256', secret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
