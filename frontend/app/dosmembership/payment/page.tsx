@@ -48,9 +48,7 @@ export default function DOSPaymentPage() {
         setSubmitting(true);
 
         try {
-            const script = document.createElement('script');
-            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-            script.onload = () => {
+            const openRazorpay = () => {
                 const options = {
                     key: paymentDetails.keyId,
                     amount: paymentDetails.amount,
@@ -98,11 +96,19 @@ export default function DOSPaymentPage() {
                 const rzp = new (window as any).Razorpay(options);
                 rzp.open();
             };
-            script.onerror = () => {
-                setError('Failed to load Razorpay payment window. Check your internet connection.');
-                setSubmitting(false);
-            };
-            document.body.appendChild(script);
+
+            if ((window as any).Razorpay) {
+                openRazorpay();
+            } else {
+                const script = document.createElement('script');
+                script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+                script.onload = openRazorpay;
+                script.onerror = () => {
+                    setError('Failed to load Razorpay payment window. Check your internet connection.');
+                    setSubmitting(false);
+                };
+                document.body.appendChild(script);
+            }
         } catch (err: any) {
             setError(err.message || 'Failed to start payment process.');
             setSubmitting(false);
