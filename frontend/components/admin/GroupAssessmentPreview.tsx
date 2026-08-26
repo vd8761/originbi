@@ -3,6 +3,7 @@ import { assessmentService } from '../../lib/services/assessment.service';
 import { buildReportApiUrl } from '../../lib/utils/reportUrl';
 import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, EyeVisibleIcon, FilterFunnelIcon } from '../icons';
 import ExcelExportButton from '../ui/ExcelExportButton';
+import ExcelExportModal, { ExcelExportColumn } from '../ui/ExcelExportModal';
 import AddCandidateModal from './AddCandidateModal';
 
 interface GroupAssessmentPreviewProps {
@@ -25,6 +26,13 @@ const formatDate = (dateStr?: string) => {
     } catch {
         return dateStr;
     }
+};
+
+/** DISC scores arrive as JSON strings; keep them numeric in the sheet. */
+const toNumber = (value: any) => {
+    if (value === null || value === undefined || value === '') return '';
+    const n = Number(value);
+    return Number.isNaN(n) ? value : n;
 };
 
 type AdminReportType = 'mba' | 'standard' | 'level1';
@@ -52,6 +60,37 @@ const completedForReport = (dept: any, rt: AdminReportType): number => {
     const v = needsL2 ? dept?.completedL1L2 : dept?.completedL1;
     return Number(v ?? dept?.completed ?? 0);
 };
+
+/**
+ * Every column the Excel Export dialog offers, in its default order. The first
+ * block mirrors the on-screen table; the rest come from the export endpoint
+ * (registration details and the Level 1 DISC report) and are opt-in.
+ */
+const EXPORT_COLUMNS: ExcelExportColumn[] = [
+    { key: 'name', label: 'Name' },
+    { key: 'email', label: 'Email ID' },
+    { key: 'mobileNumber', label: 'Mobile Number' },
+    { key: 'department', label: 'Dept' },
+    { key: 'degreeType', label: 'Degree Type' },
+    { key: 'traitCode', label: 'Trait Code' },
+    { key: 'blendedStyleName', label: 'Blended Style Name' },
+    { key: 'discD', label: 'D', format: toNumber },
+    { key: 'discI', label: 'I', format: toNumber },
+    { key: 'discS', label: 'S', format: toNumber },
+    { key: 'discC', label: 'C', format: toNumber },
+    { key: 'examStatus', label: 'Exam Status', defaultSelected: false },
+    { key: 'validFrom', label: 'Exam Starts On', defaultSelected: false, format: formatDate },
+    { key: 'validTo', label: 'Exam Ends On', defaultSelected: false, format: formatDate },
+    { key: 'startedAt', label: 'Started At', defaultSelected: false, format: formatDate },
+    { key: 'completedAt', label: 'Completed At', defaultSelected: false, format: formatDate },
+    { key: 'gender', label: 'Gender', defaultSelected: false },
+    { key: 'schoolLevel', label: 'School Level', defaultSelected: false },
+    { key: 'schoolStream', label: 'School Stream', defaultSelected: false },
+    { key: 'overallSincerity', label: 'Overall Sincerity', defaultSelected: false, format: toNumber },
+    { key: 'reportNumber', label: 'Report Number', defaultSelected: false },
+    { key: 'reportEmailSent', label: 'Report Email Sent', defaultSelected: false, format: (v: any) => (v ? 'Yes' : 'No') },
+    { key: 'reportEmailSentTo', label: 'Report Email Sent To', defaultSelected: false },
+];
 
 const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ sessionId, onBack, onViewSession }) => {
     const [groupData, setGroupData] = useState<any>(null);
@@ -83,6 +122,10 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [reportEmailSent, setReportEmailSent] = useState(false);
 
     const [showAddCandidate, setShowAddCandidate] = useState(false);
+
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportRows, setExportRows] = useState<any[]>([]);
+    const [exportLoading, setExportLoading] = useState(false);
 
     // Fetch Data
     const fetchGroupData = useCallback(async () => {
@@ -356,59 +399,42 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
         return pageNumbers;
     };
 
-    const handleExport = () => {
-        if (!groupData) return;
-
-        // Prepare Summary Data
-        const summaryRows = [
-            ['Assessment Summary'],
-            ['Exam Title', groupData.program?.assessment_title || 'N/A'],
-            ['Exam Status', groupData.status || 'N/A'],
-            ['Exam Type', 'WebApp'],
-            ['Program Name', groupData.program?.name || 'N/A'],
-            ['Group Name', groupData.group?.name || 'N/A'],
-            ['No. of Candidates', groupData.totalCandidates || allSessions.length],
-            ['Exam Starts On', formatDate(groupData.validFrom)],
-            ['Exam Ends On', formatDate(groupData.validTo)],
-            [], // Empty row
-            ['List of Candidates'],
-            ['Name', 'Email ID', 'Exam Status', 'Exam Starts On', 'Exam Ends On', 'Expired On'] // Headers
-        ];
-
-        // Prepare Candidates Data
-        const candidateRows = filteredSessions.map((session: any) => {
-            const isNotStarted = session.status === 'NOT_STARTED';
-            const isExpired = session.status === 'EXPIRED';
-            return [
-                session.userFullName,
-                session.userEmail,
-                session.status,
-                isNotStarted ? '--' : formatDate(session.validFrom),
-                isNotStarted ? '--' : formatDate(session.validTo),
-                isExpired ? formatDate(session.validTo) : '-'
-            ];
-        });
-
-        // Combine Content
-        const csvContent = [
-            ...summaryRows.map((row: any[]) => row.map(cell => `"${cell}"`).join(',')),
-            ...candidateRows.map((row: any[]) => row.map((cell: any) => `"${cell}"`).join(','))
-        ].join('\n');
-
-        // Download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `Group_Assessment_${groupData.group?.name || 'Export'}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    /**
+     * Opens the column picker. Rows are pulled from the export endpoint (which
+     * carries registration + DISC report fields the table itself doesn't show)
+     * and narrowed to whatever the current search/status filter leaves visible.
+     */
+    const handleExport = async () => {
+        setShowExportModal(true);
+        if (exportRows.length > 0) return;
+        setExportLoading(true);
+        try {
+            const res = await assessmentService.getGroupExportData(sessionId);
+            setExportRows(res?.rows || []);
+        } catch (error) {
+            console.error('Failed to fetch export data', error);
+        } finally {
+            setExportLoading(false);
+        }
     };
+
+    const visibleSessionIds = new Set(filteredSessions.map((s: any) => Number(s.id)));
+    const exportRowsForCurrentView = exportRows.filter((r: any) =>
+        visibleSessionIds.has(Number(r.sessionId)),
+    );
 
     return (
         <div className="flex flex-col gap-6 font-sans h-full">
+            <ExcelExportModal
+                open={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                columns={EXPORT_COLUMNS}
+                rows={exportRowsForCurrentView}
+                loading={exportLoading}
+                subtitle={`${exportRowsForCurrentView.length} candidate(s) will be exported.`}
+                fileName={`Group_Assessment_${groupData.group?.name || 'Export'}`}
+                sheetName="Candidates"
+            />
             <AddCandidateModal
                 isOpen={showAddCandidate}
                 groupAssessmentId={sessionId}

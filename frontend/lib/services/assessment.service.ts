@@ -281,6 +281,21 @@ export const assessmentService = {
         return res.json();
     },
 
+    /** Flat, export-ready candidate rows for a group assessment (Excel Export). */
+    async getGroupExportData(id: string): Promise<any> {
+        const token = AuthService.getToken();
+        const res = await fetch(`${API_URL}/admin/assessments/group/${id}/export-data`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: token ? `Bearer ${token}` : "",
+            },
+        });
+        if (!res.ok)
+            throw new Error("Failed to fetch group export data");
+        return res.json();
+    },
+
     async getSurveyAnswers(sessionId: string | number): Promise<{
         setNumber: number | null;
         total: number;

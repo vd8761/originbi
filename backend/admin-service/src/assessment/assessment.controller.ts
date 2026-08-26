@@ -122,6 +122,11 @@ export class AssessmentController {
     return this.assessmentService.findGroupSessionDetails(Number(id));
   }
 
+  @Get('group/:id/export-data')
+  async getGroupExportData(@Param('id') id: string) {
+    return this.assessmentService.findGroupExportData(Number(id));
+  }
+
   @Get('group-combined/:groupId/:programId')
   async getGroupCombinedDetails(
     @Param('groupId') groupId: string,
