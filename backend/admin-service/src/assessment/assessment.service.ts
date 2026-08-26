@@ -726,6 +726,75 @@ export class AssessmentService {
   }
 
   /**
+   * Flat, export-ready rows for every candidate in a group assessment.
+   *
+   * Backs the "Excel Export" column picker: the UI decides which of these
+   * fields to include and in what order, so this returns the full superset
+   * (registration details, department/degree, exam window and the Level 1
+   * DISC report values) in one query rather than a column-specific payload.
+   */
+  async findGroupExportData(id: number) {
+    const groupAssessment = await this.groupAssessmentRepo.findOne({
+      where: { id },
+      relations: ['group', 'program'],
+    });
+
+    if (!groupAssessment) {
+      return null;
+    }
+
+    const rows: any[] = await this.sessionRepo.manager.query(
+      `SELECT
+         s.id                       AS "sessionId",
+         r.full_name                AS "name",
+         u.email                    AS "email",
+         CONCAT(COALESCE(r.country_code, ''), COALESCE(r.mobile_number, ''))
+                                    AS "mobileNumber",
+         r.gender                   AS "gender",
+         d.name                     AS "department",
+         dt.name                    AS "degreeType",
+         r.school_level             AS "schoolLevel",
+         r.school_stream            AS "schoolStream",
+         s.status                   AS "examStatus",
+         s.valid_from               AS "validFrom",
+         s.valid_to                 AS "validTo",
+         s.started_at               AS "startedAt",
+         s.completed_at             AS "completedAt",
+         pt.code                    AS "traitCode",
+         pt.blended_style_name      AS "blendedStyleName",
+         ar.disc_scores ->> 'D'     AS "discD",
+         ar.disc_scores ->> 'I'     AS "discI",
+         ar.disc_scores ->> 'S'     AS "discS",
+         ar.disc_scores ->> 'C'     AS "discC",
+         ar.overall_sincerity       AS "overallSincerity",
+         ar.report_number           AS "reportNumber",
+         ar.email_sent              AS "reportEmailSent",
+         ar.email_sent_to           AS "reportEmailSentTo"
+       FROM assessment_sessions s
+       LEFT JOIN registrations r        ON r.id = s.registration_id
+       LEFT JOIN users u                ON u.id = s.user_id
+       LEFT JOIN department_degrees dd  ON dd.id = r.department_degree_id
+       LEFT JOIN departments d          ON d.id = dd.department_id
+       LEFT JOIN degree_types dt        ON dt.id = dd.degree_type_id
+       LEFT JOIN assessment_reports ar  ON ar.assessment_session_id = s.id
+       LEFT JOIN personality_traits pt  ON pt.id = ar.dominant_trait_id
+       WHERE s.group_assessment_id = $1
+       ORDER BY r.full_name ASC NULLS LAST, s.id ASC`,
+      [id],
+    );
+
+    return {
+      groupName: groupAssessment.group?.name ?? null,
+      programName: groupAssessment.program?.name ?? null,
+      assessmentTitle:
+        (groupAssessment.program as any)?.assessmentTitle ??
+        (groupAssessment.program as any)?.assessment_title ??
+        null,
+      rows,
+    };
+  }
+
+  /**
    * "By Group" list: aggregates group_assessments by (group_id, program_id) so
    * each cohort+program shows as a single combined row regardless of how many
    * exam windows it spans. Status is rolled up; candidate count is summed; the
