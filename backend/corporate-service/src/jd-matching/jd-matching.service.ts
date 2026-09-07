@@ -1864,4 +1864,66 @@ Output ONLY a JSON array:
 
     return patterns.some((p) => p.test(message));
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HR BRAIN: Employee Character & Memo Advisory
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async analyzeHRQuery(corporateId: number, query: string): Promise<string> {
+    const startTime = Date.now();
+    this.logger.log(`🧠 CORPORATE HR BRAIN - Processing query for Corporate #${corporateId}`);
+    
+    // 1. Fetch all employees
+    const candidates = await this.fetchCorporateCandidates(corporateId);
+    if (candidates.length === 0) {
+      return "You currently have no employees registered in the system. I need employee behavioral data to answer this.";
+    }
+
+    // 2. Compress candidate data to fit into LLM context efficiently
+    const employeeDataStr = candidates.map(c => {
+      return `[Name: ${c.fullName || 'Unknown'} | Email: ${c.email}]
+Behavioral Style: ${c.personalityStyle || 'Unknown'} (${c.personalityCode || ''})
+Description: ${c.personalityDescription || 'N/A'}
+---`;
+    }).join('\n');
+
+    // 3. Construct the prompt
+    const systemPrompt = `You are the "OriginBI People Intelligence Brain" – an advanced AI-powered Strategic HR and Workforce Decision Copilot for corporate leaders.
+Your core objective is to help organizations "Know your people. Understand your capabilities. Build the right teams. Make better people decisions."
+
+Instead of treating employees just by their qualifications or designations, you analyze their deep psychometric and behavioral intelligence layers.
+
+CORE CAPABILITIES & USE CASES YOU SUPPORT:
+1. Manager-to-Employee Guidance (Copilot): Advise managers on how to communicate, motivate, give feedback to, or resolve conflicts with specific employees based on their behavioral traits.
+2. Team Formation & Dynamics: Explain why certain employees might clash, or recommend how to structure a team for a project based on complementary behavioral strengths (e.g. combining execution, creativity, and analytical thinking).
+3. Leadership & Succession Planning: Identify which employees show behavioral indicators suited for leadership roles.
+4. Role Fitment & Internal Mobility: Identify employees whose natural behavioral strengths align with different roles, promoting internal talent mobility.
+
+STRICT RULES:
+1. ONLY ANSWER WORKFORCE/HR QUESTIONS: If the user asks a general question unrelated to HR, employee management, talent acquisition, or team dynamics (e.g., "what is 2+2", "write a poem", "how do I cook pasta"), you MUST strictly refuse and say: "I am the OriginBI People Intelligence Brain. I exclusively assist with workforce intelligence, behavioral analysis, talent matching, and strategic people decisions."
+2. ACTIONABLE & STRATEGIC: Base your advice deeply on the employee's specific traits, communication style, and stress response. Give highly actionable, tailored advice (e.g., "When giving feedback to Bharathiraja, focus on logic and data because his compliance trait is high, rather than emotional appeals.").
+3. MISSING EMPLOYEES: If the user asks about an employee who is NOT in the provided database, inform them the employee cannot be found in the current organizational scope.
+4. FORMATTING: Keep your response professional, strategic, and concise. Use clear markdown formatting (bolding, bullet points) for readability.
+
+ORGANIZATIONAL EMPLOYEE DATABASE (OriginBI Behavioral Data):
+${employeeDataStr}`;
+
+    try {
+      const completion = await this.getGroqClient().chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: query }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
+      });
+
+      this.logger.log(`✅ HR Query processed in ${Date.now() - startTime}ms`);
+      return completion.choices[0]?.message?.content || 'I could not process your request at this time.';
+    } catch (error) {
+      this.logger.error('Groq LLM Error:', error);
+      return 'An error occurred while analyzing the employee profiles. Please try again.';
+    }
+  }
 }

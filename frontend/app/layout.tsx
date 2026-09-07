@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   },
 };
 
+
 export default function RootLayout({
   children,
 }: {
@@ -35,7 +36,9 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-brand-light-primary dark:bg-brand-dark-primary text-brand-text-light-primary dark:text-brand-text-primary font-sans">
-        <ClientProviders>{children}</ClientProviders>
+        <ClientProviders>
+          {children}
+        </ClientProviders>
       </body>
     </html>
   );

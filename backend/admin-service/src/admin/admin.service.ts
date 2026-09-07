@@ -63,6 +63,28 @@ export class AdminService {
         where: { isDeleted: false, isTechAssessment: In([0, 2]) },
       });
 
+      const programBasedRegistrations = await this.registrationRepo
+        .createQueryBuilder('r')
+        .where('r.isDeleted = false')
+        .andWhere('r.isTechAssessment IN (:...types)', { types: [0, 2] })
+        .andWhere('r.program_id IS NOT NULL')
+        .getCount();
+
+      const programSplitRaw = await this.registrationRepo
+        .createQueryBuilder('r')
+        .select('COALESCE(p.name, \'Unassigned\')', 'program')
+        .addSelect('COUNT(r.id)', 'count')
+        .leftJoin('r.program', 'p')
+        .where('r.isDeleted = false')
+        .andWhere('r.isTechAssessment IN (:...types)', { types: [0, 2] })
+        .groupBy('COALESCE(p.name, \'Unassigned\')')
+        .getRawMany();
+
+      const programSplit = programSplitRaw.reduce((acc, row) => {
+        acc[row.program] = parseInt(row.count, 10);
+        return acc;
+      }, {});
+
       // 2. User Distribution (Segments)
       const userDistribution = await this.getUserDistribution();
 
@@ -103,6 +125,8 @@ export class AdminService {
 
       return {
         totalUsers: totalUsersCount,
+        programBasedRegistrations,
+        programSplit,
         activeAssessments,
         corporateClients,
         totalReadyToPayment: affiliateStats.totalReadyToPayment,

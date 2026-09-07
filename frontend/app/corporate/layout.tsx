@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Header from '../../components/corporate/Header';
-import FloatingChatBot from '../../components/admin/FloatingChatBot';
+import OriginBiIntelligentWidget from '../../components/ai/OriginBiIntelligentWidget';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
@@ -141,9 +141,8 @@ export default function CorporateLayout({
                                 {children}
                             </div>
                         </div>
-
-                        {/* Floating AI Chat Bot */}
-                        {showAssistant && <FloatingChatBot userRole="CORPORATE" />}
+                        {/* Intelligent Corporate HR AI */}
+                        {showAssistant && <OriginBiIntelligentWidget />}
                     </RequireCorporate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */
