@@ -3,10 +3,11 @@ import { sql } from '../../../../../lib/db';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionId = params.id;
+    const resolvedParams = await params;
+    const sessionId = resolvedParams.id;
     // Note: In production, verify that this session actually belongs to the authenticated user!
     const userId = req.headers.get('x-user-id') || 'test-user-id';
 
