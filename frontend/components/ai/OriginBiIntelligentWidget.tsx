@@ -37,16 +37,38 @@ export default function OriginBiIntelligentWidget() {
   const isCorporate = pathname?.includes('/corporate');
   
   const corporatePrompts = [
-    "Find candidates suitable for a project manager role",
-    "What is {candidate1}'s character profile?",
-    "How should I approach my team lead about a promotion?",
-    "Match employees for a Senior Developer with strong leadership",
-    "Who among my team has the highest leadership potential?",
-    "Why might two of my employees be experiencing conflict?",
-    "Which employees are best suited for a client-facing role?",
-    "Summarize the behavioral traits of {candidate2}.",
-    "Are there any employees who might be a flight risk?",
-    "What training should I assign to improve adaptability?"
+    // UC1: Individual Employee Intelligence
+    "What is {candidate1}'s behavioral character and natural working style?",
+    "Describe how {candidate2} typically approaches decisions and collaboration.",
+    // UC2: Role Fitment & Internal Mobility
+    "Is {candidate1} behaviorally suited to their current role?",
+    "Which of my employees might be underutilized in their current position?",
+    // UC4 & UC5: Team Formation & Project Teams
+    "Build a balanced 5-person team for a new product launch from my workforce.",
+    "Who are the best employees to combine for a high-pressure client delivery project?",
+    // UC6: Manager Guidance
+    "How should I give constructive feedback to {candidate2} without demotivating them?",
+    "What is the best way to delegate responsibilities to {candidate1}?",
+    // UC7: Team Dynamics & Conflict
+    "Why might two of my employees frequently disagree in team meetings?",
+    "How can I improve collaboration between two contrasting personalities on my team?",
+    // UC8: Succession Planning
+    "Who in my workforce has the strongest natural leadership potential?",
+    "Which employees could step into a senior manager role in the next 12 months?",
+    // UC9: Capability Mapping
+    "What are the dominant behavioral strengths across my entire workforce?",
+    "Where are the critical behavioral gaps in my organization?",
+    // UC11: Learning & Development
+    "What training program should I assign to {candidate1} to prepare them for a senior role?",
+    "What are the top 3 capability development priorities for my team?",
+    // UC12: Workforce Planning
+    "Do I have enough internal behavioral capability to launch a new business unit?",
+    // UC13: Recruitment Intelligence
+    "What behavioral traits should I look for when hiring for a sales leadership role?",
+    // UC14: People Strategy
+    "What communication framework best suits my team's behavioral makeup?",
+    // JD Matching
+    "Find employees suitable for a Senior Developer with strong leadership and analytical skills",
   ];
 
   const currentSubtitle = "Ask me questions about your candidates, job posts, and assessment metrics.";

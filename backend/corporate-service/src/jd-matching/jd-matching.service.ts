@@ -1878,112 +1878,658 @@ Output ONLY a JSON array:
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // HR BRAIN: Employee Character & Memo Advisory
+  // HR BRAIN: 14-Use-Case People Intelligence Engine
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Classify the user's query into one of 14 workforce intelligence intent categories.
+   * Uses a lightweight GPT call to avoid hardcoded regex fragility.
+   */
+  private async classifyIntent(query: string): Promise<string> {
+    const classificationPrompt = `You are an intent classifier for a People Intelligence platform. Classify the user's question into EXACTLY ONE of these intent keys. Respond with ONLY the key, no explanation.
+
+INTENT KEYS:
+- individual_profile    → Questions about a specific employee's personality, traits, character, working style
+- role_fitment          → Whether someone is in the right role, internal mobility, who fits what role
+- team_formation        → Building balanced teams, complementary profiles, who to put together
+- project_team          → Recommending a specific N-member team for a project or goal
+- manager_guidance      → How to manage, lead, communicate with, give feedback to a specific person
+- team_dynamics         → Why employees clash, team conflict, interpersonal friction, collaboration issues
+- succession_planning   → Future leaders, succession pipeline, who has leadership potential
+- capability_mapping    → Overall workforce strengths/gaps, dominant traits across the org, skill map
+- learning_dev          → Training needs, personal development plans, what to teach/develop in whom
+- workforce_planning    → Can we launch X, do we have enough capability, strategic people planning
+- recruitment_intel     → What to look for when hiring, what traits our top performers share
+- people_strategy       → HR policy, communication frameworks, org-wide people practices
+- general               → Anything else workforce-related that doesn't fit above categories
+
+USER QUERY: "${query.replace(/"/g, "'")}"`; 
+
+    try {
+      const res = await this.getOpenAIClient().chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: classificationPrompt }],
+        temperature: 0,
+        max_tokens: 30,
+      });
+      const intent = (res.choices[0]?.message?.content || 'general').trim().toLowerCase().replace(/[^a-z_]/g, '');
+      this.logger.log(`🧭 Intent classified: ${intent}`);
+      return intent;
+    } catch {
+      return 'general';
+    }
+  }
+
+  /**
+   * Build a compact employee data string for use in AI prompts.
+   * Behaviorally rich but no raw numeric scores are exposed.
+   */
+  private buildEmployeeDataStr(candidates: CandidateProfile[]): string {
+    return candidates.map(c => {
+      const scores = [
+        { label: 'Dominance (D)', val: c.discScoreD ?? 0 },
+        { label: 'Influence (I)', val: c.discScoreI ?? 0 },
+        { label: 'Steadiness (S)', val: c.discScoreS ?? 0 },
+        { label: 'Compliance (C)', val: c.discScoreC ?? 0 },
+      ].sort((a, b) => b.val - a.val);
+
+      const level = (v: number | null) => v == null ? 'Unknown' : v >= 18 ? 'High' : v >= 12 ? 'Moderate' : 'Low';
+
+      return `[${c.fullName}]
+Style: ${c.personalityStyle || 'Unknown'} | Code: ${c.personalityCode || 'N/A'}
+Description: ${c.personalityDescription || 'N/A'}
+D-Dominance: ${level(c.discScoreD)} | I-Influence: ${level(c.discScoreI)} | S-Steadiness: ${level(c.discScoreS)} | C-Compliance: ${level(c.discScoreC)}
+Trait Order: ${scores.map((s, i) => `${i + 1}. ${s.label}`).join(' → ')}
+Group: ${c.groupName || 'Unassigned'} | Designation: ${c.currentRole || 'N/A'} | Gender: ${c.gender || 'N/A'}`;
+    }).join('\n\n');
+  }
+
+  /** Shared corporate system role prefix injected into all specialized prompts */
+  private readonly SYSTEM_ROLE_PREFIX = `You are the OriginBI People Intelligence Brain — an AI-powered Workforce Decision Advisor serving senior HR leaders and C-suite executives.
+
+DISC MODEL (for your analysis only — never share raw scores):
+- Dominance (D): Results-driven, decisive, assertive, competitive
+- Influence (I): Persuasive, optimistic, collaborative, relationship-building
+- Steadiness (S): Consistent, patient, loyal, empathetic, stable
+- Compliance (C): Precise, analytical, quality-focused, systematic
+
+RESPONSE RULES:
+1. NEVER reveal raw scores, numbers, or DISC codes — speak in behavioral language only.
+2. Maintain formal, boardroom-level tone. No casual phrasing.
+3. Reference actual employee names from the data below.
+4. Always close with a "Strategic Recommendation" the leader can act on.
+5. Use bold headers and bullet points. Keep it executive-brief-style.
+6. If a query is not workforce-related, decline professionally.`;
+
+  // ─── MAIN ROUTING ENTRY POINT ───────────────────────────────────────────────
 
   async analyzeHRQuery(corporateId: number, query: string): Promise<string> {
     const startTime = Date.now();
-    this.logger.log(`🧠 CORPORATE HR BRAIN - Processing query for Corporate #${corporateId}`);
-    
-    // 1. Fetch all employees
+    this.logger.log(`🧠 CORPORATE HR BRAIN v2 - Corporate #${corporateId}`);
+
     const candidates = await this.fetchCorporateCandidates(corporateId);
     if (candidates.length === 0) {
-      return "You currently have no employees registered in the system. I need employee behavioral data to answer this.";
+      return 'You currently have no employees registered in the system. I need employee behavioral data to answer your question.';
     }
 
-    // 2. Build employee profiles using real DISC scores from the database
-    const employeeDataStr = candidates.map(c => {
-      const discD = c.discScoreD ?? 'N/A';
-      const discI = c.discScoreI ?? 'N/A';
-      const discS = c.discScoreS ?? 'N/A';
-      const discC = c.discScoreC ?? 'N/A';
+    const intent = await this.classifyIntent(query);
+    const employeeData = this.buildEmployeeDataStr(candidates);
 
-      // Determine dominant and secondary traits from actual scores
-      const scores = [
-        { label: 'D (Dominance)', val: c.discScoreD ?? 0 },
-        { label: 'I (Influence)', val: c.discScoreI ?? 0 },
-        { label: 'S (Steadiness)', val: c.discScoreS ?? 0 },
-        { label: 'C (Compliance)', val: c.discScoreC ?? 0 },
-      ].sort((a, b) => b.val - a.val);
+    this.logger.log(`🎯 Routing to handler: ${intent} | ${candidates.length} employees`);
 
-      return `━━━ ${c.fullName || 'Unknown'} (${c.email}) ━━━
-DISC Profile: [${c.personalityCode || 'N/A'}] ${c.personalityStyle || 'Unknown'}
-Profile Description: ${c.personalityDescription || 'N/A'}
-DISC Scores (out of 25):
-  • Dominance (D):   ${discD}/25 ${Number(discD) >= 18 ? '🔴 High' : Number(discD) >= 12 ? '🟡 Moderate' : '🟢 Low'}
-  • Influence (I):   ${discI}/25 ${Number(discI) >= 18 ? '🔴 High' : Number(discI) >= 12 ? '🟡 Moderate' : '🟢 Low'}
-  • Steadiness (S):  ${discS}/25 ${Number(discS) >= 18 ? '🔴 High' : Number(discS) >= 12 ? '🟡 Moderate' : '🟢 Low'}
-  • Compliance (C):  ${discC}/25 ${Number(discC) >= 18 ? '🔴 High' : Number(discC) >= 12 ? '🟡 Moderate' : '🟢 Low'}
-Trait Ranking: ${scores.map((s, i) => `${i + 1}. ${s.label} (${s.val})`).join(' → ')}
-Group/Team: ${c.groupName || 'Unassigned'} | Gender: ${c.gender || 'N/A'}`;
-    }).join('\n\n');
+    let answer: string;
+    switch (intent) {
+      case 'individual_profile':
+        answer = await this.handleIndividualProfile(query, candidates, employeeData);
+        break;
+      case 'role_fitment':
+        answer = await this.handleRoleFitment(query, candidates, employeeData);
+        break;
+      case 'team_formation':
+      case 'project_team':
+        answer = await this.handleTeamFormation(query, candidates, employeeData);
+        break;
+      case 'manager_guidance':
+        answer = await this.handleManagerGuidance(query, candidates, employeeData);
+        break;
+      case 'team_dynamics':
+        answer = await this.handleTeamDynamics(query, candidates, employeeData);
+        break;
+      case 'succession_planning':
+        answer = await this.handleSuccessionPlanning(query, candidates, employeeData);
+        break;
+      case 'capability_mapping':
+        answer = await this.handleCapabilityMapping(query, candidates, employeeData);
+        break;
+      case 'learning_dev':
+        answer = await this.handleLearningDev(query, candidates, employeeData);
+        break;
+      case 'workforce_planning':
+        answer = await this.handleWorkforcePlanning(query, candidates, employeeData);
+        break;
+      case 'recruitment_intel':
+        answer = await this.handleRecruitmentIntel(query, candidates, employeeData);
+        break;
+      case 'people_strategy':
+        answer = await this.handlePeopleStrategy(query, candidates, employeeData);
+        break;
+      default:
+        answer = await this.handleGeneralHRQuery(query, candidates, employeeData);
+    }
 
-    // 3. Construct the prompt
-    const systemPrompt = `You are the OriginBI People Intelligence Brain — a strategic AI-powered Workforce Decision Advisor embedded within the OriginBI corporate intelligence platform.
+    this.logger.log(`✅ HR Query [${intent}] processed in ${Date.now() - startTime}ms`);
+    return answer;
+  }
 
-You serve senior HR leaders, department heads, and C-suite executives. Your role is to provide evidence-based, behaviorally-grounded people intelligence to enable smarter workforce decisions.
+  // ─── UC1: INDIVIDUAL EMPLOYEE INTELLIGENCE ──────────────────────────────────
 
-Core Mission: "Know your people. Understand your capabilities. Build the right teams. Make better people decisions."
+  private async handleIndividualProfile(
+    query: string,
+    _candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
-━━━ DISC BEHAVIORAL FRAMEWORK ━━━
-Each employee's behavioral character is assessed through the DISC model:
-- Dominance (D): Results-orientation, decisiveness, assertiveness, competitive drive
-- Influence (I): Social energy, persuasion, enthusiasm, optimism, relationship-building
-- Steadiness (S): Consistency, patience, loyalty, empathy, stability under pressure
-- Compliance (C): Precision, analytical thinking, quality focus, rule adherence, caution
+━━━ YOUR TASK: INDIVIDUAL EMPLOYEE INTELLIGENCE ━━━
+The leader is asking about a specific employee. Provide a deeply detailed behavioral intelligence brief covering:
 
-BEHAVIORAL PROFILE REFERENCE (16 Types):
-• Dominant Director (High D) — Commanding, competitive, direct. Thrives in authority. Flight risk if underutilized.
-• Inspiring Influencer (High I) — Charismatic, optimistic, relationship-driven. Excels in client-facing roles.
-• Supportive Stabilizer (High S) — Loyal, consistent, empathetic. Needs structure and security to perform at best.
-• Conscientious Analyzer (High C) — Precise, logical, systematic. Prefers data over emotion.
-• Charismatic Leader (DI) — Bold and persuasive. Natural leader. Can be impulsive under pressure.
-• Strategic Stabilizer (DS) — Driven yet patient. Exceptional at structured project execution.
-• Decisive Analyst (DC) — High standards with assertive drive. Results-focused; may come across as blunt.
-• Dynamic Achiever (ID) — Energetic and goal-oriented. Excels in fast-paced, high-output environments.
-• Supportive Energizer (IS) — Warm, collaborative, people-first. Ideal for HR, culture, and team support.
-• Influential Planner (IC) — Creative yet structured. Thrives in communications, marketing, or training roles.
-• Reliable Executor (SD) — Dependable and driven. Excellent in operations. May resist organizational change.
-• Methodical Planner (SC) — Steady and precise. Well-suited for compliance, finance, and quality assurance.
-• Steady Contributor (SI) — Loyal and sociable. Strong in service delivery and team cohesion roles.
-• Analytical Leader (CD) — Methodical with strategic drive. Suited for engineering, strategy, or research.
-• Conscientious Connector (CI) — Precise yet people-oriented. Effective in training, facilitation, or research.
-• Methodical Supporter (CS) — Detail-oriented and loyal. Excellent for administrative and process-driven roles.
+1. **Core Behavioral Character** — Natural operating style, what drives this person, how they make decisions
+2. **Communication Style** — How they prefer to give and receive information; their natural communication strengths
+3. **Collaboration & Teamwork** — How they function in a group; their preferred team dynamics
+4. **Stress & Pressure Response** — How this person behaves when under deadline, conflict, or heavy workload
+5. **Leadership Potential** — Whether they show natural leadership indicators and what kind of leader they would be
+6. **Ideal Working Environment** — What conditions allow this person to deliver their best work
+7. **Development Areas** — Where behavioral growth would unlock the most professional value
+8. **Strategic Recommendation** — One concrete, actionable suggestion for the manager regarding this employee
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC2: ROLE FITMENT & INTERNAL MOBILITY ──────────────────────────────────
+
+  private async handleRoleFitment(
+    query: string,
+    candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const roleContext = candidates.map(c => `${c.fullName}: ${c.currentRole || 'Role not specified'} | Group: ${c.groupName || 'N/A'}`).join('\n');
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: ROLE FITMENT & INTERNAL MOBILITY ━━━
+The leader wants to understand whether employees are in the right roles and where internal mobility opportunities exist. Analyze using behavioral alignment:
+
+FRAMEWORK FOR ROLE FITMENT:
+- High-D profiles → Leadership, sales, business development, decision-making roles
+- High-I profiles → Client-facing, marketing, training, communications, partnerships
+- High-S profiles → Operations, customer service, HR support, process management
+- High-C profiles → Finance, compliance, quality assurance, engineering, data analysis
+- Blended profiles → Match based on the dominant-secondary combination
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Behaviorally Well-Placed Employees** — Who appears to be in a role that naturally suits their character
+2. **Potentially Underutilized Talent** — Employees whose behavioral profile suggests they could excel in higher-impact or different roles
+3. **Role-Profile Mismatches** — Anyone showing indicators of behavioral misalignment with their current position (flight risk signals)
+4. **Internal Mobility Opportunities** — Specific alternative roles within the organization that would better leverage certain employees' natural strengths
+5. **Strategic Recommendation** — Priority action for the HR leader on talent deployment
+
+CURRENT EMPLOYEE ROLES:
+${roleContext}
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC4 & UC5: TEAM FORMATION & PROJECT TEAM RECOMMENDATION ────────────────
+
+  private async handleTeamFormation(
+    query: string,
+    _candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: TEAM FORMATION INTELLIGENCE ━━━
+The leader wants to build a behaviorally balanced team. Apply the following framework:
+
+PRINCIPLES OF BEHAVIORAL TEAM ARCHITECTURE:
+- Every high-performing team needs a mix of:
+  • A Driver (High D) → Pushes for results, owns decisions, sets pace
+  • A Connector (High I) → Maintains team morale, handles relationships, communicates externally
+  • A Stabilizer (High S) → Ensures process consistency, team harmony, and reliable follow-through
+  • An Analyzer (High C) → Maintains quality, spots risk, ensures compliance and accuracy
+
+- Natural complements: D+I (action + people), S+C (stability + precision)
+- Natural friction zones: High D vs High S (speed vs caution), High I vs High C (emotion vs logic)
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Recommended Team Composition** — Name each person and the role they would naturally fill (Driver, Connector, Stabilizer, Analyzer)
+2. **Why This Team Works** — The specific behavioral complementarity that makes this combination effective
+3. **Potential Friction Points** — Any personality dynamics the team leader should proactively manage
+4. **Team Operating Advice** — How this team should structure meetings, decisions, and conflict resolution based on their profiles
+5. **Strategic Recommendation** — One structural or process suggestion to maximize team performance
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC6: MANAGER-TO-EMPLOYEE GUIDANCE ──────────────────────────────────────
+
+  private async handleManagerGuidance(
+    query: string,
+    _candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: MANAGER COPILOT — EMPLOYEE GUIDANCE ━━━
+The leader is seeking guidance on how to manage, communicate with, or approach a specific employee. Act as an executive-level Manager Copilot.
+
+PROVIDE GUIDANCE ACROSS THESE DIMENSIONS:
+1. **Communication Approach** — Exactly how to open the conversation, what tone and style to adopt, and what to avoid with this specific person
+2. **Feedback Style** — How this employee receives constructive criticism best (directly, gently, with data, with vision, etc.)
+3. **Motivation Levers** — What intrinsically motivates this person based on their behavioral profile; what demotivates them
+4. **Delegation Strategy** — What kinds of tasks and responsibilities this person handles best; how much autonomy to give
+5. **Conflict & Difficult Conversations** — Specific script guidance for navigating tension, performance discussions, or disagreements with this individual
+6. **Recognition & Development** — What types of recognition resonate with this person; what growth opportunities to offer
+7. **Strategic Recommendation** — One immediate action the manager should take based on this analysis
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC7: TEAM DYNAMICS & CONFLICT INTELLIGENCE ─────────────────────────────
+
+  private async handleTeamDynamics(
+    query: string,
+    _candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: TEAM DYNAMICS & CONFLICT INTELLIGENCE ━━━
+The leader wants to understand interpersonal friction, behavioral conflict, or team dynamics within the workforce.
+
+DISC CONFLICT PATTERNS TO ANALYZE:
+- D vs S: High-urgency driver clashes with patience-first stabilizer → friction around pace and risk tolerance
+- D vs C: Results-focus vs quality-focus → disagreement on timelines vs standards
+- I vs C: Emotion-led vs data-led → conflict on how decisions should be made
+- I vs S: Enthusiasm vs caution → divergence on change tolerance
+- D vs D: Two drivers competing for control → power struggles in leadership voids
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Identified Conflict Dynamic** — Which employees are involved and what behavioral gap is creating friction
+2. **Root Cause Analysis** — The underlying DISC contrast that drives the disagreement (explained in behavioral terms, not scores)
+3. **Impact on Team** — How this dynamic affects team output, morale, and collaboration
+4. **Mediation Strategy** — Specific, practical advice for the manager to bridge these behavioral differences
+5. **Who Could Complement the Leader** — If asked, recommend who in the team would best complement a specific leader's behavioral gaps
+6. **Structural Fix** — Any team or role structure change that would reduce this friction organically
+7. **Strategic Recommendation** — Priority next step for the team leader
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC8: LEADERSHIP & SUCCESSION PLANNING ──────────────────────────────────
+
+  private async handleSuccessionPlanning(
+    query: string,
+    candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    // Pre-rank by leadership indicators (High D + High I in DISC = natural leadership signals)
+    const leadershipRanked = [...candidates]
+      .map(c => ({
+        name: c.fullName,
+        style: c.personalityStyle,
+        group: c.groupName,
+        role: c.currentRole,
+        leaderScore: ((c.discScoreD ?? 0) * 0.5) + ((c.discScoreI ?? 0) * 0.3) + ((c.discScoreC ?? 0) * 0.2),
+      }))
+      .sort((a, b) => b.leaderScore - a.leaderScore)
+      .slice(0, 8);
+
+    const leadershipContext = leadershipRanked
+      .map((e, i) => `${i + 1}. ${e.name} | Style: ${e.style || 'Unknown'} | Group: ${e.group || 'N/A'} | Role: ${e.role || 'N/A'}`)
+      .join('\n');
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: LEADERSHIP IDENTIFICATION & SUCCESSION PLANNING ━━━
+The leader wants to identify future leaders and build a succession pipeline from within the existing workforce.
+
+BEHAVIORAL INDICATORS OF LEADERSHIP POTENTIAL:
+- Natural authority and decisiveness (High Dominance behavioral character)
+- Ability to inspire, persuade, and rally others (High Influence behavioral character)
+- Strategic and quality thinking for structured leadership (High Compliance paired with D)
+- Emotional intelligence and team cohesion for people-led leadership (High Steadiness paired with I)
+
+LEADERSHIP ARCHETYPES TO IDENTIFY:
+- The Commanding Leader → Drives results, commands rooms, takes ownership. Best for fast-growth or turnaround environments.
+- The People Leader → Inspires loyalty, builds culture, coaches teams. Best for stable, relationship-intensive roles.
+- The Strategic Leader → Combines vision with discipline. Best for complex, multi-stakeholder or analytical leadership roles.
+- The Servant Leader → Prioritizes team development over personal glory. Best for long-term organizational stability.
+
+PRE-ANALYZED LEADERSHIP CANDIDATES (internal ranking by behavioral leadership indicators):
+${leadershipContext}
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Strongest Leadership Candidates** — Top individuals by behavioral indicators of natural leadership character
+2. **Leadership Archetype** — The specific type of leader each candidate would naturally be
+3. **Readiness Assessment** — Who is behaviorally ready now vs who needs development before stepping up
+4. **Succession Gaps** — Where critical roles currently have no strong internal successor
+5. **Development Pathway** — What experiences or responsibilities to offer the top candidates to accelerate readiness
+6. **Strategic Recommendation** — Priority succession action for the organization
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC9: CAPABILITY MAPPING ─────────────────────────────────────────────────
+
+  private async handleCapabilityMapping(
+    query: string,
+    candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    // Build a behavioral capability distribution summary
+    const total = candidates.length;
+    const highD = candidates.filter(c => (c.discScoreD ?? 0) >= 18).length;
+    const highI = candidates.filter(c => (c.discScoreI ?? 0) >= 18).length;
+    const highS = candidates.filter(c => (c.discScoreS ?? 0) >= 18).length;
+    const highC = candidates.filter(c => (c.discScoreC ?? 0) >= 18).length;
+
+    const styleMap: Record<string, number> = {};
+    candidates.forEach(c => {
+      const s = c.personalityStyle || 'Unknown';
+      styleMap[s] = (styleMap[s] || 0) + 1;
+    });
+    const topStyles = Object.entries(styleMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([style, count]) => `${style}: ${count} employees (${Math.round((count / total) * 100)}%)`)
+      .join('\n');
+
+    const groupMap: Record<string, number> = {};
+    candidates.forEach(c => {
+      const g = c.groupName || 'Unassigned';
+      groupMap[g] = (groupMap[g] || 0) + 1;
+    });
+    const groupDist = Object.entries(groupMap)
+      .map(([group, count]) => `${group}: ${count} employees`)
+      .join('\n');
+
+    const capabilityContext = `WORKFORCE BEHAVIORAL CAPABILITY SUMMARY (${total} employees total):
+━━━ Behavioral Strength Distribution ━━━
+• Results-Drivers (High Dominance): ${highD} employees (${Math.round((highD / total) * 100)}%)
+• Relationship-Builders (High Influence): ${highI} employees (${Math.round((highI / total) * 100)}%)
+• Stability-Anchors (High Steadiness): ${highS} employees (${Math.round((highS / total) * 100)}%)
+• Precision-Thinkers (High Compliance): ${highC} employees (${Math.round((highC / total) * 100)}%)
+
+━━━ Top Behavioral Archetypes ━━━
+${topStyles}
+
+━━━ Group Distribution ━━━
+${groupDist}`;
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: ORGANIZATIONAL CAPABILITY MAPPING ━━━
+The leader wants to understand the behavioral capability landscape of their workforce — what strengths exist, where gaps are, and what risk concentrations exist.
+
+PRE-COMPUTED CAPABILITY SNAPSHOT:
+${capabilityContext}
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Dominant Organizational Character** — The overall behavioral "personality" of this workforce (e.g., "execution-heavy with limited strategic vision bandwidth")
+2. **Behavioral Strengths** — What this workforce does exceptionally well based on its dominant traits
+3. **Critical Capability Gaps** — What behavioral capabilities are scarce or missing, and what risks this creates
+4. **Concentration Risk** — Whether any critical behavioral capability is concentrated in only 1-2 individuals (single points of failure)
+5. **Team-Level Analysis** — Which groups/teams have well-rounded profiles vs which are behaviorally imbalanced
+6. **Hidden Talent Identification** — Employees whose behavioral profile suggests significant underutilized potential
+7. **Strategic Recommendation** — Specific workforce investment or restructuring suggestion to address the most critical gap
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 2000);
+  }
+
+  // ─── UC11: LEARNING & DEVELOPMENT RECOMMENDATIONS ───────────────────────────
+
+  private async handleLearningDev(
+    query: string,
+    _candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: LEARNING & DEVELOPMENT RECOMMENDATIONS ━━━
+The leader wants personalized development recommendations — either for a specific employee or for the organization.
+
+L&D FRAMEWORK BY BEHAVIORAL PROFILE:
+- High-D employees → Benefit from: executive leadership programs, strategic thinking, negotiation, emotional regulation training. Risk of stagnation if development is too slow.
+- High-I employees → Benefit from: structured thinking, data literacy, project management, follow-through accountability. Risk of over-promising and under-delivering.
+- High-S employees → Benefit from: change management, assertiveness training, presentation skills, decision-making under ambiguity. Risk of resistance to new responsibilities.
+- High-C employees → Benefit from: leadership presence, stakeholder communication, big-picture thinking, tolerance for imperfection. Risk of analysis paralysis.
+
+FOR INDIVIDUALS: Provide a 6-month development roadmap tailored to their specific profile and the next role they could realistically target.
+FOR ORGANIZATION: Identify the top 3 capability development priorities that would have the greatest collective impact.
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Development Priority** — The #1 behavioral growth area for the employee/organization
+2. **Recommended Learning Interventions** — Specific training formats, programs, or experiences (not generic courses)
+3. **Stretch Assignments** — Real on-the-job experiences that would accelerate behavioral development
+4. **Mentoring Pairing** — If applicable, which colleague's behavioral profile would provide the ideal developmental contrast
+5. **6-Month Development Roadmap** — Phased plan of actions, milestones, and expected behavioral shifts
+6. **Strategic Recommendation** — How this development investment connects to a specific business outcome
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC12: WORKFORCE PLANNING ────────────────────────────────────────────────
+
+  private async handleWorkforcePlanning(
+    query: string,
+    candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const total = candidates.length;
+    const highLeaders = candidates.filter(c => (c.discScoreD ?? 0) >= 18 && (c.discScoreI ?? 0) >= 14).length;
+    const highExecutors = candidates.filter(c => (c.discScoreS ?? 0) >= 18).length;
+    const highAnalysts = candidates.filter(c => (c.discScoreC ?? 0) >= 18).length;
+    const highConnectors = candidates.filter(c => (c.discScoreI ?? 0) >= 18).length;
+
+    const planningContext = `STRATEGIC WORKFORCE SNAPSHOT:
+Total Workforce: ${total} behaviorally profiled employees
+Natural Leaders/Drivers: ${highLeaders} (${Math.round((highLeaders / total) * 100)}%)
+Execution/Operations Specialists: ${highExecutors} (${Math.round((highExecutors / total) * 100)}%)
+Analytical/Technical Specialists: ${highAnalysts} (${Math.round((highAnalysts / total) * 100)}%)
+Relationship/Client Specialists: ${highConnectors} (${Math.round((highConnectors / total) * 100)}%)`;
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: STRATEGIC WORKFORCE PLANNING ━━━
+The leader wants to make a strategic workforce decision — such as launching a new business unit, entering a new market, or restructuring teams. Provide behavioral workforce planning intelligence.
+
+WORKFORCE PLANNING ANALYSIS FRAMEWORK:
+- Assess whether the current behavioral workforce composition can support the proposed initiative
+- Identify which behavioral capabilities are abundantly available vs critically scarce
+- Flag over-dependence on specific individuals (single points of failure)
+- Determine whether the gap requires external hiring vs internal development vs redeployment
+
+PRE-ANALYZED WORKFORCE COMPOSITION:
+${planningContext}
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Capability Assessment** — Does the current workforce have the behavioral foundation to support the stated initiative?
+2. **Behavioral Gaps** — What critical behavioral capabilities are insufficient for the initiative to succeed?
+3. **Redeployment Opportunities** — Which employees could be redeployed or given expanded scope to fill capability needs?
+4. **Hiring Recommendations** — What behavioral profiles should be prioritized in external recruitment to fill the gaps?
+5. **Concentration Risk** — Are any critical capabilities concentrated in too few people? What's the risk?
+6. **Timeline Assessment** — Can internal development close the gap, or is the timeline too tight for organic growth?
+7. **Strategic Recommendation** — A clear people-strategy decision recommendation with rationale
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC13: RECRUITMENT INTELLIGENCE ─────────────────────────────────────────
+
+  private async handleRecruitmentIntel(
+    query: string,
+    candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    // Identify the top performers behaviorally (highest total scores) to extract patterns
+    const topPerformers = [...candidates]
+      .filter(c => c.bestScore != null)
+      .sort((a, b) => (b.bestScore ?? 0) - (a.bestScore ?? 0))
+      .slice(0, 5);
+
+    const topProfileContext = topPerformers.length > 0
+      ? topPerformers.map(c =>
+          `${c.fullName}: ${c.personalityStyle || 'Unknown'} | Group: ${c.groupName || 'N/A'} | D:${c.discScoreD ?? 'N/A'} I:${c.discScoreI ?? 'N/A'} S:${c.discScoreS ?? 'N/A'} C:${c.discScoreC ?? 'N/A'}`
+        ).join('\n')
+      : 'No scored performance data available — analysis will be based on behavioral profile distribution.';
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: RECRUITMENT INTELLIGENCE ━━━
+The leader wants to use internal workforce intelligence to inform external hiring decisions. Analyze the behavioral patterns of the existing workforce — particularly top performers — to generate recruitment targeting insights.
+
+TOP INTERNAL PERFORMERS (for pattern extraction):
+${topProfileContext}
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Behavioral Profile of Success** — What behavioral character traits are consistently present in the organization's highest performers?
+2. **The Ideal Hire Profile** — Describe in behavioral terms the profile of a candidate most likely to succeed in this organization's culture
+3. **Red Flag Profiles** — What behavioral indicators, based on current workforce data, suggest a candidate might struggle or disengage in this environment?
+4. **Interview Intelligence** — What specific behavioral competencies and scenarios to probe in interviews to identify the right profile?
+5. **Onboarding Guidance** — Given the existing team's behavioral dynamics, how should a new hire be onboarded for fastest integration?
+6. **Cultural Fit Assessment** — What cultural characteristics emerge from the current workforce's behavioral makeup? What type of person would thrive vs clash?
+7. **Strategic Recommendation** — Specific hiring criteria or behavioral assessment approach to strengthen the next recruitment cycle
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800);
+  }
+
+  // ─── UC14: PEOPLE STRATEGY & POLICY ─────────────────────────────────────────
+
+  private async handlePeopleStrategy(
+    query: string,
+    candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const total = candidates.length;
+    const genderMap: Record<string, number> = {};
+    const styleMap: Record<string, number> = {};
+    candidates.forEach(c => {
+      const g = c.gender || 'Unknown';
+      genderMap[g] = (genderMap[g] || 0) + 1;
+      const s = c.personalityStyle || 'Unknown';
+      styleMap[s] = (styleMap[s] || 0) + 1;
+    });
+
+    const topStyles = Object.entries(styleMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([s, n]) => `${s} (${n})`)
+      .join(', ');
+
+    const demographicContext = `WORKFORCE DEMOGRAPHIC & BEHAVIORAL SUMMARY:
+Total: ${total} employees | Top Styles: ${topStyles}
+Gender: ${Object.entries(genderMap).map(([g, n]) => `${g}: ${n}`).join(', ')}`;
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: PEOPLE STRATEGY & POLICY INTELLIGENCE ━━━
+The leader wants aggregate behavioral intelligence to inform HR policies, people programs, and organizational culture initiatives. All recommendations must be grounded in the actual behavioral makeup of this specific workforce — not generic HR best practices.
+
+IMPORTANT: Individual psychometric data is used for internal analytical reference only. Policy recommendations are aggregated insights — not individual-level decisions.
+
+AGGREGATE WORKFORCE CONTEXT:
+${demographicContext}
+
+YOUR ANALYSIS SHOULD COVER:
+1. **Organizational Character** — The collective behavioral personality of this workforce and what it tells us about culture
+2. **Communication Framework** — What communication style, cadence, and channels would resonate best with this workforce's dominant behavioral profile?
+3. **Recognition & Engagement** — What types of recognition, incentives, and engagement programs align with the workforce's motivational drivers?
+4. **Leadership Development Policy** — What should the organization invest in to build its next generation of leaders from within?
+5. **Team Structure Recommendations** — How should teams ideally be structured given the behavioral distribution across the workforce?
+6. **Wellbeing & Retention Risk** — What patterns suggest retention risk, and what policy levers exist to address them?
+7. **Change Management Approach** — How should organizational change be communicated and led given the workforce's behavioral makeup?
+8. **Strategic Recommendation** — The single most impactful people-strategy initiative this organization should prioritize based on behavioral intelligence
+
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 2000);
+  }
+
+  // ─── GENERAL FALLBACK ────────────────────────────────────────────────────────
+
+  private async handleGeneralHRQuery(
+    query: string,
+    _candidates: CandidateProfile[],
+    employeeData: string,
+  ): Promise<string> {
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
 ━━━ YOUR ADVISORY CAPABILITIES ━━━
-1. Individual Character Assessment — Articulate an employee's behavioral strengths, natural working style, communication preferences, stress responses, and growth areas.
-2. Manager Advisory — Advise managers on how to lead, motivate, give feedback, and resolve conflict with specific team members based on their behavioral profile.
-3. Team Architecture — Identify profile complementarity, potential interpersonal friction, and ideal team compositions for specific objectives.
-4. Retention & Flight Risk — Assess behavioral indicators of disengagement or misalignment between an employee's profile and their current role/environment.
-5. Leadership Identification — Surface employees with natural leadership behavioral tendencies.
-6. Talent Mobility — Recommend internal role transitions based on behavioral strengths.
-7. Organizational Diagnostics — Answer broader people strategy questions using workforce-wide behavioral patterns.
+Answer any workforce or people intelligence question using behavioral data. You can:
+- Profile individual employees in depth
+- Advise on team composition and dynamics
+- Guide managers in leading specific individuals
+- Identify leadership potential and succession candidates
+- Map organizational capabilities and gaps
+- Recommend learning and development investments
+- Support strategic workforce planning decisions
+- Inform recruitment and onboarding strategies
+- Design people policies grounded in behavioral intelligence
 
-━━━ RESPONSE STANDARDS ━━━
-1. CONFIDENTIALITY OF DATA — The DISC assessment data below is strictly for your internal analysis. Never disclose raw scores, numeric values, or profile codes in your response. Communicate exclusively in behavioral language.
-2. BEHAVIORAL LANGUAGE ONLY — Do not say "his D score is high." Instead say: "This individual demonstrates a strongly results-oriented and assertive leadership character, naturally inclined to drive decisions with speed and conviction."
-3. CORPORATE TONE — Maintain a formal, executive-level communication style at all times. Responses must be structured, precise, and boardroom-appropriate. Avoid casual, conversational, or informal phrasing.
-4. EMPLOYEE-SPECIFIC INSIGHTS — Every response must reference the specific employees in this organization by name. Never give generic HR advice — anchor every insight to an actual employee's behavioral character.
-5. STRUCTURED FORMAT — Use clear section headers, bold employee names, and concise bullet points. Responses should read like a professional advisory brief.
-6. SCOPE DISCIPLINE — This platform is exclusively for workforce intelligence and people strategy. Decline all off-topic queries professionally and redirect to workforce matters.
-7. STRATEGIC CLOSURE — Conclude every response with a clearly labeled "Strategic Recommendation" or "Recommended Next Step" that the leader can act on immediately.
+Always reference specific employees by name and anchor insights to their actual behavioral profile.
+Always close with a "Strategic Recommendation."
 
-━━━ ORGANIZATIONAL PEOPLE INTELLIGENCE DATABASE ━━━
-(Confidential — Internal Reference Only)
-${employeeDataStr}`;
+━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
 
+    return this.callGPT(systemPrompt, query, 1500);
+  }
+
+  // ─── SHARED GPT CALLER ───────────────────────────────────────────────────────
+
+  private async callGPT(systemPrompt: string, userQuery: string, maxTokens = 1500): Promise<string> {
     try {
       const completion = await this.getOpenAIClient().chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: query }
+          { role: 'user', content: userQuery },
         ],
         temperature: 0.3,
-        max_tokens: 1500,
+        max_tokens: maxTokens,
       });
-
-      this.logger.log(`✅ HR Query processed in ${Date.now() - startTime}ms`);
       return completion.choices[0]?.message?.content || 'I could not process your request at this time.';
     } catch (error) {
       this.logger.error('OpenAI LLM Error:', error);
