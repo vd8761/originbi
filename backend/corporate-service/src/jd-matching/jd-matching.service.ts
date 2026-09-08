@@ -1,4 +1,4 @@
-﻿/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import OpenAI from 'openai';
@@ -64,7 +64,7 @@ interface AgileRequirement {
   adaptabilityWeight: number;
 }
 
-interface CandidateProfile {
+export interface CandidateProfile {
   registrationId: number;
   fullName: string;
   email: string;
@@ -709,7 +709,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
   // LAYER 2: CORPORATE-SCOPED CANDIDATE FETCH
   // Only fetches candidates belonging to this corporate account
   // ═══════════════════════════════════════════════════════════════════════════
-  private async fetchCorporateCandidates(
+  async fetchCorporateCandidates(
     corporateId: number,
     groupId?: number,
   ): Promise<CandidateProfile[]> {
@@ -1925,22 +1925,24 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
    * Behaviorally rich but no raw numeric scores are exposed.
    */
   private buildEmployeeDataStr(candidates: CandidateProfile[]): string {
+    // Detect employees sharing the same first name (for disambiguation — REQ 6)
+    const firstNames = candidates.map(c => c.fullName.split(' ')[0].toLowerCase());
+    const isDuplicate = (name: string) =>
+      firstNames.filter(n => n === name.split(' ')[0].toLowerCase()).length > 1;
+
     return candidates.map(c => {
-      const scores = [
-        { label: 'Dominance (D)', val: c.discScoreD ?? 0 },
-        { label: 'Influence (I)', val: c.discScoreI ?? 0 },
-        { label: 'Steadiness (S)', val: c.discScoreS ?? 0 },
-        { label: 'Compliance (C)', val: c.discScoreC ?? 0 },
-      ].sort((a, b) => b.val - a.val);
+      const level = (v: number | null) =>
+        v == null ? 'Unknown' : v >= 18 ? 'High' : v >= 12 ? 'Moderate' : 'Low';
 
-      const level = (v: number | null) => v == null ? 'Unknown' : v >= 18 ? 'High' : v >= 12 ? 'Moderate' : 'Low';
+      // Add disambiguation suffix for duplicate first names (REQ 6)
+      const displayName = isDuplicate(c.fullName)
+        ? `${c.fullName} [${c.groupName || 'No Group'} | ${c.currentRole || 'No Designation'}]`
+        : c.fullName;
 
-      return `[${c.fullName}]
-Style: ${c.personalityStyle || 'Unknown'} | Code: ${c.personalityCode || 'N/A'}
-Description: ${c.personalityDescription || 'N/A'}
-D-Dominance: ${level(c.discScoreD)} | I-Influence: ${level(c.discScoreI)} | S-Steadiness: ${level(c.discScoreS)} | C-Compliance: ${level(c.discScoreC)}
-Trait Order: ${scores.map((s, i) => `${i + 1}. ${s.label}`).join(' → ')}
-Group: ${c.groupName || 'Unassigned'} | Designation: ${c.currentRole || 'N/A'} | Gender: ${c.gender || 'N/A'}`;
+      // NOTE: Style name, code, and raw description are intentionally omitted (REQ 4, 9)
+      return `[${displayName}]
+Group: ${c.groupName || 'Unassigned'} | Role: ${c.currentRole || 'N/A'} | Gender: ${c.gender || 'N/A'}
+Behavioral Profile: Drive=${level(c.discScoreD)}, Influence=${level(c.discScoreI)}, Steadiness=${level(c.discScoreS)}, Compliance=${level(c.discScoreC)}`;
     }).join('\n\n');
   }
 
@@ -2533,6 +2535,55 @@ Always close with a "Strategic Recommendation."
 ${employeeData}`;
 
     return this.callGPT(systemPrompt, query, 1800, history);
+  }
+
+  // ─── UC8: INTERVIEW TRANSCRIPT ANALYSIS (no DB fetch) ───────────────────────
+  // Called when interviewMode=true — analyses pasted JD + transcripts externally.
+  // No employee data is fetched from the database.
+
+  async handleInterviewAnalysis(
+    jdText: string,
+    transcripts: { name: string; transcript: string }[],
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
+  ): Promise<string> {
+    const systemPrompt = `You are an expert HR interviewer, behavioural analyst, and talent acquisition specialist.
+
+Your task: Analyse each candidate's interview transcript against the provided Job Description.
+
+OUTPUT FORMAT — For each candidate:
+## [Candidate Name]
+**Role Fit:** (Strong / Moderate / Weak)
+**Key Strengths:** (2–3 behavioral strengths relevant to the JD)
+**Gaps / Watch Points:** (1–2 areas of concern)
+**Behavioral Signals:** (communication style, decision-making, collaboration indicators)
+**Recommendation:** (Proceed to Next Round / Hold / Not Recommended)
+
+Close with an **Overall Hiring Summary** ranking candidates in order of fit.
+
+RULES:
+1. Be objective and evidence-based — cite specific transcript excerpts.
+2. Do not assume what was not said in the transcript.
+3. Focus on behavioral fit, not just technical claims.
+4. Keep each candidate section concise but insightful.`;
+
+    const transcriptBlock = transcripts
+      .map(t => `\n━━━ CANDIDATE: ${t.name} ━━━\n${t.transcript}`)
+      .join('\n\n');
+
+    const userQuery = `JOB DESCRIPTION:\n${jdText}\n\n${transcriptBlock}`;
+
+    return this.callGPT(systemPrompt, userQuery, 2500, history);
+  }
+
+  // ─── ALIAS: getCorporateIdByEmail ─────────────────────────────────────────
+  // Used by the /employees GET endpoint in the controller.
+
+  async getCorporateIdByEmail(email: string, authHeader?: string): Promise<number | null> {
+    try {
+      return await this.getCorporateAccountId(email);
+    } catch {
+      return null;
+    }
   }
 
   // ─── SHARED GPT CALLER ───────────────────────────────────────────────────────

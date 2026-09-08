@@ -66,12 +66,11 @@ export default function CorporateLayout({
     }, [showHeader, pathname]);
 
     const handleNavigate = (view: string) => {
-        // Map view ID to route
         switch (view) {
             case 'dashboard':
                 router.push('/corporate/dashboard');
                 break;
-            case 'registrations': // Mapped to My Employees
+            case 'registrations':
                 router.push('/corporate/registrations');
                 break;
             case 'jobs':
@@ -85,6 +84,9 @@ export default function CorporateLayout({
                 break;
             case 'settings':
                 router.push('/corporate/settings');
+                break;
+            case 'ask-ai':
+                router.push('/corporate/ask-ai');
                 break;
             default:
                 router.push(`/corporate/${view}`);
@@ -141,8 +143,7 @@ export default function CorporateLayout({
                                 {children}
                             </div>
                         </div>
-                        {/* Intelligent Corporate HR AI */}
-                        <OriginBiIntelligentWidget />
+                        {/* Ask AI is now a dedicated full page at /corporate/ask-ai */}
                     </RequireCorporate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */

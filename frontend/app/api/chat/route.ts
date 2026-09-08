@@ -7,12 +7,13 @@ export async function POST(req: NextRequest) {
   try {
     const userId = req.headers.get('x-user-id') || 'test-user-id';
     const body = await req.json();
-    const { messages, sessionId, prompt, userRole } = body;
+    const { messages, sessionId, prompt, userRole, interviewMode, jdText, transcripts } = body;
     const role = (userRole || req.headers.get('x-user-role') || 'STUDENT') as UserRole;
     const authToken = req.headers.get('x-auth-token') || '';
     const authHeader: Record<string, string> = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
 
-    if (!prompt) {
+    // Prompt required unless this is interview mode (which uses jdText + transcripts)
+    if (!prompt && !interviewMode) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
@@ -41,17 +42,27 @@ export async function POST(req: NextRequest) {
     if (role === 'CORPORATE') {
       const corpApiBase = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003';
       try {
+        const requestBody: any = {
+          email: userId,
+          history: (messages || []).slice(-8).map((m: any) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          })),
+        };
+
+        // Interview mode: forward jdText + transcripts instead of message
+        if (interviewMode && jdText && transcripts?.length) {
+          requestBody.interviewMode = true;
+          requestBody.jdText = jdText;
+          requestBody.transcripts = transcripts;
+        } else {
+          requestBody.message = prompt;
+        }
+
         const res = await fetch(`${corpApiBase}/jd-matching/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeader },
-          body: JSON.stringify({
-            email: userId,
-            message: prompt,
-            history: (messages || []).slice(-8).map((m: any) => ({
-              role: m.role as 'user' | 'assistant',
-              content: m.content,
-            })),
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         const hrAnswer = res.ok
