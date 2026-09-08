@@ -45,6 +45,9 @@ export class ChatJDMatchRequestDto {
   @IsOptional()
   @IsNumber()
   groupId?: number;
+
+  @IsOptional()
+  history?: { role: 'user' | 'assistant'; content: string }[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -117,6 +120,7 @@ export class JDMatchingController {
       const hrAnswer = await this.jdMatchingService.analyzeHRQuery(
         corporateId,
         dto.message,
+        dto.history || [],
       );
       
       return {

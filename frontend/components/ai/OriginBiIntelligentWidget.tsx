@@ -466,8 +466,8 @@ export default function OriginBiIntelligentWidget() {
 
                           {/* Message Bubble */}
                           <div className={`max-w-[90%] sm:max-w-[80%] ${
-                            msg.role === 'user' 
-                              ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-3xl rounded-tr-sm px-6 py-4 shadow-md' 
+                            msg.role === 'user'
+                              ? 'bg-brand-green/10 border border-brand-green/25 text-slate-800 dark:text-slate-100 dark:bg-brand-green/15 dark:border-brand-green/30 rounded-3xl rounded-tr-sm px-6 py-4 shadow-sm'
                               : 'text-slate-800 dark:text-slate-200 prose prose-slate dark:prose-invert max-w-none bg-white dark:bg-[#1E293B] rounded-3xl rounded-tl-sm px-7 py-5 shadow-sm border border-slate-100 dark:border-slate-800'
                           }`}>
                             {msg.role === 'user' ? (
@@ -521,6 +521,11 @@ export default function OriginBiIntelligentWidget() {
                       ref={inputRef as any}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
+                      onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = 'auto';
+                        target.style.height = Math.min(target.scrollHeight, 200) + 'px';
+                      }}
                       onPaste={(e) => {
                         e.preventDefault();
                         const pasted = e.clipboardData.getData('text');

@@ -54,7 +54,15 @@ export async function POST(req: NextRequest) {
         const res = await fetch(`${corpApiBase}/jd-matching/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeader },
-          body: JSON.stringify({ email: userId, message: prompt })
+          body: JSON.stringify({
+            email: userId,
+            message: prompt,
+            // Send last 8 messages (4 turns) as conversation history for memory/context
+            history: (messages || []).slice(-8).map((m: any) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            })),
+          })
         });
         
         if (res.ok) {

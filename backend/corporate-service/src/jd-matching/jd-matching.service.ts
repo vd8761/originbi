@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
+﻿/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import OpenAI from 'openai';
@@ -1959,11 +1959,17 @@ RESPONSE RULES:
 3. Reference actual employee names from the data below.
 4. Always close with a "Strategic Recommendation" the leader can act on.
 5. Use bold headers and bullet points. Keep it executive-brief-style.
-6. If a query is not workforce-related, decline professionally.`;
+6. If a query is not workforce-related, decline professionally.
+7. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response by listing the employee's DISC profile, type name, or code. This data is your internal reference only. Begin your response DIRECTLY addressing the question asked. Only surface behavioral traits when specifically needed to answer the question. You are a behaviour intelligence copilot, not a profile report generator.
+8. CRITICAL — CONVERSATION MEMORY: The conversation history provided shows prior messages. If the user uses pronouns like "he", "him", "her", "they", "this person", "this employee", or refers implicitly to someone, resolve them to the last explicitly named employee in the conversation history. Never ask "which employee?" for a follow-up question.`;
 
   // ─── MAIN ROUTING ENTRY POINT ───────────────────────────────────────────────
 
-  async analyzeHRQuery(corporateId: number, query: string): Promise<string> {
+  async analyzeHRQuery(
+    corporateId: number,
+    query: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
+  ): Promise<string> {
     const startTime = Date.now();
     this.logger.log(`🧠 CORPORATE HR BRAIN v2 - Corporate #${corporateId}`);
 
@@ -1975,46 +1981,46 @@ RESPONSE RULES:
     const intent = await this.classifyIntent(query);
     const employeeData = this.buildEmployeeDataStr(candidates);
 
-    this.logger.log(`🎯 Routing to handler: ${intent} | ${candidates.length} employees`);
+    this.logger.log(`🎯 Routing to handler: ${intent} | ${candidates.length} employees | history: ${history.length} msgs`);
 
     let answer: string;
     switch (intent) {
       case 'individual_profile':
-        answer = await this.handleIndividualProfile(query, candidates, employeeData);
+        answer = await this.handleIndividualProfile(query, candidates, employeeData, history);
         break;
       case 'role_fitment':
-        answer = await this.handleRoleFitment(query, candidates, employeeData);
+        answer = await this.handleRoleFitment(query, candidates, employeeData, history);
         break;
       case 'team_formation':
       case 'project_team':
-        answer = await this.handleTeamFormation(query, candidates, employeeData);
+        answer = await this.handleTeamFormation(query, candidates, employeeData, history);
         break;
       case 'manager_guidance':
-        answer = await this.handleManagerGuidance(query, candidates, employeeData);
+        answer = await this.handleManagerGuidance(query, candidates, employeeData, history);
         break;
       case 'team_dynamics':
-        answer = await this.handleTeamDynamics(query, candidates, employeeData);
+        answer = await this.handleTeamDynamics(query, candidates, employeeData, history);
         break;
       case 'succession_planning':
-        answer = await this.handleSuccessionPlanning(query, candidates, employeeData);
+        answer = await this.handleSuccessionPlanning(query, candidates, employeeData, history);
         break;
       case 'capability_mapping':
-        answer = await this.handleCapabilityMapping(query, candidates, employeeData);
+        answer = await this.handleCapabilityMapping(query, candidates, employeeData, history);
         break;
       case 'learning_dev':
-        answer = await this.handleLearningDev(query, candidates, employeeData);
+        answer = await this.handleLearningDev(query, candidates, employeeData, history);
         break;
       case 'workforce_planning':
-        answer = await this.handleWorkforcePlanning(query, candidates, employeeData);
+        answer = await this.handleWorkforcePlanning(query, candidates, employeeData, history);
         break;
       case 'recruitment_intel':
-        answer = await this.handleRecruitmentIntel(query, candidates, employeeData);
+        answer = await this.handleRecruitmentIntel(query, candidates, employeeData, history);
         break;
       case 'people_strategy':
-        answer = await this.handlePeopleStrategy(query, candidates, employeeData);
+        answer = await this.handlePeopleStrategy(query, candidates, employeeData, history);
         break;
       default:
-        answer = await this.handleGeneralHRQuery(query, candidates, employeeData);
+        answer = await this.handleGeneralHRQuery(query, candidates, employeeData, history);
     }
 
     this.logger.log(`✅ HR Query [${intent}] processed in ${Date.now() - startTime}ms`);
@@ -2027,6 +2033,7 @@ RESPONSE RULES:
     query: string,
     _candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2045,7 +2052,7 @@ The leader is asking about a specific employee. Provide a deeply detailed behavi
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC2: ROLE FITMENT & INTERNAL MOBILITY ──────────────────────────────────
@@ -2054,6 +2061,7 @@ ${employeeData}`;
     query: string,
     candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const roleContext = candidates.map(c => `${c.fullName}: ${c.currentRole || 'Role not specified'} | Group: ${c.groupName || 'N/A'}`).join('\n');
 
@@ -2082,7 +2090,7 @@ ${roleContext}
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC4 & UC5: TEAM FORMATION & PROJECT TEAM RECOMMENDATION ────────────────
@@ -2091,6 +2099,7 @@ ${employeeData}`;
     query: string,
     _candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2117,7 +2126,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC6: MANAGER-TO-EMPLOYEE GUIDANCE ──────────────────────────────────────
@@ -2126,6 +2135,7 @@ ${employeeData}`;
     query: string,
     _candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2144,7 +2154,7 @@ PROVIDE GUIDANCE ACROSS THESE DIMENSIONS:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC7: TEAM DYNAMICS & CONFLICT INTELLIGENCE ─────────────────────────────
@@ -2153,6 +2163,7 @@ ${employeeData}`;
     query: string,
     _candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2178,7 +2189,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC8: LEADERSHIP & SUCCESSION PLANNING ──────────────────────────────────
@@ -2187,6 +2198,7 @@ ${employeeData}`;
     query: string,
     candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     // Pre-rank by leadership indicators (High D + High I in DISC = natural leadership signals)
     const leadershipRanked = [...candidates]
@@ -2235,7 +2247,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC9: CAPABILITY MAPPING ─────────────────────────────────────────────────
@@ -2244,6 +2256,7 @@ ${employeeData}`;
     query: string,
     candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     // Build a behavioral capability distribution summary
     const total = candidates.length;
@@ -2305,7 +2318,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 2000);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC11: LEARNING & DEVELOPMENT RECOMMENDATIONS ───────────────────────────
@@ -2314,6 +2327,7 @@ ${employeeData}`;
     query: string,
     _candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2340,7 +2354,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC12: WORKFORCE PLANNING ────────────────────────────────────────────────
@@ -2349,6 +2363,7 @@ ${employeeData}`;
     query: string,
     candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const total = candidates.length;
     const highLeaders = candidates.filter(c => (c.discScoreD ?? 0) >= 18 && (c.discScoreI ?? 0) >= 14).length;
@@ -2389,7 +2404,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC13: RECRUITMENT INTELLIGENCE ─────────────────────────────────────────
@@ -2398,6 +2413,7 @@ ${employeeData}`;
     query: string,
     candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     // Identify the top performers behaviorally (highest total scores) to extract patterns
     const topPerformers = [...candidates]
@@ -2431,7 +2447,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1800);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── UC14: PEOPLE STRATEGY & POLICY ─────────────────────────────────────────
@@ -2440,6 +2456,7 @@ ${employeeData}`;
     query: string,
     candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const total = candidates.length;
     const genderMap: Record<string, number> = {};
@@ -2484,7 +2501,7 @@ YOUR ANALYSIS SHOULD COVER:
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 2000);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── GENERAL FALLBACK ────────────────────────────────────────────────────────
@@ -2493,6 +2510,7 @@ ${employeeData}`;
     query: string,
     _candidates: CandidateProfile[],
     employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2514,17 +2532,28 @@ Always close with a "Strategic Recommendation."
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
 ${employeeData}`;
 
-    return this.callGPT(systemPrompt, query, 1500);
+    return this.callGPT(systemPrompt, query, 1800, history);
   }
 
   // ─── SHARED GPT CALLER ───────────────────────────────────────────────────────
 
-  private async callGPT(systemPrompt: string, userQuery: string, maxTokens = 1500): Promise<string> {
+  private async callGPT(
+    systemPrompt: string,
+    userQuery: string,
+    maxTokens = 1500,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
+  ): Promise<string> {
     try {
+      const historyMessages = history.map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+
       const completion = await this.getOpenAIClient().chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
+          ...historyMessages,          // inject prior conversation turns
           { role: 'user', content: userQuery },
         ],
         temperature: 0.3,

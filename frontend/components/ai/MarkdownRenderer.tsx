@@ -95,14 +95,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         const level = headingMatch[1].length;
         const text = headingMatch[2];
         const Tag = `h${level}` as keyof JSX.IntrinsicElements;
-        const sizeClasses = {
-          1: 'text-2xl font-bold mt-4 mb-2',
-          2: 'text-xl font-semibold mt-3 mb-2',
-          3: 'text-lg font-medium mt-2 mb-1',
-          4: 'text-base font-medium mt-2',
+        const sizeClasses = ({
+          1: 'text-xl font-bold mt-5 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1',
+          2: 'text-lg font-semibold mt-4 mb-2',
+          3: 'text-base font-semibold mt-3 mb-1',
+          4: 'text-sm font-semibold mt-2',
           5: 'text-sm font-medium mt-1',
           6: 'text-xs font-medium mt-1',
-        }[level] || 'text-base font-bold';
+        } as Record<number, string>)[level] || 'text-base font-bold';
         
         elements.push(
           <Tag key={`h-${i}`} className={`${sizeClasses} text-gray-900 dark:text-gray-100`}>
@@ -112,9 +112,17 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         continue;
       }
 
-      // Handle Lists
-      if (line.startsWith('- ') || line.startsWith('* ')) {
-        listItems.push(line.substring(2));
+      // Handle Horizontal Rules (━━━, ---, ***)
+      if (/^(━{2,}|─{2,}|-{3,}|\*{3,})$/.test(line)) {
+        flushList();
+        elements.push(<hr key={`hr-${i}`} className="my-3 border-gray-200 dark:border-gray-700" />);
+        continue;
+      }
+
+      // Handle Lists: -, *, and • (strip bullet char to prevent double rendering)
+      const listMatch = line.match(/^[-*•]\s*(.+)$/);
+      if (listMatch) {
+        listItems.push(listMatch[1]);
         continue;
       } else {
         flushList();
@@ -137,8 +145,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
   };
 
   const parseInline = (text: string) => {
-    // Parse bold, italics, code, and badges
-    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\[Badge:.*?\])/g);
+    // Strip residual leading bullet chars to prevent double rendering
+    const cleaned = text.replace(/^[•·]\s*/, '');
+    const parts = cleaned.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\[Badge:.*?\])/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
         return <strong key={i} className="font-bold">{part.slice(2, -2)}</strong>;
@@ -169,7 +178,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
     });
   };
 
-  return <div className="space-y-2">{parseMarkdown(content)}</div>;
+  return <div className="space-y-1">{parseMarkdown(content)}</div>;
 };
 
 export default MarkdownRenderer;
