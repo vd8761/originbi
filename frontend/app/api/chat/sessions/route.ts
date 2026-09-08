@@ -3,17 +3,15 @@ import { sql } from '../../../../lib/db';
 
 export async function GET(req: NextRequest) {
   try {
-    // Note: In production, extract this from the verified JWT/Amplify session.
-    // For now, we look for headers or use a default for testing.
     const userId = req.headers.get('x-user-id') || 'test-user-id';
-    
-    // Fetch sessions from the database
+    const role = req.headers.get('x-user-role') || 'CORPORATE';
+
     const sessions = await sql`
-      SELECT id, title, created_at as "createdAt"
+      SELECT id, title, created_at as "createdAt", updated_at as "updatedAt"
       FROM chat_sessions
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC
-      LIMIT 50
+      WHERE user_id = ${userId} AND role = ${role}
+      ORDER BY COALESCE(updated_at, created_at) DESC
+      LIMIT 100
     `;
 
     return NextResponse.json(sessions);
@@ -22,6 +20,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
   }
 }
+
 
 export async function POST(req: NextRequest) {
   try {

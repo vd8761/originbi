@@ -7,12 +7,13 @@ export async function POST(req: NextRequest) {
   try {
     const userId = req.headers.get('x-user-id') || 'test-user-id';
     const body = await req.json();
-    const { messages, sessionId, prompt, userRole } = body;
+    const { messages, sessionId, prompt, userRole, interviewMode, jdText, transcripts } = body;
     const role = (userRole || req.headers.get('x-user-role') || 'STUDENT') as UserRole;
     const authToken = req.headers.get('x-auth-token') || '';
     const authHeader: Record<string, string> = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
 
-    if (!prompt) {
+    // Prompt required unless this is interview mode (which uses jdText + transcripts)
+    if (!prompt && !interviewMode) {
       return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
     }
 
@@ -34,7 +35,63 @@ export async function POST(req: NextRequest) {
       VALUES (${currentSessionId}, 'user', ${prompt})
     `;
 
-    // 3. Fetch Role-Specific Data context
+    // ═══════════════════════════════════════════════════════════════════════
+    // CORPORATE PATH — always returns here, never falls through.
+    // AI is handled by corporate-service (port 4003), not OpenAI directly.
+    // ═══════════════════════════════════════════════════════════════════════
+    if (role === 'CORPORATE') {
+      const corpApiBase = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003';
+      try {
+        const requestBody: any = {
+          email: userId,
+          history: (messages || []).slice(-8).map((m: any) => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          })),
+        };
+
+        // Interview mode: forward jdText + transcripts instead of message
+        if (interviewMode && jdText && transcripts?.length) {
+          requestBody.interviewMode = true;
+          requestBody.jdText = jdText;
+          requestBody.transcripts = transcripts;
+        } else {
+          requestBody.message = prompt;
+        }
+
+        const res = await fetch(`${corpApiBase}/jd-matching/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeader },
+          body: JSON.stringify(requestBody),
+        });
+
+        const hrAnswer = res.ok
+          ? (await res.json()).answer
+          : 'The Corporate AI Brain is currently unavailable. Please ensure the corporate service is running on port 4003.';
+
+        await sql`
+          INSERT INTO chat_messages (session_id, role, content)
+          VALUES (${currentSessionId}, 'assistant', ${hrAnswer})
+        `;
+
+        return NextResponse.json({ sessionId: currentSessionId, reply: hrAnswer });
+
+      } catch (err) {
+        console.error('Corporate service unreachable:', err);
+        const fallback = 'Unable to connect to the Corporate AI Brain. Please ensure the corporate service is running and try again.';
+        await sql`
+          INSERT INTO chat_messages (session_id, role, content)
+          VALUES (${currentSessionId}, 'assistant', ${fallback})
+        `.catch(() => {});
+        return NextResponse.json({ sessionId: currentSessionId, reply: fallback });
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ADMIN / STUDENT PATH — uses OpenAI directly
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // 3. Fetch role-specific context data
     let reportData: any = null;
     try {
       if (role === 'ADMIN') {
@@ -42,108 +99,55 @@ export async function POST(req: NextRequest) {
         const res = await fetch(`${adminApiBase}/admin/dashboard-stats`, {
           headers: { 'Content-Type': 'application/json', ...authHeader }
         });
-        if (res.ok) {
-          reportData = await res.json();
-        } else {
-          console.warn('Admin stats unavailable, status:', res.status);
-          reportData = { note: 'Live admin stats unavailable. Please check the admin service.' };
-        }
-      } else if (role === 'CORPORATE') {
-        // Forward Corporate requests directly to the HR AI Brain
-        const corpApiBase = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003';
-        const res = await fetch(`${corpApiBase}/jd-matching/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeader },
-          body: JSON.stringify({ email: userId, message: prompt })
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          const hrAnswer = data.answer;
-          
-          // Save assistant response to DB for session history
-          await sql`
-            INSERT INTO chat_messages (session_id, role, content)
-            VALUES (${currentSessionId}, 'assistant', ${hrAnswer})
-          `;
-          
-          return NextResponse.json({
-            sessionId: currentSessionId,
-            reply: hrAnswer
-          });
-        } else {
-          console.warn('Corporate HR Brain unavailable');
-          return NextResponse.json({
-            sessionId: currentSessionId,
-            reply: 'The Corporate AI Brain is currently unavailable. Please try again later.'
-          });
-        }
+        reportData = res.ok ? await res.json() : { note: 'Live admin stats unavailable.' };
       } else {
-        // STUDENT - fetch personal report
+        // STUDENT
         const reportApiBase = process.env.NEXT_PUBLIC_REPORT_API_BASE_URL || 'http://localhost:4004/report';
         const res = await fetch(`${reportApiBase}/summary?userId=${userId}`, {
           headers: { 'Content-Type': 'application/json' }
         });
-        if (res.ok) {
-          reportData = await res.json();
-        } else {
-          console.warn('Report service unavailable, using fallback data');
-          reportData = {
-            status: "Assessment Completed",
-            topSkills: ["Communication", "React Framework", "Data Analysis"],
-            careerRecommendations: ["Frontend Developer", "Data Analyst"]
-          };
-        }
+        reportData = res.ok ? await res.json() : {
+          status: 'Assessment Completed',
+          topSkills: ['Communication', 'React Framework', 'Data Analysis'],
+          careerRecommendations: ['Frontend Developer', 'Data Analyst'],
+        };
       }
     } catch (e) {
       console.warn('Failed to fetch context data:', e);
     }
 
-    // 4. Construct the prompt
-    const promptContext: PromptContext = {
-      role,
-      reportData,
-      userName: userId // Could resolve to actual name from profile
-    };
+    // 4. Build system prompt
+    const promptContext: PromptContext = { role, reportData, userName: userId };
     const systemPrompt = generateSystemPrompt(promptContext);
 
-    // Smart Caching Logic
-    // We hash the prompt + role + reportData stringified to ensure if report updates, cache busts.
+    // 5. Smart cache lookup
     const cacheString = `${role}:${prompt.trim().toLowerCase()}:${JSON.stringify(reportData || {})}`;
     const queryHash = crypto.createHash('sha256').update(cacheString).digest('hex');
 
     try {
       const cached = await sql`
-        SELECT response FROM chat_cache 
+        SELECT response FROM chat_cache
         WHERE query_hash = ${queryHash} AND role = ${role}
         LIMIT 1
       `;
       if (cached && cached.length > 0) {
         const cachedReply = cached[0].response;
-        
-        // Save assistant response to DB for session history
         await sql`
           INSERT INTO chat_messages (session_id, role, content)
           VALUES (${currentSessionId}, 'assistant', ${cachedReply})
         `;
-
-        return NextResponse.json({
-          sessionId: currentSessionId,
-          reply: cachedReply,
-          cached: true
-        });
+        return NextResponse.json({ sessionId: currentSessionId, reply: cachedReply, cached: true });
       }
     } catch (cacheErr) {
       console.warn('Cache lookup failed:', cacheErr);
     }
 
-    // 5. Call OpenAI API (gpt-4o)
-    const openaiApiKey = process.env.OPENAI_API_KEY;
+    // 6. Call OpenAI (ADMIN/STUDENT only)
+    const openaiApiKey = process.env.OPENAI_KEY || process.env.OPENAI_API_KEY;
     if (!openaiApiKey) {
-      throw new Error('OPENAI_API_KEY is not configured.');
+      throw new Error('OPENAI_API_KEY is not configured for ADMIN/STUDENT path.');
     }
 
-    // Prepare message history
     const apiMessages = [
       { role: 'system', content: systemPrompt },
       ...(messages || []).map((m: any) => ({ role: m.role, content: m.content })),
@@ -152,18 +156,15 @@ export async function POST(req: NextRequest) {
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiApiKey}` },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: apiMessages,
         temperature: 0.3,
         top_p: 0.9,
         max_tokens: 600,
-        frequency_penalty: 0.2
-      })
+        frequency_penalty: 0.2,
+      }),
     });
 
     if (!openaiRes.ok) {
@@ -175,13 +176,11 @@ export async function POST(req: NextRequest) {
     const data = await openaiRes.json();
     const assistantReply = data.choices[0].message.content;
 
-    // 6. Save assistant response to session DB
     await sql`
       INSERT INTO chat_messages (session_id, role, content)
       VALUES (${currentSessionId}, 'assistant', ${assistantReply})
     `;
 
-    // 7. Save to Smart Cache
     try {
       await sql`
         INSERT INTO chat_cache (query_hash, role, response)
@@ -192,10 +191,7 @@ export async function POST(req: NextRequest) {
       console.warn('Failed to save to cache:', cacheSaveErr);
     }
 
-    return NextResponse.json({
-      sessionId: currentSessionId,
-      reply: assistantReply
-    });
+    return NextResponse.json({ sessionId: currentSessionId, reply: assistantReply });
 
   } catch (error: any) {
     console.error('Chat API Error:', error);

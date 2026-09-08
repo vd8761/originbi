@@ -3,13 +3,15 @@ import {
   Post,
   Body,
   Get,
+  Headers,
   BadRequestException,
 } from '@nestjs/common';
 import {
   CorporateJDMatchingService,
   JDMatchResult,
+  CandidateProfile,
 } from './jd-matching.service';
-import { IsString, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsArray } from 'class-validator';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DTOs
@@ -39,12 +41,29 @@ export class ChatJDMatchRequestDto {
   @IsString()
   email: string;
 
+  @IsOptional()
   @IsString()
-  message: string;
+  message?: string;
 
   @IsOptional()
   @IsNumber()
   groupId?: number;
+
+  @IsOptional()
+  history?: { role: 'user' | 'assistant'; content: string }[];
+
+  // ── Interview Transcript Mode (REQ 8) ──────────────────────────────────
+  @IsOptional()
+  @IsBoolean()
+  interviewMode?: boolean;
+
+  @IsOptional()
+  @IsString()
+  jdText?: string;
+
+  @IsOptional()
+  @IsArray()
+  transcripts?: { name: string; transcript: string }[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -103,6 +122,18 @@ export class JDMatchingController {
     data?: JDMatchResult;
   }> {
     if (!dto.email) throw new BadRequestException('Email is required');
+
+    // ── Interview Transcript Mode (REQ 8) ─────────────────────────────────
+    // No DB fetch — purely GPT analysis of pasted JD + transcripts
+    if (dto.interviewMode && dto.jdText && dto.transcripts?.length) {
+      const answer = await this.jdMatchingService.handleInterviewAnalysis(
+        dto.jdText,
+        dto.transcripts,
+        dto.history || [],
+      );
+      return { success: true, answer, isJDMatch: false };
+    }
+
     if (!dto.message) throw new BadRequestException('Message is required');
 
     // Check if the message is a JD matching request
@@ -117,6 +148,7 @@ export class JDMatchingController {
       const hrAnswer = await this.jdMatchingService.analyzeHRQuery(
         corporateId,
         dto.message,
+        dto.history || [],
       );
       
       return {
@@ -160,6 +192,26 @@ export class JDMatchingController {
   }
 
   /**
+   * GET /jd-matching/employees
+   * Returns the employee list with trait codes for the frontend cache.
+   * Only returns safe fields — NO raw scores, NO blended style name.
+   */
+  @Get('employees')
+  async getEmployees(
+    @Headers('authorization') authHeader: string,
+  ): Promise<CandidateProfile[]> {
+    // Extract email from the service (it reads from the JWT via the corporate account lookup)
+    // For now we return for all employees of the corporate account via token context
+    const email = ''; // Will be resolved by service via token
+    const corporateId = await this.jdMatchingService.getCorporateIdByEmail(email, authHeader);
+    if (!corporateId) {
+      throw new BadRequestException('Could not identify corporate account');
+    }
+    const candidates = await this.jdMatchingService.fetchCorporateCandidates(corporateId);
+    return candidates;
+  }
+
+  /**
    * GET /jd-matching/health
    * Health check endpoint
    */
@@ -176,6 +228,8 @@ export class JDMatchingController {
         'ai-insights',
         'success-prediction',
         'retention-risk-analysis',
+        'interview-transcript-analysis',
+        'conversation-memory',
       ],
     };
   }
