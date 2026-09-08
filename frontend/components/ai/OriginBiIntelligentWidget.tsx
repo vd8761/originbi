@@ -173,7 +173,9 @@ export default function OriginBiIntelligentWidget() {
         try {
           const errorData = await res.json();
           if (errorData.error) errorMsg = errorData.error;
-        } catch(e) {}
+        } catch(e) {
+          console.error("Failed to parse error response", e);
+        }
         throw new Error(errorMsg);
       }
       const data = await res.json();
