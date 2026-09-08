@@ -65,8 +65,21 @@ export default function AskAIPage() {
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const e = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail') || '';
-    const t = sessionStorage.getItem('authToken') || localStorage.getItem('token') || '';
+    // Corporate app stores user as JSON object in localStorage.getItem('user')
+    // not as a flat 'userEmail' key. Try all known patterns.
+    let e = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail') || '';
+    if (!e) {
+      try {
+        const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+        if (userStr) e = JSON.parse(userStr)?.email || '';
+      } catch { /* ignore parse error */ }
+    }
+
+    const t = sessionStorage.getItem('authToken')
+      || localStorage.getItem('token')
+      || sessionStorage.getItem('token')
+      || '';
+
     setEmail(e); setAuthToken(t);
   }, []);
 
