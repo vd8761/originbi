@@ -86,6 +86,8 @@ interface CandidateProfile {
   corporateAccountId: number | null;
   groupId: number | null;
   groupName: string | null;
+  currentRole?: string | null;
+  departmentName?: string | null;
 }
 
 export interface ScoredCandidate {
@@ -745,7 +747,9 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
          WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as best_score,
         (SELECT COUNT(*) 
          FROM assessment_attempts aa3 
-         WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count
+         WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count,
+        r.metadata->>'currentRole' as current_role,
+        r.metadata->>'designation' as designation
       FROM registrations r
       JOIN users u ON r.user_id = u.id
       JOIN assessment_attempts aa ON aa.registration_id = r.id 
@@ -789,6 +793,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         corporateAccountId: row.corporate_account_id ? parseInt(row.corporate_account_id) : null,
         groupId: row.group_id ? parseInt(row.group_id) : null,
         groupName: row.group_name || null,
+        currentRole: row.current_role || row.designation || null,
       }));
     } catch (error) {
       this.logger.error(`Corporate candidate fetch error: ${error.message}`);
@@ -1753,9 +1758,11 @@ Output ONLY a JSON array:
         response += `**Behavioral Profile:** ${sc.candidate.personalityStyle}\n`;
       }
 
-      // Corporate Specific: Group/Dept
-      if (sc.candidate.groupName) {
-        response += `**Department:** ${sc.candidate.groupName}\n`;
+      // Corporate Specific: Designation / Role / Group
+      if (sc.candidate.currentRole) {
+        response += `**Designation:** ${sc.candidate.currentRole}\n`;
+      } else if (sc.candidate.groupName) {
+        response += `**Group:** ${sc.candidate.groupName}\n`;
       }
 
       // Predictions
