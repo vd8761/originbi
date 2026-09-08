@@ -49,6 +49,7 @@ export default function AskAIPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -133,13 +134,14 @@ export default function AskAIPage() {
 
   const deleteSession = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
+    setConfirmDeleteId(null);
     await fetch(`/api/chat/sessions/${id}`, { method: 'DELETE', headers: { 'x-user-id': email } });
     if (activeSessionId === id) newChat();
     setSessions(p => p.filter(s => s.id !== id));
   };
 
   const startEdit = (s: Session, e: React.MouseEvent) => {
-    e.stopPropagation(); setEditingId(s.id); setEditingTitle(s.title || '');
+    e.stopPropagation(); setEditingId(s.id); setConfirmDeleteId(null); setEditingTitle(s.title || '');
   };
 
   const saveTitle = async (id: number) => {
@@ -270,8 +272,17 @@ export default function AskAIPage() {
                       <span className="flex-1 truncate">{s.title || 'Untitled Chat'}</span>
                     )}
                     <span className="hidden group-hover:flex items-center gap-1 shrink-0">
-                      <button onClick={e => startEdit(s, e)} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs" title="Rename">✎</button>
-                      <button onClick={e => deleteSession(s.id, e)} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500 text-xs" title="Delete">✕</button>
+                      {confirmDeleteId === s.id ? (
+                        <>
+                          <button onClick={e => deleteSession(s.id, e)} className="w-5 h-5 flex items-center justify-center text-red-500 hover:text-red-700 text-sm" title="Confirm Delete">✓</button>
+                          <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs" title="Cancel">✕</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={e => startEdit(s, e)} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs" title="Rename">✎</button>
+                          <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(s.id); setEditingId(null); }} className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-red-500 text-xs" title="Delete">✕</button>
+                        </>
+                      )}
                     </span>
                   </div>
                 ))}
