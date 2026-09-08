@@ -198,12 +198,14 @@ export class JDMatchingController {
    */
   @Get('employees')
   async getEmployees(
+    @Headers('x-user-id') userId: string,
     @Headers('authorization') authHeader: string,
   ): Promise<CandidateProfile[]> {
-    // Extract email from the service (it reads from the JWT via the corporate account lookup)
-    // For now we return for all employees of the corporate account via token context
-    const email = ''; // Will be resolved by service via token
-    const corporateId = await this.jdMatchingService.getCorporateIdByEmail(email, authHeader);
+    const email = userId || '';
+    if (!email) {
+      throw new BadRequestException('x-user-id header (email) is required');
+    }
+    const corporateId = await this.jdMatchingService.getCorporateAccountId(email);
     if (!corporateId) {
       throw new BadRequestException('Could not identify corporate account');
     }

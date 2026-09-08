@@ -15,12 +15,13 @@ function toLevel(score: number | null): 'High' | 'Moderate' | 'Low' {
 export async function GET(req: NextRequest) {
   try {
     const authToken = req.headers.get('x-auth-token') || '';
+    const userId = req.headers.get('x-user-id') || '';
     const corpApiBase = process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003';
 
-    // Proxy to corporate service — it has direct DB access and auth
     const res = await fetch(`${corpApiBase}/jd-matching/employees`, {
       headers: {
         'Content-Type': 'application/json',
+        'x-user-id': userId,
         ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
       },
     });
