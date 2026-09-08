@@ -32,52 +32,68 @@ export default function OriginBiIntelligentWidget() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pathname = usePathname();
-  let currentRole = 'STUDENT';
-  if (pathname?.includes('/admin')) currentRole = 'ADMIN';
-  else if (pathname?.includes('/corporate')) currentRole = 'CORPORATE';
+  
+  // Widget is now exclusively for CORPORATE users
+  const isCorporate = pathname?.includes('/corporate');
+  
+  const corporatePrompts = [
+    "Find candidates suitable for a project manager role",
+    "What is {candidate1}'s character profile?",
+    "How should I approach my team lead about a promotion?",
+    "Match employees for a Senior Developer with strong leadership",
+    "Who among my team has the highest leadership potential?",
+    "Why might two of my employees be experiencing conflict?",
+    "Which employees are best suited for a client-facing role?",
+    "Summarize the behavioral traits of {candidate2}.",
+    "Are there any employees who might be a flight risk?",
+    "What training should I assign to improve adaptability?"
+  ];
 
-  const rolePrompts: Record<string, string[]> = {
-    ADMIN: [
-      "Show me total active users this month.",
-      "What are the most popular assessments right now?",
-      "Summarize platform revenue trends.",
-      "Are there any system alerts or anomalies?"
-    ],
-    CORPORATE: [
-      "Find candidates suitable for a project manager role",
-      "What is Arumugam's character profile?",
-      "How should I approach my team lead about a promotion?",
-      "Match employees for a Senior Developer with strong leadership",
-      "Who among my team has the highest leadership potential?",
-      "Why might two of my employees be experiencing conflict?",
-      "Which employees are best suited for a client-facing role?",
-      "Summarize the behavioral traits of my engineering team.",
-      "Are there any employees who might be a flight risk?",
-      "What training should I assign to improve adaptability?"
-    ],
-    STUDENT: [
-      "Show me my recent assessment results.",
-      "What are my top recommended career paths?",
-      "Summarize my strengths and weaknesses.",
-      "How can I improve my technical skills?"
-    ]
+  const currentSubtitle = "Ask me questions about your candidates, job posts, and assessment metrics.";
+
+  const fetchCandidatesAndSetPrompts = async () => {
+    try {
+      const email = typeof window !== 'undefined'
+        ? (localStorage.getItem('originbi_user_email') || sessionStorage.getItem('userEmail') || '')
+        : '';
+        
+      const res = await fetch('/api/chat/candidates', {
+        headers: { 'x-user-email': email }
+      });
+      let candidateNames = [];
+      if (res.ok) {
+        const data = await res.json();
+        candidateNames = data.candidates || [];
+      }
+      
+      let filledPrompts = [...corporatePrompts];
+      
+      if (candidateNames.length >= 1) {
+        filledPrompts = filledPrompts.map(p => p.replace('{candidate1}', candidateNames[0]));
+      } else {
+        filledPrompts = filledPrompts.filter(p => !p.includes('{candidate1}'));
+      }
+
+      if (candidateNames.length >= 2) {
+        filledPrompts = filledPrompts.map(p => p.replace('{candidate2}', candidateNames[1]));
+      } else {
+        filledPrompts = filledPrompts.filter(p => !p.includes('{candidate2}'));
+      }
+      
+      const shuffled = [...filledPrompts].sort(() => 0.5 - Math.random());
+      setDynamicPrompts(shuffled.slice(0, 4));
+    } catch (error) {
+      const fallbackPrompts = corporatePrompts.filter(p => !p.includes('{candidate1}') && !p.includes('{candidate2}'));
+      const shuffled = [...fallbackPrompts].sort(() => 0.5 - Math.random());
+      setDynamicPrompts(shuffled.slice(0, 4));
+    }
   };
-
-  const roleSubtitles: Record<string, string> = {
-    ADMIN: "Ask me questions about platform analytics, user growth, and system health.",
-    CORPORATE: "Ask me questions about your candidates, job posts, and assessment metrics.",
-    STUDENT: "Ask me questions about your reports, career paths, and skill analysis."
-  };
-
-  const suggestedPrompts = rolePrompts[currentRole];
-  const currentSubtitle = roleSubtitles[currentRole];
 
   useEffect(() => {
-    // Shuffle and pick 4 random prompts on mount
-    const allPrompts = rolePrompts[currentRole] || [];
-    const shuffled = [...allPrompts].sort(() => 0.5 - Math.random());
-    setDynamicPrompts(shuffled.slice(0, 4));
-  }, [currentRole]);
+    if (isCorporate) {
+      fetchCandidatesAndSetPrompts();
+    }
+  }, [isCorporate]);
 
   // Auto-scroll
   useEffect(() => {
@@ -91,14 +107,14 @@ export default function OriginBiIntelligentWidget() {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       setTimeout(() => inputRef.current?.focus(), 300);
-      if (sessions.length === 0) fetchSessions();
+      if (sessions.length === 0 && isCorporate) fetchSessions();
     } else {
       document.body.style.overflow = 'unset';
     }
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen]);
+  }, [isOpen, isCorporate]);
 
   const fetchSessions = async () => {
     try {
@@ -164,7 +180,7 @@ export default function OriginBiIntelligentWidget() {
           prompt: text.trim(),
           sessionId: activeSessionId,
           messages: messages,
-          userRole: currentRole
+          userRole: 'CORPORATE'
         })
       });
       
@@ -239,6 +255,8 @@ export default function OriginBiIntelligentWidget() {
   };
 
   const groupedSessions = groupSessions();
+
+  if (!isCorporate) return null;
 
   return (
     <>
