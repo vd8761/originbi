@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import Header from '../../components/corporate/Header';
-import OriginBiIntelligentWidget from '../../components/ai/OriginBiIntelligentWidget';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
@@ -18,7 +17,6 @@ export default function CorporateLayout({
 }) {
     const pathname = usePathname();
     const router = useRouter();
-    const [showAssistant, setShowAssistant] = useState(false);
 
     // Show header only if NOT on auth pages (login, register, forgot-password, reset-password)
     const hideHeaderRoutes = [

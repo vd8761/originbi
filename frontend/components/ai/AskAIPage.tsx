@@ -82,7 +82,7 @@ export default function AskAIPage() {
         const p: EmployeeCache = JSON.parse(raw);
         if (Date.now() - p.timestamp < CACHE_TTL) { setEmployees(p.data); return; }
       }
-    } catch {}
+    } catch { /* localStorage unavailable or invalid JSON — fall through to fetch */ }
     await refreshCache();
   }, [email, authToken]);
 
@@ -95,14 +95,14 @@ export default function AskAIPage() {
         setEmployees(data);
         localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
       }
-    } catch {}
+    } catch { /* network error — cache remains stale, silent fail */ }
   };
 
   const loadSessions = async () => {
     try {
       const res = await fetch('/api/chat/sessions', { headers: { 'x-user-id': email, 'x-user-role': 'CORPORATE' } });
       if (res.ok) setSessions(await res.json());
-    } catch {}
+    } catch { /* network error — sessions list unchanged */ }
   };
 
   const newChat = () => {
@@ -115,7 +115,7 @@ export default function AskAIPage() {
     try {
       const res = await fetch(`/api/chat/sessions/${s.id}`, { headers: { 'x-user-id': email } });
       if (res.ok) { const msgs: any[] = await res.json(); setMessages(msgs.map(m => ({ role: m.role, content: m.content }))); }
-    } catch {}
+    } catch { /* network error — messages list unchanged */ }
   };
 
   const deleteSession = async (id: number, e: React.MouseEvent) => {
@@ -172,7 +172,14 @@ export default function AskAIPage() {
             });
             if (tr.ok) {
               const td = await tr.json();
-              const autoTitle = (td.reply || '').replace(/['"]/g, '').trim().substring(0, 60);
+              const rawTitle = td.reply || '';
+              // Strip ALL markdown: bold (**), italic (*/_), headings (#), code (`), and trim whitespace
+              const autoTitle = rawTitle
+                .replace(/\*\*/g, '')   // remove bold markers
+                .replace(/[*_#`]/g, '') // remove other markdown
+                .replace(/^[\s\W]+/, '') // trim leading punctuation/spaces
+                .trim()
+                .substring(0, 60);
               if (autoTitle) {
                 await fetch(`/api/chat/sessions/${sid}/title`, {
                   method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-id': email },
@@ -181,7 +188,7 @@ export default function AskAIPage() {
                 setSessions(p => p.map(s => s.id === sid ? { ...s, title: autoTitle } : s));
               }
             }
-          } catch {}
+          } catch { /* auto-title failed — session keeps default title */ }
         }
       } else if (sid) {
         setSessions(p =>

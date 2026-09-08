@@ -42,7 +42,10 @@ interface HeaderProps {
   | "registrations"
   | "jobs"
   | "origindata"
-  | "settings";
+  | "settings"
+  | "candidates"
+  | "counselling"
+  | "ask-ai";
   portalMode?: "student" | "corporate" | "admin";
   onSwitchPortal?: () => void;
   onNavigate?: (view: any) => void;
