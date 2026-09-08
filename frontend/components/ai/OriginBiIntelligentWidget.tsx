@@ -26,6 +26,7 @@ export default function OriginBiIntelligentWidget() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [dynamicPrompts, setDynamicPrompts] = useState<string[]>([]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +47,13 @@ export default function OriginBiIntelligentWidget() {
       "Find candidates suitable for a project manager role",
       "What is Arumugam's character profile?",
       "How should I approach my team lead about a promotion?",
-      "Match employees for a Senior Developer with strong leadership"
+      "Match employees for a Senior Developer with strong leadership",
+      "Who among my team has the highest leadership potential?",
+      "Why might two of my employees be experiencing conflict?",
+      "Which employees are best suited for a client-facing role?",
+      "Summarize the behavioral traits of my engineering team.",
+      "Are there any employees who might be a flight risk?",
+      "What training should I assign to improve adaptability?"
     ],
     STUDENT: [
       "Show me my recent assessment results.",
@@ -64,6 +71,13 @@ export default function OriginBiIntelligentWidget() {
 
   const suggestedPrompts = rolePrompts[currentRole];
   const currentSubtitle = roleSubtitles[currentRole];
+
+  useEffect(() => {
+    // Shuffle and pick 4 random prompts on mount
+    const allPrompts = rolePrompts[currentRole] || [];
+    const shuffled = [...allPrompts].sort(() => 0.5 - Math.random());
+    setDynamicPrompts(shuffled.slice(0, 4));
+  }, [currentRole]);
 
   // Auto-scroll
   useEffect(() => {
@@ -131,19 +145,23 @@ export default function OriginBiIntelligentWidget() {
     setIsLoading(true);
 
     try {
-      // Read auth token from browser storage to forward to backend
+      // Read auth token and email from browser storage
       const authToken = typeof window !== 'undefined'
         ? (localStorage.getItem('originbi_id_token') || sessionStorage.getItem('idToken') || '')
+        : '';
+      const userEmail = typeof window !== 'undefined'
+        ? (sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail') || '')
         : '';
 
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...(authToken ? { 'x-auth-token': authToken } : {})
+          ...(authToken ? { 'x-auth-token': authToken } : {}),
+          ...(userEmail ? { 'x-user-id': userEmail } : {})
         },
         body: JSON.stringify({
-          prompt: text,
+          prompt: text.trim(),
           sessionId: activeSessionId,
           messages: messages,
           userRole: currentRole
@@ -343,20 +361,20 @@ export default function OriginBiIntelligentWidget() {
               <div className="flex-1 overflow-y-auto scroll-smooth z-0 pt-4 pb-12">
                 <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 w-full min-h-full flex flex-col">
                   {messages.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
+                    <div className="flex-1 flex flex-col items-center justify-center text-center py-4 md:py-8">
                       <motion.div 
                         initial={{ scale: 0.8, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.5, ease: "easeOut" }}
-                        className="w-24 h-24 bg-gradient-to-br from-brand-green/10 to-emerald-500/5 rounded-3xl rotate-3 flex items-center justify-center mb-8 border border-brand-green/20 shadow-xl shadow-brand-green/5"
+                        className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-brand-green/10 to-emerald-500/5 rounded-3xl rotate-3 flex items-center justify-center mb-4 md:mb-6 border border-brand-green/20 shadow-xl shadow-brand-green/5"
                       >
-                        <Sparkles size={44} className="text-brand-green -rotate-3" />
+                        <Sparkles size={32} className="text-brand-green -rotate-3" />
                       </motion.div>
                       <motion.h1 
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ duration: 0.5, delay: 0.1 }}
-                        className="text-4xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight"
+                        className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-slate-900 dark:text-white mb-2 md:mb-3 tracking-tight"
                       >
                         How can I help you today?
                       </motion.h1>
@@ -364,7 +382,7 @@ export default function OriginBiIntelligentWidget() {
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ duration: 0.5, delay: 0.2 }}
-                        className="text-lg text-slate-500 dark:text-slate-400 mb-12 max-w-lg"
+                        className="text-sm md:text-base lg:text-lg text-slate-500 dark:text-slate-400 mb-6 md:mb-10 max-w-lg"
                       >
                         {currentSubtitle}
                       </motion.p>
@@ -375,14 +393,14 @@ export default function OriginBiIntelligentWidget() {
                         transition={{ duration: 0.5, delay: 0.3 }}
                         className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl"
                       >
-                        {suggestedPrompts.map((prompt, i) => (
+                        {dynamicPrompts.map((prompt, i) => (
                           <button
                             key={i}
                             onClick={() => handleSend(prompt)}
-                            className="group text-left p-5 bg-white/60 hover:bg-white dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl transition-all duration-300 hover:shadow-[0_8px_30px_rgba(30,211,106,0.12)] hover:border-brand-green/30 hover:-translate-y-1 backdrop-blur-sm relative overflow-hidden"
+                            className="group text-left p-4 md:p-5 bg-white/60 hover:bg-white dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl transition-all duration-300 hover:shadow-[0_8px_30px_rgba(30,211,106,0.12)] hover:border-brand-green/30 hover:-translate-y-1 backdrop-blur-sm relative overflow-hidden"
                           >
                             <div className="absolute inset-0 bg-gradient-to-br from-brand-green/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            <p className="text-[15px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed relative z-10">{prompt}</p>
+                            <p className="text-[14px] md:text-[15px] text-slate-700 dark:text-slate-300 font-medium leading-relaxed relative z-10 w-full">{prompt}</p>
                           </button>
                         ))}
                       </motion.div>
@@ -461,6 +479,13 @@ export default function OriginBiIntelligentWidget() {
                       ref={inputRef as any}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pasted = e.clipboardData.getData('text');
+                        // Collapse multiple blank lines into one, trim leading/trailing whitespace
+                        const cleaned = pasted.replace(/\n{3,}/g, '\n\n').trim();
+                        setInput(prev => prev + cleaned);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();

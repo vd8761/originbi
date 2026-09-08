@@ -142,7 +142,7 @@ export default function CorporateLayout({
                             </div>
                         </div>
                         {/* Intelligent Corporate HR AI */}
-                        {showAssistant && <OriginBiIntelligentWidget />}
+                        <OriginBiIntelligentWidget />
                     </RequireCorporate>
                 ) : (
                     /* --- PUBLIC LAYOUT (No Header, No Guard) --- */

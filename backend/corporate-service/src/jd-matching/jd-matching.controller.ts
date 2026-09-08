@@ -9,22 +9,41 @@ import {
   CorporateJDMatchingService,
   JDMatchResult,
 } from './jd-matching.service';
+import { IsString, IsOptional, IsNumber } from 'class-validator';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DTOs
 // ═══════════════════════════════════════════════════════════════════════════
 
 class JDMatchRequestDto {
+  @IsString()
   email: string;
+
+  @IsString()
   jobDescription: string;
+
+  @IsOptional()
+  @IsNumber()
   groupId?: number;
+
+  @IsOptional()
+  @IsNumber()
   topN?: number;
+
+  @IsOptional()
+  @IsNumber()
   minScore?: number;
 }
 
-class ChatJDMatchRequestDto {
+export class ChatJDMatchRequestDto {
+  @IsString()
   email: string;
+
+  @IsString()
   message: string;
+
+  @IsOptional()
+  @IsNumber()
   groupId?: number;
 }
 
