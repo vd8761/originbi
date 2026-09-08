@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Header from '../../components/admin/Header';
-import FloatingChatBot from '../../components/admin/FloatingChatBot';
 import { usePathname, useRouter } from 'next/navigation';
 import RequireAdmin from '../../components/auth/RequireAdmin';
 import { signOut } from 'aws-amplify/auth';
@@ -118,9 +117,6 @@ export default function AdminLayout({
                                 {children}
                             </div>
                         </div>
-
-                        {/* Floating AI Chat Bot */}
-                        <FloatingChatBot userRole="ADMIN" />
                     </RequireAdmin>
                 )}
             </div>

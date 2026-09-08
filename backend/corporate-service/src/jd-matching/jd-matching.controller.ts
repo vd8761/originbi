@@ -9,22 +9,41 @@ import {
   CorporateJDMatchingService,
   JDMatchResult,
 } from './jd-matching.service';
+import { IsString, IsOptional, IsNumber } from 'class-validator';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DTOs
 // ═══════════════════════════════════════════════════════════════════════════
 
 class JDMatchRequestDto {
+  @IsString()
   email: string;
+
+  @IsString()
   jobDescription: string;
+
+  @IsOptional()
+  @IsNumber()
   groupId?: number;
+
+  @IsOptional()
+  @IsNumber()
   topN?: number;
+
+  @IsOptional()
+  @IsNumber()
   minScore?: number;
 }
 
-class ChatJDMatchRequestDto {
+export class ChatJDMatchRequestDto {
+  @IsString()
   email: string;
+
+  @IsString()
   message: string;
+
+  @IsOptional()
+  @IsNumber()
   groupId?: number;
 }
 
@@ -89,17 +108,24 @@ export class JDMatchingController {
     // Check if the message is a JD matching request
     const isJDMatch = this.jdMatchingService.isJDMatchingRequest(dto.message);
 
+    const corporateId = await this.jdMatchingService.getCorporateAccountId(
+      dto.email,
+    );
+
     if (!isJDMatch) {
+      // It's not a JD Match, so it must be an HR / Employee analysis query
+      const hrAnswer = await this.jdMatchingService.analyzeHRQuery(
+        corporateId,
+        dto.message,
+      );
+      
       return {
         success: true,
-        answer: `I can help you find the best candidates from your team! To use JD matching, try:\n\n• "Find candidates suitable for a project manager role requiring leadership and analytical thinking"\n• "Match employees for: Senior Software Engineer with strong problem-solving skills"\n• "Who is best fit for a customer success manager?"\n\nProvide a job description and I'll analyze your team's behavioral profiles to find the best matches.`,
+        answer: hrAnswer,
         isJDMatch: false,
       };
     }
 
-    const corporateId = await this.jdMatchingService.getCorporateAccountId(
-      dto.email,
-    );
     const jobDescription = this.jdMatchingService.extractJDFromMessage(
       dto.message,
     );

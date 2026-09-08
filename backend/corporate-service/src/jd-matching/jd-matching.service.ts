@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -73,6 +73,10 @@ interface CandidateProfile {
   personalityStyle: string | null;
   personalityDescription: string | null;
   personalityCode: string | null;
+  discScoreD: number | null;
+  discScoreI: number | null;
+  discScoreS: number | null;
+  discScoreC: number | null;
   totalScore: number | null;
   sincerityIndex: number | null;
   sincerityClass: string | null;
@@ -358,19 +362,19 @@ const TIER_THRESHOLDS = {
 @Injectable()
 export class CorporateJDMatchingService {
   private readonly logger = new Logger('Corporate-JD-MatchEngine');
-  private groqClient: Groq | null = null;
+  private openaiClient: OpenAI | null = null;
 
   constructor(private dataSource: DataSource) {
     this.logger.log('🎯 Corporate JD Matching Engine v2.0 initialized');
   }
 
-  private getGroqClient(): Groq {
-    if (!this.groqClient) {
-      const apiKey = process.env.GROQ_API_KEY;
-      if (!apiKey) throw new Error('GROQ_API_KEY not set');
-      this.groqClient = new Groq({ apiKey });
+  private getOpenAIClient(): OpenAI {
+    if (!this.openaiClient) {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) throw new Error('OPENAI_API_KEY not set');
+      this.openaiClient = new OpenAI({ apiKey });
     }
-    return this.groqClient;
+    return this.openaiClient;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -548,8 +552,6 @@ CONTEXT: We use the DISC behavioral model. Personality styles in our system:
 - Reliable Executor (High S+C), Influential Connector (High I), Methodical Planner (High C+S)
 - Dynamic Achiever (High D+I), Steady Contributor (High S), Visionary Strategist (High D+I+C)
 
-We also have an Agile Compatibility Index (ACI): 0-125 score.
-- Agile Naturalist (100-125), Agile Adaptive (75-99), Agile Learner (50-74), Agile Resistant (0-49)
 
 Respond with ONLY valid JSON:
 {
@@ -568,8 +570,8 @@ Respond with ONLY valid JSON:
 RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with weights summing ~1.0.`;
 
     try {
-      const completion = await this.getGroqClient().chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+      const completion = await this.getOpenAIClient().chat.completions.create({
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           {
@@ -734,6 +736,10 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         aa.sincerity_index,
         aa.sincerity_class,
         aa.status as assessment_status,
+        (aa.metadata->'disc_scores'->>'D')::numeric as disc_d,
+        (aa.metadata->'disc_scores'->>'I')::numeric as disc_i,
+        (aa.metadata->'disc_scores'->>'S')::numeric as disc_s,
+        (aa.metadata->'disc_scores'->>'C')::numeric as disc_c,
         (SELECT MAX(aa2.total_score::numeric) 
          FROM assessment_attempts aa2 
          WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as best_score,
@@ -770,17 +776,17 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         personalityStyle: row.personality_style,
         personalityDescription: row.personality_description,
         personalityCode: row.personality_code,
+        discScoreD: row.disc_d ? parseFloat(row.disc_d) : null,
+        discScoreI: row.disc_i ? parseFloat(row.disc_i) : null,
+        discScoreS: row.disc_s ? parseFloat(row.disc_s) : null,
+        discScoreC: row.disc_c ? parseFloat(row.disc_c) : null,
         totalScore: row.total_score ? parseFloat(row.total_score) : null,
-        sincerityIndex: row.sincerity_index
-          ? parseFloat(row.sincerity_index)
-          : null,
+        sincerityIndex: row.sincerity_index ? parseFloat(row.sincerity_index) : null,
         sincerityClass: row.sincerity_class,
         attemptCount: parseInt(row.attempt_count) || 0,
         bestScore: row.best_score ? parseFloat(row.best_score) : null,
         assessmentStatus: row.assessment_status || 'UNKNOWN',
-        corporateAccountId: row.corporate_account_id
-          ? parseInt(row.corporate_account_id)
-          : null,
+        corporateAccountId: row.corporate_account_id ? parseInt(row.corporate_account_id) : null,
         groupId: row.group_id ? parseInt(row.group_id) : null,
         groupName: row.group_name || null,
       }));
@@ -1467,10 +1473,9 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
       style: sc.candidate.personalityStyle || 'Unknown',
       score: sc.compositeScore,
       tier: sc.tier,
-      agileScore: sc.candidate.bestScore || sc.candidate.totalScore || 0,
       group: sc.candidate.groupName || 'General',
-      strengths: sc.matchReasons.join('; '),
-      gaps: sc.developmentAreas.join('; '),
+      strengths: sc.matchReasons.filter(r => !r.toLowerCase().includes('agile')).join('; '),
+      gaps: sc.developmentAreas.filter(a => !a.toLowerCase().includes('agile')).join('; '),
     }));
 
     const prompt = `You are an expert talent analyst. Generate brief, specific insights for each candidate matched to this role.
@@ -1484,7 +1489,7 @@ ${candidateSummaries
   .map(
     (
       c,
-    ) => `${c.rank}. ${c.name} | Style: ${c.style} | Score: ${c.score}/100 | Tier: ${c.tier} | Group: ${c.group} | Agile: ${c.agileScore}/125
+    ) => `${c.rank}. ${c.name} | Style: ${c.style} | Score: ${c.score}/100 | Tier: ${c.tier} | Group: ${c.group}
    Strengths: ${c.strengths}
    Gaps: ${c.gaps}`,
   )
@@ -1495,8 +1500,8 @@ Output ONLY a JSON array:
 [{"rank": 1, "insight": "...", "recommendation": "..."}, ...]`;
 
     try {
-      const completion = await this.getGroqClient().chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+      const completion = await this.getOpenAIClient().chat.completions.create({
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 1500,
@@ -1863,5 +1868,119 @@ Output ONLY a JSON array:
     ];
 
     return patterns.some((p) => p.test(message));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HR BRAIN: Employee Character & Memo Advisory
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async analyzeHRQuery(corporateId: number, query: string): Promise<string> {
+    const startTime = Date.now();
+    this.logger.log(`🧠 CORPORATE HR BRAIN - Processing query for Corporate #${corporateId}`);
+    
+    // 1. Fetch all employees
+    const candidates = await this.fetchCorporateCandidates(corporateId);
+    if (candidates.length === 0) {
+      return "You currently have no employees registered in the system. I need employee behavioral data to answer this.";
+    }
+
+    // 2. Build employee profiles using real DISC scores from the database
+    const employeeDataStr = candidates.map(c => {
+      const discD = c.discScoreD ?? 'N/A';
+      const discI = c.discScoreI ?? 'N/A';
+      const discS = c.discScoreS ?? 'N/A';
+      const discC = c.discScoreC ?? 'N/A';
+
+      // Determine dominant and secondary traits from actual scores
+      const scores = [
+        { label: 'D (Dominance)', val: c.discScoreD ?? 0 },
+        { label: 'I (Influence)', val: c.discScoreI ?? 0 },
+        { label: 'S (Steadiness)', val: c.discScoreS ?? 0 },
+        { label: 'C (Compliance)', val: c.discScoreC ?? 0 },
+      ].sort((a, b) => b.val - a.val);
+
+      return `━━━ ${c.fullName || 'Unknown'} (${c.email}) ━━━
+DISC Profile: [${c.personalityCode || 'N/A'}] ${c.personalityStyle || 'Unknown'}
+Profile Description: ${c.personalityDescription || 'N/A'}
+DISC Scores (out of 25):
+  • Dominance (D):   ${discD}/25 ${Number(discD) >= 18 ? '🔴 High' : Number(discD) >= 12 ? '🟡 Moderate' : '🟢 Low'}
+  • Influence (I):   ${discI}/25 ${Number(discI) >= 18 ? '🔴 High' : Number(discI) >= 12 ? '🟡 Moderate' : '🟢 Low'}
+  • Steadiness (S):  ${discS}/25 ${Number(discS) >= 18 ? '🔴 High' : Number(discS) >= 12 ? '🟡 Moderate' : '🟢 Low'}
+  • Compliance (C):  ${discC}/25 ${Number(discC) >= 18 ? '🔴 High' : Number(discC) >= 12 ? '🟡 Moderate' : '🟢 Low'}
+Trait Ranking: ${scores.map((s, i) => `${i + 1}. ${s.label} (${s.val})`).join(' → ')}
+Group/Team: ${c.groupName || 'Unassigned'} | Gender: ${c.gender || 'N/A'}`;
+    }).join('\n\n');
+
+    // 3. Construct the prompt
+    const systemPrompt = `You are the OriginBI People Intelligence Brain — a strategic AI-powered Workforce Decision Advisor embedded within the OriginBI corporate intelligence platform.
+
+You serve senior HR leaders, department heads, and C-suite executives. Your role is to provide evidence-based, behaviorally-grounded people intelligence to enable smarter workforce decisions.
+
+Core Mission: "Know your people. Understand your capabilities. Build the right teams. Make better people decisions."
+
+━━━ DISC BEHAVIORAL FRAMEWORK ━━━
+Each employee's behavioral character is assessed through the DISC model:
+- Dominance (D): Results-orientation, decisiveness, assertiveness, competitive drive
+- Influence (I): Social energy, persuasion, enthusiasm, optimism, relationship-building
+- Steadiness (S): Consistency, patience, loyalty, empathy, stability under pressure
+- Compliance (C): Precision, analytical thinking, quality focus, rule adherence, caution
+
+BEHAVIORAL PROFILE REFERENCE (16 Types):
+• Dominant Director (High D) — Commanding, competitive, direct. Thrives in authority. Flight risk if underutilized.
+• Inspiring Influencer (High I) — Charismatic, optimistic, relationship-driven. Excels in client-facing roles.
+• Supportive Stabilizer (High S) — Loyal, consistent, empathetic. Needs structure and security to perform at best.
+• Conscientious Analyzer (High C) — Precise, logical, systematic. Prefers data over emotion.
+• Charismatic Leader (DI) — Bold and persuasive. Natural leader. Can be impulsive under pressure.
+• Strategic Stabilizer (DS) — Driven yet patient. Exceptional at structured project execution.
+• Decisive Analyst (DC) — High standards with assertive drive. Results-focused; may come across as blunt.
+• Dynamic Achiever (ID) — Energetic and goal-oriented. Excels in fast-paced, high-output environments.
+• Supportive Energizer (IS) — Warm, collaborative, people-first. Ideal for HR, culture, and team support.
+• Influential Planner (IC) — Creative yet structured. Thrives in communications, marketing, or training roles.
+• Reliable Executor (SD) — Dependable and driven. Excellent in operations. May resist organizational change.
+• Methodical Planner (SC) — Steady and precise. Well-suited for compliance, finance, and quality assurance.
+• Steady Contributor (SI) — Loyal and sociable. Strong in service delivery and team cohesion roles.
+• Analytical Leader (CD) — Methodical with strategic drive. Suited for engineering, strategy, or research.
+• Conscientious Connector (CI) — Precise yet people-oriented. Effective in training, facilitation, or research.
+• Methodical Supporter (CS) — Detail-oriented and loyal. Excellent for administrative and process-driven roles.
+
+━━━ YOUR ADVISORY CAPABILITIES ━━━
+1. Individual Character Assessment — Articulate an employee's behavioral strengths, natural working style, communication preferences, stress responses, and growth areas.
+2. Manager Advisory — Advise managers on how to lead, motivate, give feedback, and resolve conflict with specific team members based on their behavioral profile.
+3. Team Architecture — Identify profile complementarity, potential interpersonal friction, and ideal team compositions for specific objectives.
+4. Retention & Flight Risk — Assess behavioral indicators of disengagement or misalignment between an employee's profile and their current role/environment.
+5. Leadership Identification — Surface employees with natural leadership behavioral tendencies.
+6. Talent Mobility — Recommend internal role transitions based on behavioral strengths.
+7. Organizational Diagnostics — Answer broader people strategy questions using workforce-wide behavioral patterns.
+
+━━━ RESPONSE STANDARDS ━━━
+1. CONFIDENTIALITY OF DATA — The DISC assessment data below is strictly for your internal analysis. Never disclose raw scores, numeric values, or profile codes in your response. Communicate exclusively in behavioral language.
+2. BEHAVIORAL LANGUAGE ONLY — Do not say "his D score is high." Instead say: "This individual demonstrates a strongly results-oriented and assertive leadership character, naturally inclined to drive decisions with speed and conviction."
+3. CORPORATE TONE — Maintain a formal, executive-level communication style at all times. Responses must be structured, precise, and boardroom-appropriate. Avoid casual, conversational, or informal phrasing.
+4. EMPLOYEE-SPECIFIC INSIGHTS — Every response must reference the specific employees in this organization by name. Never give generic HR advice — anchor every insight to an actual employee's behavioral character.
+5. STRUCTURED FORMAT — Use clear section headers, bold employee names, and concise bullet points. Responses should read like a professional advisory brief.
+6. SCOPE DISCIPLINE — This platform is exclusively for workforce intelligence and people strategy. Decline all off-topic queries professionally and redirect to workforce matters.
+7. STRATEGIC CLOSURE — Conclude every response with a clearly labeled "Strategic Recommendation" or "Recommended Next Step" that the leader can act on immediately.
+
+━━━ ORGANIZATIONAL PEOPLE INTELLIGENCE DATABASE ━━━
+(Confidential — Internal Reference Only)
+${employeeDataStr}`;
+
+    try {
+      const completion = await this.getOpenAIClient().chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: query }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
+      });
+
+      this.logger.log(`✅ HR Query processed in ${Date.now() - startTime}ms`);
+      return completion.choices[0]?.message?.content || 'I could not process your request at this time.';
+    } catch (error) {
+      this.logger.error('OpenAI LLM Error:', error);
+      return 'An error occurred while analyzing the employee profiles. Please try again.';
+    }
   }
 }

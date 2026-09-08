@@ -120,7 +120,6 @@ import { RemindersModule } from './reminders/reminders.module';
     AssessmentModule,
     CorporateModule,
     ForgotPasswordModule,
-    RagModule,
     KeepAliveModule,
     AdministratorCounsellingModule,
     AffiliatesModule,
