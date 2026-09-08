@@ -66,17 +66,25 @@ export default function OriginBiIntelligentWidget() {
         candidateNames = data.candidates || [];
       }
       
-      const c1 = candidateNames[0] || "Arumugam";
-      const c2 = candidateNames[1] || "Satheesh";
+      let filledPrompts = [...corporatePrompts];
       
-      const filledPrompts = corporatePrompts.map(p => 
-        p.replace('{candidate1}', c1).replace('{candidate2}', c2)
-      );
+      if (candidateNames.length >= 1) {
+        filledPrompts = filledPrompts.map(p => p.replace('{candidate1}', candidateNames[0]));
+      } else {
+        filledPrompts = filledPrompts.filter(p => !p.includes('{candidate1}'));
+      }
+
+      if (candidateNames.length >= 2) {
+        filledPrompts = filledPrompts.map(p => p.replace('{candidate2}', candidateNames[1]));
+      } else {
+        filledPrompts = filledPrompts.filter(p => !p.includes('{candidate2}'));
+      }
       
       const shuffled = [...filledPrompts].sort(() => 0.5 - Math.random());
       setDynamicPrompts(shuffled.slice(0, 4));
     } catch (error) {
-      const shuffled = [...corporatePrompts].sort(() => 0.5 - Math.random());
+      const fallbackPrompts = corporatePrompts.filter(p => !p.includes('{candidate1}') && !p.includes('{candidate2}'));
+      const shuffled = [...fallbackPrompts].sort(() => 0.5 - Math.random());
       setDynamicPrompts(shuffled.slice(0, 4));
     }
   };
