@@ -183,7 +183,7 @@ export default function AskAIPage() {
             const tr = await fetch('/api/chat', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
-              body: JSON.stringify({ prompt: `Generate a concise 5-7 word chat title (no quotes, no punctuation) for a conversation starting with: "${prompt.substring(0, 100)}"`, sessionId: null, userRole: 'CORPORATE', messages: [] }),
+              body: JSON.stringify({ prompt: `Generate a concise 5-7 word chat title (no quotes, no punctuation) for a conversation starting with: "${prompt.substring(0, 100)}"`, sessionId: null, userRole: 'CORPORATE', messages: [], noSession: true }),
             });
             if (tr.ok) {
               const td = await tr.json();
@@ -224,7 +224,7 @@ export default function AskAIPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
-        body: JSON.stringify({ prompt: ' ', userRole: 'CORPORATE', interviewMode: true, jdText, transcripts: filled, messages: [] }),
+        body: JSON.stringify({ prompt: ' ', userRole: 'CORPORATE', interviewMode: true, jdText, transcripts: filled, messages: [], noSession: true }),
       });
       const data = await res.json();
       setInterviewResult(data.reply || 'Analysis failed.');

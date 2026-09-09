@@ -88,6 +88,9 @@ export interface CandidateProfile {
   groupName: string | null;
   currentRole?: string | null;
   departmentName?: string | null;
+  registrationType?: string | null;   // COLLEGE_STUDENT | EMPLOYEE | CXO_GENERAL | SCHOOL_STUDENT
+  currentYear?: string | null;         // For college students
+  schoolStream?: string | null;        // For school students
 }
 
 export interface ScoredCandidate {
@@ -730,6 +733,8 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         r.mobile_number,
         r.corporate_account_id,
         r.group_id,
+        r.school_level,
+        r.school_stream,
         g.name as group_name,
         pt.blended_style_name as personality_style,
         pt.blended_style_desc as personality_description,
@@ -749,7 +754,12 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
          FROM assessment_attempts aa3 
          WHERE aa3.registration_id = r.id AND aa3.status = 'COMPLETED') as attempt_count,
         r.metadata->>'currentRole' as current_role,
-        r.metadata->>'designation' as designation
+        r.metadata->>'designation' as designation,
+        r.metadata->>'currentYear' as current_year,
+        r.metadata->>'departmentId' as dept_id_meta,
+        prog.code as program_code,
+        prog.name as program_name,
+        dept.name as department_name
       FROM registrations r
       JOIN users u ON r.user_id = u.id
       JOIN assessment_attempts aa ON aa.registration_id = r.id 
@@ -762,6 +772,10 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         )
       LEFT JOIN personality_traits pt ON aa.dominant_trait_id = pt.id
       LEFT JOIN groups g ON r.group_id = g.id
+      LEFT JOIN programs prog ON (r.metadata->>'programType')::int = prog.id
+      LEFT JOIN departments dept ON (r.metadata->>'departmentId') IS NOT NULL
+        AND (r.metadata->>'departmentId') <> ''
+        AND dept.id = (r.metadata->>'departmentId')::int
       WHERE r.is_deleted = false
         AND r.is_tech_assessment IN (0, 2)
         AND r.corporate_account_id = $1
@@ -794,6 +808,10 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         groupId: row.group_id ? parseInt(row.group_id) : null,
         groupName: row.group_name || null,
         currentRole: row.current_role || row.designation || null,
+        departmentName: row.department_name || null,
+        registrationType: row.program_code || null,
+        currentYear: row.current_year || null,
+        schoolStream: row.school_stream || null,
       }));
     } catch (error) {
       this.logger.error(`Corporate candidate fetch error: ${error.message}`);
@@ -1901,9 +1919,10 @@ INTENT KEYS:
 - workforce_planning    → Can we launch X, do we have enough capability, strategic people planning
 - recruitment_intel     → What to look for when hiring, what traits our top performers share
 - people_strategy       → HR policy, communication frameworks, org-wide people practices
+- jd_filter             → Filter or list candidates/students matching a job description, criteria, department, or name list
 - general               → Anything else workforce-related that doesn't fit above categories
 
-USER QUERY: "${query.replace(/"/g, "'")}"`; 
+USER QUERY: "${query.replace(/"/g, "'")}"`;
 
     try {
       const res = await this.getOpenAIClient().chat.completions.create({
@@ -1925,7 +1944,6 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
    * Behaviorally rich but no raw numeric scores are exposed.
    */
   private buildEmployeeDataStr(candidates: CandidateProfile[]): string {
-    // Detect employees sharing the same first name (for disambiguation — REQ 6)
     const firstNames = candidates.map(c => c.fullName.split(' ')[0].toLowerCase());
     const isDuplicate = (name: string) =>
       firstNames.filter(n => n === name.split(' ')[0].toLowerCase()).length > 1;
@@ -1934,14 +1952,42 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
       const level = (v: number | null) =>
         v == null ? 'Unknown' : v >= 18 ? 'High' : v >= 12 ? 'Moderate' : 'Low';
 
-      // Add disambiguation suffix for duplicate first names (REQ 6)
       const displayName = isDuplicate(c.fullName)
         ? `${c.fullName} [${c.groupName || 'No Group'} | ${c.currentRole || 'No Designation'}]`
         : c.fullName;
 
-      // NOTE: Style name, code, and raw description are intentionally omitted (REQ 4, 9)
+      // Build type-specific context line
+      const rType = (c.registrationType || '').toUpperCase();
+      let contextLine = '';
+      if (rType.includes('COLLEGE') || rType.includes('SCHOOL')) {
+        // Academic profile
+        const parts: string[] = [];
+        if (c.groupName) parts.push(`Institution: ${c.groupName}`);
+        if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
+        if (c.currentYear) parts.push(`Year: ${c.currentYear}`);
+        if (c.schoolStream) parts.push(`Stream: ${c.schoolStream}`);
+        if (c.gender) parts.push(`Gender: ${c.gender}`);
+        contextLine = parts.join(' | ');
+      } else if (rType.includes('CXO')) {
+        // CXO profile
+        const parts: string[] = [];
+        if (c.currentRole) parts.push(`Role: ${c.currentRole}`);
+        if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
+        if (c.groupName) parts.push(`Group: ${c.groupName}`);
+        if (c.gender) parts.push(`Gender: ${c.gender}`);
+        contextLine = parts.join(' | ');
+      } else {
+        // Employee (default)
+        const parts: string[] = [];
+        if (c.groupName) parts.push(`Group: ${c.groupName}`);
+        if (c.currentRole) parts.push(`Role: ${c.currentRole}`);
+        if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
+        if (c.gender) parts.push(`Gender: ${c.gender}`);
+        contextLine = parts.join(' | ');
+      }
+
       return `[${displayName}]
-Group: ${c.groupName || 'Unassigned'} | Role: ${c.currentRole || 'N/A'} | Gender: ${c.gender || 'N/A'}
+${contextLine || `Group: ${c.groupName || 'Unassigned'} | Gender: ${c.gender || 'N/A'}`}
 Behavioral Profile: Drive=${level(c.discScoreD)}, Influence=${level(c.discScoreI)}, Steadiness=${level(c.discScoreS)}, Compliance=${level(c.discScoreC)}`;
     }).join('\n\n');
   }
@@ -1955,15 +2001,23 @@ DISC MODEL (for your analysis only — never share raw scores):
 - Steadiness (S): Consistent, patient, loyal, empathetic, stable
 - Compliance (C): Precise, analytical, quality-focused, systematic
 
+DATA AVAILABLE FOR EACH PERSON:
+- Full name, gender, group/institution, registration type (College Student / Employee / CXO)
+- For College Students: institution name, department/stream, year of study
+- For Employees: role/designation, department
+- For CXO: role/designation, department
+- Behavioral profile (Drive, Influence, Steadiness, Compliance levels)
+
 RESPONSE RULES:
 1. NEVER reveal raw scores, numbers, or DISC codes — speak in behavioral language only.
 2. Maintain formal, boardroom-level tone. No casual phrasing.
-3. Reference actual employee names from the data below.
+3. Reference actual names from the data below.
 4. Always close with a "Strategic Recommendation" the leader can act on.
 5. Use bold headers and bullet points. Keep it executive-brief-style.
-6. If a query is not workforce-related, decline professionally.
-7. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response by listing the employee's DISC profile, type name, or code. This data is your internal reference only. Begin your response DIRECTLY addressing the question asked. Only surface behavioral traits when specifically needed to answer the question. You are a behaviour intelligence copilot, not a profile report generator.
-8. CRITICAL — CONVERSATION MEMORY: The conversation history provided shows prior messages. If the user uses pronouns like "he", "him", "her", "they", "this person", "this employee", or refers implicitly to someone, resolve them to the last explicitly named employee in the conversation history. Never ask "which employee?" for a follow-up question.`;
+6. You CAN answer questions about education history, department, year of study, role, and designation — this data is available.
+7. You CAN filter and list candidates by any criteria — JD match, department, name list, group, year, etc.
+8. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response by listing the employee's DISC profile or type name. Begin DIRECTLY addressing the question. Surface behavioral traits only when needed.
+9. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. Never ask "which employee?" for a follow-up.`;
 
   // ─── MAIN ROUTING ENTRY POINT ───────────────────────────────────────────────
 
@@ -2020,6 +2074,9 @@ RESPONSE RULES:
         break;
       case 'people_strategy':
         answer = await this.handlePeopleStrategy(query, candidates, employeeData, history);
+        break;
+      case 'jd_filter':
+        answer = await this.handleJDFilter(query, candidates, employeeData, history);
         break;
       default:
         answer = await this.handleGeneralHRQuery(query, candidates, employeeData, history);
@@ -2501,6 +2558,52 @@ YOUR ANALYSIS SHOULD COVER:
 8. **Strategic Recommendation** — The single most impactful people-strategy initiative this organization should prioritize based on behavioral intelligence
 
 ━━━ PEOPLE INTELLIGENCE DATABASE ━━━
+${employeeData}`;
+
+    return this.callGPT(systemPrompt, query, 1800, history);
+  }
+
+  // ─── JD FILTER: list / filter candidates matching a JD or criteria ───────────
+
+  private async handleJDFilter(
+    query: string,
+    candidates: CandidateProfile[],
+    employeeData: string,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
+  ): Promise<string> {
+    const nameList = candidates.map(c => {
+      const rType = (c.registrationType || '').toUpperCase();
+      let info = '';
+      if (rType.includes('COLLEGE') || rType.includes('SCHOOL')) {
+        info = [c.groupName, c.departmentName, c.currentYear ? `Year ${c.currentYear}` : null]
+          .filter(Boolean).join(' | ');
+      } else {
+        info = [c.currentRole, c.departmentName, c.groupName].filter(Boolean).join(' | ');
+      }
+      return `- ${c.fullName}${info ? ` (${info})` : ''}`;
+    }).join('\n');
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: CANDIDATE FILTERING & LISTING ━━━
+The user wants to filter or list specific candidates/students. You have FULL access to names, departments, roles, years of study, and behavioral profiles.
+
+When asked to:
+- List names matching a JD → Filter by behavioral fit AND any mentioned criteria
+- Filter by department/stream → Use the department data provided
+- List all candidates → List all names with key context
+- Match to a role → Identify best behavioral fits
+
+FORMAT your response as:
+1. A numbered list of names with brief reasoning
+2. Follow with a "Strategic Recommendation"
+
+Do NOT refuse to list names — this is a core feature.
+
+COMPLETE CANDIDATE LIST:
+${nameList}
+
+━━━ FULL BEHAVIORAL DATABASE ━━━
 ${employeeData}`;
 
     return this.callGPT(systemPrompt, query, 1800, history);

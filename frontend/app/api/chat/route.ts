@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const userId = req.headers.get('x-user-id') || 'test-user-id';
     const body = await req.json();
-    const { messages, sessionId, prompt, userRole, interviewMode, jdText, transcripts } = body;
+    const { messages, sessionId, prompt, userRole, interviewMode, jdText, transcripts, noSession } = body;
     const role = (userRole || req.headers.get('x-user-role') || 'STUDENT') as UserRole;
     const authToken = req.headers.get('x-auth-token') || '';
     const authHeader: Record<string, string> = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
@@ -19,8 +19,11 @@ export async function POST(req: NextRequest) {
 
     let currentSessionId = sessionId;
 
-    // 1. Create session if it doesn't exist
-    if (!currentSessionId) {
+    // Skip session creation for: auto-title generation (noSession=true) or interview mode
+    const skipSession = noSession === true || interviewMode === true;
+
+    // 1. Create session if needed
+    if (!currentSessionId && !skipSession && prompt) {
       const newSession = await sql`
         INSERT INTO chat_sessions (user_id, role, title)
         VALUES (${userId}, ${role}, ${prompt.substring(0, 50)})
@@ -29,11 +32,13 @@ export async function POST(req: NextRequest) {
       currentSessionId = newSession[0].id;
     }
 
-    // 2. Save user message to DB
-    await sql`
-      INSERT INTO chat_messages (session_id, role, content)
-      VALUES (${currentSessionId}, 'user', ${prompt})
-    `;
+    // 2. Save user message to DB (skip for noSession / interview mode)
+    if (currentSessionId && !skipSession && prompt) {
+      await sql`
+        INSERT INTO chat_messages (session_id, role, content)
+        VALUES (${currentSessionId}, 'user', ${prompt})
+      `;
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // CORPORATE PATH — always returns here, never falls through.
