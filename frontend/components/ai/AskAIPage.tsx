@@ -39,7 +39,7 @@ function groupSessions(sessions: Session[]) {
   return g;
 }
 
-const SUGGESTIONS = [
+const ALL_SUGGESTIONS = [
   { icon: '🧠', label: 'Who is your best team leader candidate?' },
   { icon: '🎯', label: 'Match employees for a Senior Sales Manager role' },
   { icon: '🤝', label: 'Who collaborates best under pressure?' },
@@ -48,6 +48,8 @@ const SUGGESTIONS = [
   { icon: '🌱', label: 'Who needs development to become ready for management?' },
   { icon: '🔥', label: 'Form the best 5-person cross-functional project team' },
   { icon: '💬', label: 'How do I communicate with a detail-oriented employee?' },
+  { icon: '🔎', label: 'Identify our top performers with high drive' },
+  { icon: '⚖️', label: 'Who can balance compliance and speed effectively?' }
 ];
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'This Week', 'Last Week', 'Older'];
@@ -75,8 +77,12 @@ export default function AskAIPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
 
   useEffect(() => {
+    // Shuffle and pick 8
+    const shuffled = [...ALL_SUGGESTIONS].sort(() => 0.5 - Math.random());
+    setRandomSuggestions(shuffled.slice(0, 8));
     // Corporate app stores user as JSON object in localStorage.getItem('user')
     // not as a flat 'userEmail' key. Try all known patterns.
     let e = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail') || '';
@@ -173,7 +179,11 @@ export default function AskAIPage() {
     const isFirst = messages.length === 0;
     const updated: Message[] = [...messages, { role: 'user', content: prompt }];
     setMessages(updated); setInput('');
-    if (inputRef.current) inputRef.current.style.height = 'auto';
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      // Refocus input box automatically
+      setTimeout(() => inputRef.current?.focus(), 10);
+    }
     setLoading(true);
     try {
       const res = await fetch('/api/chat', {
@@ -224,7 +234,10 @@ export default function AskAIPage() {
       }
     } catch {
       setMessages(p => [...p, { role: 'assistant', content: '⚠️ Connection error. Please check the corporate service is running.' }]);
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
   };
 
   const runInterview = async () => {
@@ -317,8 +330,8 @@ export default function AskAIPage() {
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 12h16M4 18h7"/></svg>
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-semibold text-gray-900 dark:text-white">People Intelligence Copilot</h1>
-            <p className="text-[11px] text-gray-500">OriginBI · Workforce Decision Advisor</p>
+            <h1 className="text-base font-semibold text-gray-900 dark:text-white">Origin Copilot</h1>
+            <p className="text-[11px] text-gray-500">AI People Advisor</p>
           </div>
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-white/[0.06] rounded-xl p-1">
             {[{ id: 'ask', label: '🧠 Ask Your Team' }, { id: 'interviews', label: '📋 Analyse Interviews' }].map(tab => (
@@ -343,12 +356,12 @@ export default function AskAIPage() {
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-green/20 to-brand-green/5 flex items-center justify-center mb-5 shadow-inner">
                     <span className="text-3xl">🧠</span>
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">People Intelligence Copilot</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Origin Copilot</h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 text-center max-w-md leading-relaxed">
                     Ask anything about your workforce. I understand your team's behavioural profiles and help you make smarter people decisions.
                   </p>
-                  <div className="grid grid-cols-2 gap-3 w-full max-w-2xl">
-                    {SUGGESTIONS.map((s, i) => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-2xl px-4">
+                    {randomSuggestions.map((s, i) => (
                       <button key={i} onClick={() => send(s.label)}
                         className="group flex items-start gap-3 px-4 py-3.5 bg-white dark:bg-white/[0.03] hover:bg-gray-50 dark:hover:bg-white/[0.06] border border-gray-200 dark:border-white/[0.07] hover:border-brand-green/30 rounded-xl text-left transition-all shadow-sm">
                         <span className="text-xl shrink-0 mt-0.5">{s.icon}</span>
@@ -385,26 +398,28 @@ export default function AskAIPage() {
                       </div>
                     </div>
                   )}
-                  <div ref={bottomRef} />
+                  <div ref={bottomRef} className="h-6" />
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 dark:border-white/[0.06] bg-white/95 dark:bg-[#19211C]/95 shrink-0">
-              <div className="flex gap-3 items-end max-w-4xl mx-auto">
-                <div className="flex-1 bg-gray-50 dark:bg-white/[0.04] border border-gray-200 dark:border-white/[0.09] rounded-2xl focus-within:border-brand-green/40 transition-colors">
+            
+            {/* Floating Input Area like ChatGPT/Claude */}
+            <div className="relative bottom-0 left-0 right-0 px-4 pb-6 pt-2 bg-gradient-to-t from-white via-white to-transparent dark:from-[#19211C] dark:via-[#19211C] dark:to-transparent shrink-0 z-10 w-full max-w-4xl mx-auto">
+              <div className="flex gap-3 items-end w-full">
+                <div className="flex-1 bg-white dark:bg-[#1a2620] border border-gray-200 dark:border-white/[0.09] rounded-[24px] focus-within:border-brand-green/40 transition-colors shadow-[0_0_15px_rgba(0,0,0,0.05)] dark:shadow-[0_0_15px_rgba(0,0,0,0.2)]">
                   <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
                     onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 200) + 'px'; }}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder="Ask about your team… e.g. 'Who would be best suited for a client-facing leadership role?'"
+                    placeholder="Ask about your team… e.g. 'Who would be best suited for a client-facing role?'"
                     rows={1} disabled={loading}
-                    className="w-full bg-transparent px-5 py-4 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600 resize-none outline-none min-h-[52px] max-h-[200px]" />
+                    className="w-full bg-transparent px-5 py-3.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 resize-none outline-none min-h-[52px] max-h-[200px]" />
                 </div>
                 <button onClick={() => send()} disabled={!input.trim() || loading}
-                  className="w-12 h-12 shrink-0 bg-brand-green hover:bg-brand-green/80 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-all shadow-sm">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                  className="w-[48px] h-[48px] shrink-0 bg-brand-green hover:bg-brand-green/90 disabled:bg-gray-200 disabled:dark:bg-white/[0.05] disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded-[20px] flex items-center justify-center transition-all shadow-sm">
+                  <svg className="w-5 h-5 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                 </button>
               </div>
-              <p className="text-center text-[10px] text-gray-400 mt-2">Enter to send · Shift+Enter for new line</p>
+              <p className="text-center text-[10px] text-gray-400 mt-2">Origin Copilot can make mistakes. Consider verifying important information.</p>
             </div>
           </>
         )}
