@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 
 export default function OriginBiIntelligentWidget() {
   const [mounted, setMounted] = useState(false);
@@ -63,16 +64,13 @@ export default function OriginBiIntelligentWidget() {
           }}
           aria-label="Open Ask AI"
         >
-          {/* Stars icon */}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style={{ flexShrink: 0 }}>
-            <motion.path
-              d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"
-              animate={{ opacity: [1, 0.6, 1] }}
-              transition={{ duration: 1.8, repeat: Infinity }}
-            />
-            <path d="M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z" opacity="0.8" />
-            <path d="M19 13l.75 2.25L22 16l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 13z" opacity="0.6" />
-          </svg>
+          {/* Sparkles icon */}
+          <motion.div
+            animate={{ opacity: [1, 0.6, 1], scale: [1, 1.05, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <Sparkles className="w-4 h-4 text-white" strokeWidth={2.5} />
+          </motion.div>
 
           <span>Ask AI</span>
 
