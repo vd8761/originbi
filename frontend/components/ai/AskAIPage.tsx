@@ -15,11 +15,11 @@ interface Employee {
 interface Transcript { id: string; name: string; transcript: string; }
 
 const THINKING_LABELS = [
-  'Thinking…',
+  'Originating…',
+  'Cooking…',
   'Analyzing your team…',
-  'Generating insights…',
-  'Processing data…',
-  'Crafting response…',
+  'Connecting the dots…',
+  'Drafting response…',
 ];
 
 function getISTDateInfo(dateStr?: string | Date) {
@@ -73,18 +73,8 @@ function ThinkingIndicator() {
 
   return (
     <div className="flex items-center gap-3 py-1">
-      {/* Animated dots like ChatGPT */}
-      <span className="flex gap-[5px] items-center">
-        {[0, 0.15, 0.3].map((delay, i) => (
-          <span
-            key={i}
-            className="inline-block w-[7px] h-[7px] rounded-full bg-[#8e8ea0] animate-bounce"
-            style={{ animationDelay: `${delay}s`, animationDuration: '0.9s' }}
-          />
-        ))}
-      </span>
       <span
-        className="text-[13px] text-[#8e8ea0]"
+        className="text-[14px] text-[#8e8ea0] font-medium"
         key={labelIdx}
         style={{ animation: 'originFadeIn 0.4s ease-in-out' }}
       >
@@ -206,6 +196,12 @@ export default function AskAIPage() {
     if (e) {
       const name = e.split('@')[0];
       setUserInitials(name.slice(0, 2).toUpperCase());
+    }
+
+    // Load sidebar state from localStorage
+    const savedSidebar = localStorage.getItem('originbi_ask_ai_sidebar');
+    if (savedSidebar !== null) {
+      setSidebarOpen(savedSidebar === 'true');
     }
   }, []);
 
@@ -406,7 +402,7 @@ export default function AskAIPage() {
         </div>
 
         {/* Sessions */}
-        <div className="flex-1 overflow-y-auto px-2 pb-4">
+        <div className="flex-1 overflow-y-auto px-2 pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {filteredSessions ? (
             /* Filtered results */
             filteredSessions.length === 0 ? (
@@ -484,7 +480,11 @@ export default function AskAIPage() {
           <div className="flex items-center gap-2">
             {/* Sidebar toggle */}
             <button
-              onClick={() => setSidebarOpen(p => !p)}
+              onClick={() => setSidebarOpen(p => {
+                const next = !p;
+                localStorage.setItem('originbi_ask_ai_sidebar', String(next));
+                return next;
+              })}
               className="p-1.5 rounded-md hover:bg-[#f3f4f6] dark:hover:bg-[#2d2d2d] text-[#6b7280] dark:text-[#9ca3af] transition-colors"
               title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
             >
@@ -526,13 +526,10 @@ export default function AskAIPage() {
         {activeTab === 'ask' && (
           <div className="flex flex-col flex-1 overflow-hidden">
             {/* Messages scrollable area */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {messages.length === 0 ? (
                 /* Empty state */
                 <div className="flex flex-col items-center justify-center min-h-full px-4 py-12">
-                  <div className="mb-6">
-                    <CopilotIcon size={48} />
-                  </div>
                   <h1 className="text-[28px] font-semibold text-[#111827] dark:text-white mb-2 text-center">
                     Origin Copilot
                   </h1>
@@ -557,13 +554,6 @@ export default function AskAIPage() {
                 <div className="max-w-3xl mx-auto w-full px-4 py-8 space-y-8">
                   {messages.map((msg, i) => (
                     <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      {/* Copilot icon */}
-                      {msg.role === 'assistant' && (
-                        <div className="shrink-0 mt-0.5">
-                          <CopilotIcon size={28} />
-                        </div>
-                      )}
-
                       <div className={`min-w-0 max-w-[85%] ${msg.role === 'user' ? 'flex flex-col items-end' : 'flex-1'}`}>
                         {msg.role === 'user' ? (
                           <div className="bg-[#f3f4f6] dark:bg-[#2d2d2d] text-[#111827] dark:text-[#f9fafb] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
@@ -588,9 +578,6 @@ export default function AskAIPage() {
                   {/* Thinking indicator */}
                   {loading && (
                     <div className="flex gap-4">
-                      <div className="shrink-0 mt-0.5">
-                        <CopilotIcon size={28} />
-                      </div>
                       <div className="flex-1">
                         <ThinkingIndicator />
                       </div>
