@@ -743,10 +743,10 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         aa.sincerity_index,
         aa.sincerity_class,
         aa.status as assessment_status,
-        (aa.metadata->'disc_scores'->>'D')::numeric as disc_d,
-        (aa.metadata->'disc_scores'->>'I')::numeric as disc_i,
-        (aa.metadata->'disc_scores'->>'S')::numeric as disc_s,
-        (aa.metadata->'disc_scores'->>'C')::numeric as disc_c,
+        COALESCE((aa.metadata->'disc_scores'->>'D'), (aa.metadata->'discScores'->>'D'))::numeric as disc_d,
+        COALESCE((aa.metadata->'disc_scores'->>'I'), (aa.metadata->'discScores'->>'I'))::numeric as disc_i,
+        COALESCE((aa.metadata->'disc_scores'->>'S'), (aa.metadata->'discScores'->>'S'))::numeric as disc_s,
+        COALESCE((aa.metadata->'disc_scores'->>'C'), (aa.metadata->'discScores'->>'C'))::numeric as disc_c,
         (SELECT MAX(aa2.total_score::numeric) 
          FROM assessment_attempts aa2 
          WHERE aa2.registration_id = r.id AND aa2.status = 'COMPLETED') as best_score,
@@ -2017,12 +2017,14 @@ RESPONSE RULES:
 1. NEVER reveal raw scores, numbers, or DISC codes — speak in behavioral language only.
 2. Maintain formal, boardroom-level tone. No casual phrasing.
 3. Reference actual names from the data below.
-4. Always close with a "Strategic Recommendation" the leader can act on.
+4. ALWAYS close with a "Strategic Recommendation" the leader can act on.
 5. Use bold headers and bullet points. Keep it executive-brief-style.
 6. You CAN answer questions about education history, department, year of study, role, and designation — this data is available.
 7. You CAN filter and list candidates by any criteria — JD match, department, name list, group, year, etc.
-8. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response by listing the employee's DISC profile or type name. Begin DIRECTLY addressing the question. Surface behavioral traits only when needed.
-9. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. Never ask "which employee?" for a follow-up.`;
+8. CRITICAL — NAME-FIRST FORMAT: When answering "who" questions (who collaborates best, who is a good leader, who fits this role, etc.), ALWAYS lead with a concise bulleted name list first. Then briefly state why for each name in 1 sentence. Do NOT write long paragraphs before revealing names. The leader wants names immediately.
+9. CRITICAL — INVITE FOLLOW-UP: After giving the name list, end with: "Would you like a deeper profile on any of these individuals?"
+10. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response with a DISC profile dump. Begin DIRECTLY addressing the question. Surface behavioral traits only when needed.
+11. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. Never ask "which employee?" for a follow-up.`;
 
   // ─── MAIN ROUTING ENTRY POINT ───────────────────────────────────────────────
 
