@@ -61,7 +61,7 @@ export default function CorporateLayout({
     };
 
     return (
-        <div className="relative min-h-screen w-full bg-transparent dark:bg-[#19211C] font-sans selection:bg-brand-green/20 overflow-x-hidden">
+        <div className="relative min-h-screen w-full bg-transparent dark:bg-[#19211C] font-sans selection:bg-brand-green/20">
             <div className={`w-full min-h-screen ${showHeader ? 'lg:[zoom:0.85] xl:[zoom:0.9] 2xl:[zoom:1.0]' : ''}`}>
                 {showHeader ? (
                     <RequireCorporate>
