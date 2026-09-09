@@ -1,10 +1,15 @@
-import AskAIPage from '../../../components/ai/AskAIPage';
+'use client';
 
-export const metadata = {
-  title: 'Ask AI — People Intelligence | OriginBI',
-  description: 'AI-powered workforce intelligence copilot. Ask about your team, match candidates, and make smarter people decisions.',
-};
+import RequireCorporate from '../../../components/auth/RequireCorporate';
+import AskAIPage from '../../../components/ai/AskAIPage';
+import { configureAmplify } from '../../../lib/aws-amplify-config';
+
+configureAmplify();
 
 export default function AskAIRoutePage() {
-  return <AskAIPage />;
+  return (
+    <RequireCorporate>
+      <AskAIPage />
+    </RequireCorporate>
+  );
 }
