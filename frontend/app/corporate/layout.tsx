@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Header from '../../components/corporate/Header';
+import OriginBiIntelligentWidget from '../../components/ai/OriginBiIntelligentWidget';
 import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'aws-amplify/auth';
 import { configureAmplify } from '../../lib/aws-amplify-config';
@@ -86,7 +87,6 @@ export default function CorporateLayout({
                                 {children}
                             </div>
                         </div>
-                        {/* Ask AI is a dedicated full page at /corporate/ask-ai */}
                     </RequireCorporate>
                 ) : (
                     <div className="relative z-10 w-full min-h-screen transition-all duration-300">
@@ -94,6 +94,8 @@ export default function CorporateLayout({
                     </div>
                 )}
             </div>
+            {/* Floating Ask AI button — outside zoom wrapper so fixed positioning is unaffected */}
+            {showHeader && <OriginBiIntelligentWidget />}
         </div>
     );
 }
