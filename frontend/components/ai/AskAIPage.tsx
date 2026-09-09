@@ -14,15 +14,26 @@ interface Employee {
 }
 interface Transcript { id: string; name: string; transcript: string; }
 
+function getISTDateInfo(dateStr?: string | Date) {
+  const d = dateStr ? new Date(dateStr) : new Date();
+  const istString = d.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+  const istDate = new Date(istString);
+  istDate.setHours(0, 0, 0, 0);
+  return istDate;
+}
+
 function groupSessions(sessions: Session[]) {
-  const now = new Date();
+  const nowIST = getISTDateInfo();
   const g: Record<string, Session[]> = { Today: [], Yesterday: [], 'This Week': [], 'Last Week': [], Older: [] };
+  
   sessions.forEach(s => {
-    const diff = Math.floor((now.getTime() - new Date(s.updatedAt || s.createdAt).getTime()) / 86400000);
-    if (diff === 0) g.Today.push(s);
-    else if (diff === 1) g.Yesterday.push(s);
-    else if (diff <= 7) g['This Week'].push(s);
-    else if (diff <= 14) g['Last Week'].push(s);
+    const sIST = getISTDateInfo(s.updatedAt || s.createdAt);
+    const diffDays = Math.round((nowIST.getTime() - sIST.getTime()) / 86400000);
+    
+    if (diffDays === 0) g.Today.push(s);
+    else if (diffDays === 1) g.Yesterday.push(s);
+    else if (diffDays <= 7) g['This Week'].push(s);
+    else if (diffDays <= 14) g['Last Week'].push(s);
     else g.Older.push(s);
   });
   return g;
@@ -269,7 +280,7 @@ export default function AskAIPage() {
                         onClick={e => e.stopPropagation()} maxLength={60}
                         className="flex-1 bg-white dark:bg-[#1a2620] border border-brand-green/40 rounded-lg px-2 py-0.5 text-sm outline-none" />
                     ) : (
-                      <span className="flex-1 truncate">{s.title || 'Untitled Chat'}</span>
+                      <span className="flex-1 truncate" title={s.title || 'Untitled Chat'}>{s.title || 'Untitled Chat'}</span>
                     )}
                     <span className="hidden group-hover:flex items-center gap-1 shrink-0">
                       {confirmDeleteId === s.id ? (
