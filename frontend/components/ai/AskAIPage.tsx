@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Pencil, Trash2, Check, X } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
@@ -179,7 +180,7 @@ export default function AskAIPage() {
   const [interviewLoading, setInterviewLoading] = useState(false);
   const [interviewResult, setInterviewResult] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessionSearch, setSessionSearch] = useState('');
   const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
 
@@ -370,11 +371,9 @@ export default function AskAIPage() {
       <aside
         className={`flex flex-col shrink-0 bg-[#f9f9f9] dark:bg-[#171717] border-r border-[#e5e7eb] dark:border-[#2d2d2d] transition-all duration-300 ${sidebarOpen ? 'w-[260px]' : 'w-0'} overflow-hidden`}
       >
-        {/* Top bar */}
-        <div className="flex items-center gap-2 px-3 py-3 shrink-0">
-          {/* Logo mark */}
-          <img src="/Origin-BI-Logo-01.png" alt="OriginBI" className="h-5 w-auto dark:hidden" />
-          <img src="/Origin-BI-white-logo.png" alt="OriginBI" className="h-5 w-auto hidden dark:block" />
+        {/* Sidebar top spacer to align with header height */}
+        <div className="h-[52px] shrink-0 flex items-center px-3">
+          <span className="text-[12px] font-semibold text-[#9ca3af] uppercase tracking-wider">Chats</span>
         </div>
 
         {/* New Chat */}
@@ -766,13 +765,21 @@ function SessionItem({
       <span className="hidden group-hover:flex items-center gap-1 shrink-0">
         {confirmDeleteId === s.id ? (
           <>
-            <button onClick={onDelete} className="w-5 h-5 flex items-center justify-center text-red-500 hover:text-red-700 text-sm" title="Confirm Delete">✓</button>
-            <button onClick={e => { e.stopPropagation(); onCancelDelete(); }} className="w-5 h-5 flex items-center justify-center text-[#9ca3af] hover:text-[#374151] text-xs" title="Cancel">✕</button>
+            <button onClick={onDelete} className="p-1 flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors" title="Confirm Delete">
+              <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onCancelDelete(); }} className="p-1 flex items-center justify-center text-[#9ca3af] hover:text-[#374151] hover:bg-[#e5e7eb] dark:hover:bg-[#3d3d3d] rounded-md transition-colors" title="Cancel">
+              <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+            </button>
           </>
         ) : (
           <>
-            <button onClick={onStartEdit} className="w-5 h-5 flex items-center justify-center text-[#9ca3af] hover:text-[#374151] dark:hover:text-[#d1d5db] text-xs" title="Rename">✎</button>
-            <button onClick={e => { e.stopPropagation(); onConfirmDelete(); }} className="w-5 h-5 flex items-center justify-center text-[#9ca3af] hover:text-red-500 text-xs" title="Delete">✕</button>
+            <button onClick={onStartEdit} className="p-1 flex items-center justify-center text-[#9ca3af] hover:text-[#374151] hover:bg-[#e5e7eb] dark:hover:text-[#d1d5db] dark:hover:bg-[#3d3d3d] rounded-md transition-colors" title="Rename">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onConfirmDelete(); }} className="p-1 flex items-center justify-center text-[#9ca3af] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors" title="Delete">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </>
         )}
       </span>
