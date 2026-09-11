@@ -562,7 +562,7 @@ export default function AskAIPage() {
                         ) : (
                           <>
                             <div className="text-[15px] leading-[1.75] text-[#374151] dark:text-[#d1d5db]">
-                              <MarkdownRenderer content={msg.content} />
+                              <MarkdownRenderer content={msg.content} hideSingleBullet={true} />
                             </div>
                             {/* Response actions */}
                             <div className="flex items-center gap-0.5 mt-3 -ml-2">
@@ -693,7 +693,7 @@ export default function AskAIPage() {
               </button>
               {interviewResult && (
                 <div className="mt-6 bg-white dark:bg-[#2d2d2d] border border-[#e5e7eb] dark:border-[#3d3d3d] rounded-xl px-6 py-6">
-                  <MarkdownRenderer content={interviewResult} />
+                  <MarkdownRenderer content={interviewResult} hideSingleBullet={true} />
                   <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#e5e7eb] dark:border-[#3d3d3d]">
                     <CopyButton text={interviewResult} />
                     <DownloadButton text={interviewResult} />
