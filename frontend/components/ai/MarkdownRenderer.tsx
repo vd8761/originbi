@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 
 interface MarkdownRendererProps {
   content: string;
+  hideSingleBullet?: boolean;
 }
 
 // Inline parser: bold, italic, inline code, links
@@ -40,7 +41,7 @@ function parseInline(text: string): React.ReactNode[] {
   });
 }
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, hideSingleBullet = false }) => {
   const parseMarkdown = (text: string): React.ReactNode[] => {
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
@@ -87,16 +88,24 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
 
     const flushBullets = () => {
       if (bulletItems.length === 0) return;
-      elements.push(
-        <ul key={`ul-${elements.length}`} className="my-2 space-y-1.5 pl-5 list-none">
-          {bulletItems.map((item, i) => (
-            <li key={i} className="flex gap-2.5 text-[15px] leading-relaxed text-[#374151] dark:text-[#d1d5db]">
-              <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#374151] dark:bg-[#9ca3af] shrink-0" />
-              <span>{parseInline(item)}</span>
-            </li>
-          ))}
-        </ul>
-      );
+      if (bulletItems.length === 1 && hideSingleBullet) {
+        elements.push(
+          <p key={`ul-single-${elements.length}`} className="my-1 pl-5 text-[15px] leading-[1.75] text-[#374151] dark:text-[#d1d5db]">
+            {parseInline(bulletItems[0])}
+          </p>
+        );
+      } else {
+        elements.push(
+          <ul key={`ul-${elements.length}`} className="my-2 space-y-1.5 pl-5 list-none">
+            {bulletItems.map((item, i) => (
+              <li key={i} className="flex gap-2.5 text-[15px] leading-relaxed text-[#374151] dark:text-[#d1d5db]">
+                <span className="mt-[7px] w-1.5 h-1.5 rounded-full bg-[#374151] dark:bg-[#9ca3af] shrink-0" />
+                <span>{parseInline(item)}</span>
+              </li>
+            ))}
+          </ul>
+        );
+      }
       bulletItems = [];
     };
 
