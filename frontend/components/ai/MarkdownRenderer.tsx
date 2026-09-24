@@ -20,7 +20,19 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, hid
           h3: ({node, ...props}) => <h3 className="text-[15px] font-semibold mt-4 mb-1.5 text-[#111827] dark:text-[#f9fafb]" {...props} />,
           h4: ({node, ...props}) => <h4 className="text-[14px] font-semibold mt-3 mb-1 text-[#111827] dark:text-[#f9fafb]" {...props} />,
           p: ({node, ...props}) => <p className="my-2" {...props} />,
-          ul: ({node, ...props}) => <ul className="my-2 space-y-1.5 pl-6 list-disc list-outside" {...props} />,
+          ul: ({node, children, ...props}) => {
+            // Count real li children (ignore whitespace text nodes)
+            if (hideSingleBullet) {
+              const liChildren = React.Children.toArray(children).filter(
+                (c): c is React.ReactElement => React.isValidElement(c) && (c as React.ReactElement<any>).type === 'li'
+              );
+              if (liChildren.length === 1) {
+                // Render the single item as a plain paragraph — no bullet, no indent
+                return <p className="my-2">{(liChildren[0] as React.ReactElement<any>).props.children}</p>;
+              }
+            }
+            return <ul className="my-2 space-y-1.5 pl-6 list-disc list-outside" {...props}>{children}</ul>;
+          },
           ol: ({node, ...props}) => <ol className="my-2 space-y-1.5 pl-6 list-decimal list-outside" {...props} />,
           li: ({node, ...props}) => <li className="pl-1" {...props} />,
           table: ({node, ...props}) => (
