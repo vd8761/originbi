@@ -6,9 +6,10 @@ import remarkGfm from 'remark-gfm';
 
 interface MarkdownRendererProps {
   content: string;
+  hideSingleBullet?: boolean;
 }
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, hideSingleBullet }) => {
   return (
     <div className="min-w-0 break-words text-[15px] leading-relaxed text-[#374151] dark:text-[#d1d5db]">
       <ReactMarkdown
