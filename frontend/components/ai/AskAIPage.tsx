@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Pencil, Trash2, Check, X } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Square } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
@@ -61,25 +61,51 @@ const ALL_SUGGESTIONS = [
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Previous 30 days', 'Older'];
 const CACHE_TTL = 60 * 60 * 1000;
 
-// Animated thinking indicator — cycles through status labels
+// Animated thinking indicator — cycles through status labels with pulse dots
 function ThinkingIndicator() {
   const [labelIdx, setLabelIdx] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => {
       setLabelIdx(p => (p + 1) % THINKING_LABELS.length);
-    }, 1600);
+    }, 1800);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="flex items-center gap-3 py-1">
+    <div className="flex items-center gap-2.5 py-1">
+      {/* Animated pulse dots */}
+      <span className="flex items-center gap-[4px]">
+        {[0, 1, 2].map(i => (
+          <span
+            key={i}
+            className="inline-block w-[6px] h-[6px] rounded-full bg-[#19c37d]"
+            style={{
+              animation: `thinkPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+            }}
+          />
+        ))}
+      </span>
       <span
-        className="text-[14px] text-[#8e8ea0] font-medium"
+        className="text-[13px] text-[#8e8ea0] font-medium"
         key={labelIdx}
         style={{ animation: 'originFadeIn 0.4s ease-in-out' }}
       >
         {THINKING_LABELS[labelIdx]}
       </span>
+      <style>{`
+        @keyframes thinkPulse {
+          0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+          40% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes originFadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes msgReveal {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -164,6 +190,8 @@ export default function AskAIPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  // Typewriter streaming state: holds the reply being "typed" out
+  const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ask' | 'interviews'>('ask');
   const [jdText, setJdText] = useState('');
   const [transcripts, setTranscripts] = useState<Transcript[]>([{ id: '1', name: '', transcript: '' }]);
@@ -177,6 +205,8 @@ export default function AskAIPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  // Abort ref lets us cancel typewriter mid-stream
+  const streamAbortRef = useRef(false);
 
   useEffect(() => {
     const shuffled = [...ALL_SUGGESTIONS].sort(() => 0.5 - Math.random());
@@ -206,7 +236,7 @@ export default function AskAIPage() {
   }, []);
 
   useEffect(() => { if (email) { loadSessions(); loadCache(); } }, [email]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streamingContent]);
   useEffect(() => { if (editingId) titleRef.current?.focus(); }, [editingId]);
 
   const loadCache = useCallback(async () => {
@@ -277,6 +307,33 @@ export default function AskAIPage() {
     setEditingId(null);
   };
 
+  // Typewriter helper: streams reply word-by-word into streamingContent
+  const typewriterStream = useCallback(async (fullReply: string) => {
+    streamAbortRef.current = false;
+    const words = fullReply.split(/(?<=[\s\n])/); // split keeping whitespace
+    let built = '';
+    setStreamingContent('');
+    for (const word of words) {
+      if (streamAbortRef.current) break;
+      built += word;
+      setStreamingContent(built);
+      // Speed: shorter chunks render faster; longer words slightly slower
+      await new Promise(r => setTimeout(r, Math.min(word.length * 8, 30)));
+    }
+    // Commit final complete message to messages array
+    setStreamingContent(null);
+    if (!streamAbortRef.current) {
+      setMessages(p => [...p, { role: 'assistant', content: fullReply }]);
+    } else {
+      // User stopped early — commit what was typed so far
+      setMessages(p => [...p, { role: 'assistant', content: built }]);
+    }
+  }, []);
+
+  const stopGeneration = () => {
+    streamAbortRef.current = true;
+  };
+
   const send = async (text?: string) => {
     const prompt = (text || input).trim();
     if (!prompt || loading) return;
@@ -297,31 +354,38 @@ export default function AskAIPage() {
       const data = await res.json();
       const reply = data.reply || 'Sorry, I could not process that.';
       const sid: number = data.sessionId;
-      setMessages(p => [...p, { role: 'assistant', content: reply }]);
+      // ✅ Stop the loader — start typewriter streaming immediately
+      setLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+      // Kick off typewriter (non-blocking)
+      typewriterStream(reply);
 
       if (sid && sid !== activeSessionId) {
         setActiveSessionId(sid);
-        await loadSessions();
+        loadSessions(); // fire-and-forget, no await
         if (isFirst) {
-          try {
-            const tr = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
-              body: JSON.stringify({ prompt: `Generate a concise 5-7 word chat title (no quotes, no punctuation) for a conversation starting with: "${prompt.substring(0, 100)}"`, sessionId: null, userRole: 'CORPORATE', messages: [], noSession: true }),
-            });
-            if (tr.ok) {
-              const td = await tr.json();
-              const rawTitle = td.reply || '';
-              const autoTitle = rawTitle.replace(/\*\*/g, '').replace(/[*_#`]/g, '').replace(/^[\s\W]+/, '').trim().substring(0, 60);
-              if (autoTitle) {
-                await fetch(`/api/chat/sessions/${sid}/title`, {
-                  method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-id': email },
-                  body: JSON.stringify({ title: autoTitle }),
-                });
-                setSessions(p => p.map(s => s.id === sid ? { ...s, title: autoTitle } : s));
+          // Title generation runs fully in the background — never blocks the UI
+          (async () => {
+            try {
+              const tr = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
+                body: JSON.stringify({ prompt: `Generate a concise 5-7 word chat title (no quotes, no punctuation) for a conversation starting with: "${prompt.substring(0, 100)}"`, sessionId: null, userRole: 'CORPORATE', messages: [], noSession: true }),
+              });
+              if (tr.ok) {
+                const td = await tr.json();
+                const rawTitle = td.reply || '';
+                const autoTitle = rawTitle.replace(/\*\*/g, '').replace(/[*_#`]/g, '').replace(/^[\s\W]+/, '').trim().substring(0, 60);
+                if (autoTitle) {
+                  await fetch(`/api/chat/sessions/${sid}/title`, {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-id': email },
+                    body: JSON.stringify({ title: autoTitle }),
+                  });
+                  setSessions(p => p.map(s => s.id === sid ? { ...s, title: autoTitle } : s));
+                }
               }
-            }
-          } catch { /* ignore */ }
+            } catch { /* ignore */ }
+          })();
         }
       } else if (sid) {
         setSessions(p =>
@@ -331,7 +395,6 @@ export default function AskAIPage() {
       }
     } catch {
       setMessages(p => [...p, { role: 'assistant', content: '⚠️ Connection error. Please check the corporate service is running.' }]);
-    } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
@@ -553,7 +616,11 @@ export default function AskAIPage() {
                 /* Messages list */
                 <div className="max-w-3xl mx-auto w-full px-4 py-8 space-y-8">
                   {messages.map((msg, i) => (
-                    <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      key={i}
+                      className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      style={{ animation: 'msgReveal 0.35s ease-out' }}
+                    >
                       <div className={`min-w-0 max-w-[85%] ${msg.role === 'user' ? 'flex flex-col items-end' : 'flex-1'}`}>
                         {msg.role === 'user' ? (
                           <div className="bg-[#f3f4f6] dark:bg-[#2d2d2d] text-[#111827] dark:text-[#f9fafb] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap">
@@ -575,8 +642,24 @@ export default function AskAIPage() {
                     </div>
                   ))}
 
-                  {/* Thinking indicator */}
-                  {loading && (
+                  {/* Typewriter streaming reply */}
+                  {streamingContent !== null && (
+                    <div className="flex gap-4 justify-start" style={{ animation: 'msgReveal 0.35s ease-out' }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[15px] leading-[1.75] text-[#374151] dark:text-[#d1d5db]">
+                          <MarkdownRenderer content={streamingContent} hideSingleBullet={true} />
+                        </div>
+                        {/* Blinking cursor at end */}
+                        <span
+                          className="inline-block w-[2px] h-[16px] bg-[#19c37d] ml-0.5 align-middle rounded-full"
+                          style={{ animation: 'thinkPulse 0.8s ease-in-out infinite' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Thinking indicator — only while fetching, before stream starts */}
+                  {loading && streamingContent === null && (
                     <div className="flex gap-4">
                       <div className="flex-1">
                         <ThinkingIndicator />
@@ -605,22 +688,33 @@ export default function AskAIPage() {
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                     placeholder="Ask about your team…"
                     rows={1}
-                    disabled={loading}
-                    className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed"
+                    disabled={loading || streamingContent !== null}
+                    className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60"
                   />
-                  {/* Send button — bottom-right inside textarea box */}
+                  {/* Send / Stop button — bottom-right inside textarea box */}
                   <div className="absolute bottom-3 right-3">
-                    <button
-                      onClick={() => send()}
-                      disabled={!input.trim() || loading}
-                      className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#111827] dark:bg-white disabled:bg-[#e5e7eb] dark:disabled:bg-[#3d3d3d] text-white dark:text-[#111827] disabled:text-[#9ca3af] dark:disabled:text-[#6b7280] disabled:cursor-not-allowed transition-colors"
-                      title="Send message"
-                    >
-                      {/* Up arrow */}
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                      </svg>
-                    </button>
+                    {(loading || streamingContent !== null) ? (
+                      /* Stop button while generating/streaming */
+                      <button
+                        onClick={stopGeneration}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#111827] dark:bg-white text-white dark:text-[#111827] hover:bg-[#374151] dark:hover:bg-[#f3f4f6] transition-all shadow-sm"
+                        title="Stop generating"
+                      >
+                        <Square className="w-3.5 h-3.5" fill="currentColor" />
+                      </button>
+                    ) : (
+                      /* Send button */
+                      <button
+                        onClick={() => send()}
+                        disabled={!input.trim()}
+                        className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#111827] dark:bg-white disabled:bg-[#e5e7eb] dark:disabled:bg-[#3d3d3d] text-white dark:text-[#111827] disabled:text-[#9ca3af] dark:disabled:text-[#6b7280] disabled:cursor-not-allowed transition-colors"
+                        title="Send message"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p className="text-center text-[11px] text-[#9ca3af] mt-2">
