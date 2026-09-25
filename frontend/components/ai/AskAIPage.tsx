@@ -272,7 +272,6 @@ export default function AskAIPage() {
         };
 
         mediaRecorder.onstop = async () => {
-          // Stop all mic tracks
           stream.getTracks().forEach(track => track.stop());
 
           const chunks = audioChunksRef.current;
@@ -281,12 +280,13 @@ export default function AskAIPage() {
           if (chunks.length === 0) return;
 
           const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-          if (audioBlob.size < 1000) return; // too short, ignore
+          if (audioBlob.size < 1000) return;
 
           setIsTranscribing(true);
           try {
             const formData = new FormData();
             formData.append('file', audioBlob, 'audio.webm');
+            // No language hint — let Whisper auto-detect
 
             const res = await fetch('/api/transcribe', {
               method: 'POST',
@@ -296,19 +296,14 @@ export default function AskAIPage() {
             const data = await res.json();
             if (res.ok && data.text && data.text.trim()) {
               const transcribed = data.text.trim();
-              setInput(prev => prev ? prev + ' ' + transcribed : transcribed);
-              // Resize textarea
-              setTimeout(() => {
-                if (inputRef.current) {
-                  inputRef.current.style.height = 'auto';
-                  inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
-                  inputRef.current.focus();
-                }
-              }, 50);
+              // Auto-submit directly
+              setIsTranscribing(false);
+              send(transcribed);
+            } else {
+              setIsTranscribing(false);
             }
           } catch (err) {
             console.error('Transcription error:', err);
-          } finally {
             setIsTranscribing(false);
           }
         };
@@ -780,40 +775,57 @@ export default function AskAIPage() {
             {/* ── INPUT AREA ── */}
             <div className="shrink-0 px-4 pb-6 pt-2 bg-white dark:bg-[#212121]">
               <div className="max-w-3xl mx-auto">
-                <div className="relative bg-white dark:bg-[#2d2d2d] border border-[#e5e7eb] dark:border-[#3d3d3d] rounded-2xl shadow-sm focus-within:border-[#9ca3af] dark:focus-within:border-[#6b7280] transition-colors">
-                  <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onInput={e => {
-                      const t = e.target as HTMLTextAreaElement;
-                      t.style.height = 'auto';
-                      t.style.height = Math.min(t.scrollHeight, 200) + 'px';
-                    }}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder={isListening ? 'Listening... tap mic to stop & transcribe' : 'Ask about your team…'}
-                    rows={1}
-                    disabled={loading || streamingContent !== null}
-                    className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-                  />
-                  {/* Recording overlay when mic is active */}
+                <style>{`
+                  @keyframes voiceBar {
+                    from { transform: scaleY(0.3); opacity: 0.4; }
+                    to   { transform: scaleY(1);   opacity: 1; }
+                  }
+                `}</style>
+                <div className="relative bg-white dark:bg-[#2d2d2d] border border-[#e5e7eb] dark:border-[#3d3d3d] rounded-2xl shadow-sm focus-within:border-[#9ca3af] dark:focus-within:border-[#6b7280] transition-colors overflow-hidden">
+                  {/* Normal textarea — hidden during voice states */}
+                  {!isListening && !isTranscribing && (
+                    <textarea
+                      ref={inputRef}
+                      value={input}
+                      onChange={e => setInput(e.target.value)}
+                      onInput={e => {
+                        const t = e.target as HTMLTextAreaElement;
+                        t.style.height = 'auto';
+                        t.style.height = Math.min(t.scrollHeight, 200) + 'px';
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                      placeholder="Ask about your team…"
+                      rows={1}
+                      disabled={loading || streamingContent !== null}
+                      className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                    />
+                  )}
+                  {/* Voice recording state — replaces textarea */}
                   {isListening && (
-                    <div className="absolute inset-x-0 top-0 flex items-center gap-2.5 px-4 py-3.5 pointer-events-none">
-                      <span className="relative flex h-2.5 w-2.5 shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
-                      </span>
-                      <span className="text-[14px] text-red-500 font-medium">Recording — tap mic to stop</span>
+                    <div className="px-4 pt-4 pb-12 min-h-[56px] flex flex-col justify-center gap-2">
+                      <div className="flex items-center gap-2">
+                        {[0.5,0.9,1.3,1,1.5,0.7,1.1,0.5,1.3,0.9,1.5,0.7,0.9,1.2,0.5].map((h, i) => (
+                          <div
+                            key={i}
+                            className="w-[3px] rounded-full bg-red-500"
+                            style={{
+                              height: `${h * 18}px`,
+                              animation: `voiceBar 0.7s ease-in-out ${i * 0.055}s infinite alternate`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-[12px] text-[#9ca3af]">Listening… speak any language — tap mic to stop &amp; send</p>
                     </div>
                   )}
-                  {/* Transcribing spinner */}
+                  {/* Transcribing state — replaces textarea */}
                   {isTranscribing && (
-                    <div className="absolute inset-x-0 top-0 flex items-center gap-2.5 px-4 py-3.5 pointer-events-none">
+                    <div className="px-4 pt-4 pb-12 min-h-[56px] flex items-center gap-2.5">
                       <svg className="animate-spin h-4 w-4 text-[#6b7280] shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                       </svg>
-                      <span className="text-[14px] text-[#6b7280]">Transcribing your voice…</span>
+                      <span className="text-[14px] text-[#6b7280] dark:text-[#9ca3af]">Transcribing &amp; sending…</span>
                     </div>
                   )}
                   {/* Actions — bottom-right inside textarea box */}
