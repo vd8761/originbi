@@ -196,9 +196,8 @@ export default function AskAIPage() {
   const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechLang, setSpeechLang] = useState('en-US');
-  const shouldListenRef = useRef(false);
-  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -238,82 +237,74 @@ export default function AskAIPage() {
   useEffect(() => { if (editingId) titleRef.current?.focus(); }, [editingId]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = speechLang;
-        
-        let previousInput = '';
-        recognition.onstart = () => {
-          previousInput = inputRef.current?.value || '';
-        };
-
-        recognition.onresult = (event: any) => {
-          let currentInterim = '';
-          let currentFinal = '';
-          
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              currentFinal += event.results[i][0].transcript;
-            } else {
-              currentInterim += event.results[i][0].transcript;
-            }
-          }
-          
-          if (currentFinal) {
-            previousInput = (previousInput + ' ' + currentFinal).trim();
-          }
-          
-          setInput((previousInput + ' ' + currentInterim).trim());
-          
-          if (inputRef.current) {
-            inputRef.current.style.height = 'auto';
-            inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
-          }
-        };
-
-        recognition.onerror = (e: any) => {
-          if (shouldListenRef.current && e.error !== 'not-allowed') {
-            try { recognition.start(); } catch (err) { console.warn('speech start error', err); }
-          } else {
-            setIsListening(false);
-          }
-        };
-        recognition.onend = () => {
-          if (shouldListenRef.current) {
-            try { recognition.start(); } catch (err) { console.warn('speech auto-restart error', err); }
-          } else {
-            setIsListening(false);
-          }
-        };
-        recognitionRef.current = recognition;
-
-        if (shouldListenRef.current) {
-          try { recognition.start(); } catch (err) { console.warn('speech init start error', err); }
-        }
-      }
-    }
     return () => {
-      if (recognitionRef.current) {
-        shouldListenRef.current = false;
-        try { recognitionRef.current.stop(); } catch (err) { console.warn('speech stop error', err); }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
       }
       window.speechSynthesis?.cancel();
     };
-  }, [speechLang]);
+  }, []);
 
-  const toggleListening = () => {
+  const toggleListening = async () => {
     if (isListening) {
-      shouldListenRef.current = false;
-      try { recognitionRef.current?.stop(); } catch (err) { console.warn('speech toggle stop error', err); }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
       setIsListening(false);
     } else {
-      shouldListenRef.current = true;
-      try { recognitionRef.current?.start(); } catch (err) { console.warn('speech toggle start error', err); }
-      setIsListening(true);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          audioChunksRef.current = [];
+          
+          stream.getTracks().forEach(track => track.stop());
+
+          if (audioBlob.size === 0) return;
+
+          setLoading(true);
+          try {
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'audio.webm');
+
+            const res = await fetch('/api/transcribe', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!res.ok) throw new Error('Transcription failed');
+            
+            const data = await res.json();
+            if (data.text) {
+              setInput(prev => (prev + ' ' + data.text).trim());
+              if (inputRef.current) {
+                inputRef.current.style.height = 'auto';
+                inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
+              }
+            }
+          } catch (err) {
+            console.error('Transcription error:', err);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        mediaRecorder.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error('Microphone access denied:', err);
+        setIsListening(false);
+      }
     }
   };
 
@@ -792,18 +783,6 @@ export default function AskAIPage() {
                   />
                   {/* Actions — bottom-right inside textarea box */}
                   <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                    {/* Speech Language Selector */}
-                    <select
-                      value={speechLang}
-                      onChange={e => setSpeechLang(e.target.value)}
-                      className="text-[12px] bg-transparent border-none text-[#9ca3af] hover:text-[#6b7280] dark:hover:text-[#d1d5db] outline-none cursor-pointer pr-1"
-                      title="Speech Recognition Language"
-                    >
-                      <option value="en-US">EN</option>
-                      <option value="ta-IN">TA</option>
-                      <option value="hi-IN">HI</option>
-                    </select>
-                    
                     <button
                       onClick={toggleListening}
                       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all shadow-sm ${
