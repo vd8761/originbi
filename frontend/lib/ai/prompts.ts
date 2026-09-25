@@ -15,6 +15,7 @@ export function generateSystemPrompt(context: PromptContext): string {
 Date: ${today}${userName ? `. User: ${userName}` : ''}.
 
 RESPONSE RULES (strictly follow these):
+- LANGUAGE ADAPTATION: Always detect the language of the user's prompt and respond in that EXACT same language.
 - Be CONCISE but COMPREHENSIVE: get to the point immediately, but if you have breakdown data (like program splits or user distribution), always include a quick summary table or list.
 - Use MARKDOWN formatting: bold key figures, use tables for lists/stats, bullet points for steps.
 - NUMBERS FIRST: lead with the primary number, then provide the split. E.g. "**1,656** total registered users. Here is the breakdown: ..."
