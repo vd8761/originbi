@@ -209,6 +209,8 @@ export default function AskAIPage() {
   const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechLang, setSpeechLang] = useState('en-US');
+  const shouldListenRef = useRef(false);
   const recognitionRef = useRef<any>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -255,6 +257,7 @@ export default function AskAIPage() {
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
+        recognition.lang = speechLang;
         
         let previousInput = '';
         recognition.onstart = () => {
@@ -285,23 +288,44 @@ export default function AskAIPage() {
           }
         };
 
-        recognition.onerror = () => setIsListening(false);
-        recognition.onend = () => setIsListening(false);
+        recognition.onerror = (e: any) => {
+          if (shouldListenRef.current && e.error !== 'not-allowed') {
+            try { recognition.start(); } catch {}
+          } else {
+            setIsListening(false);
+          }
+        };
+        recognition.onend = () => {
+          if (shouldListenRef.current) {
+            try { recognition.start(); } catch {}
+          } else {
+            setIsListening(false);
+          }
+        };
         recognitionRef.current = recognition;
+
+        if (shouldListenRef.current) {
+          try { recognition.start(); } catch {}
+        }
       }
     }
     return () => {
-      if (recognitionRef.current) recognitionRef.current.stop();
+      if (recognitionRef.current) {
+        shouldListenRef.current = false;
+        try { recognitionRef.current.stop(); } catch {}
+      }
       window.speechSynthesis?.cancel();
     };
-  }, []);
+  }, [speechLang]);
 
   const toggleListening = () => {
     if (isListening) {
-      recognitionRef.current?.stop();
+      shouldListenRef.current = false;
+      try { recognitionRef.current?.stop(); } catch {}
       setIsListening(false);
     } else {
-      recognitionRef.current?.start();
+      shouldListenRef.current = true;
+      try { recognitionRef.current?.start(); } catch {}
       setIsListening(true);
     }
   };
@@ -777,10 +801,22 @@ export default function AskAIPage() {
                     placeholder="Ask about your team…"
                     rows={1}
                     disabled={loading || streamingContent !== null}
-                    className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60"
+                    className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                   />
                   {/* Actions — bottom-right inside textarea box */}
                   <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                    {/* Speech Language Selector */}
+                    <select
+                      value={speechLang}
+                      onChange={e => setSpeechLang(e.target.value)}
+                      className="text-[12px] bg-transparent border-none text-[#9ca3af] hover:text-[#6b7280] dark:hover:text-[#d1d5db] outline-none cursor-pointer pr-1"
+                      title="Speech Recognition Language"
+                    >
+                      <option value="en-US">EN</option>
+                      <option value="ta-IN">TA</option>
+                      <option value="hi-IN">HI</option>
+                    </select>
+                    
                     <button
                       onClick={toggleListening}
                       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all shadow-sm ${
