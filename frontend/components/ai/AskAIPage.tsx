@@ -169,20 +169,7 @@ function DownloadButton({ text }: { text: string }) {
   );
 }
 
-// Origin copilot icon (no brain emoji)
-function CopilotIcon({ size = 28 }: { size?: number }) {
-  return (
-    <div
-      className="rounded-full flex items-center justify-center shrink-0 bg-[#19c37d]"
-      style={{ width: size, height: size }}
-    >
-      <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 24 24" fill="white">
-        <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z" />
-        <path d="M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z" opacity="0.7" />
-      </svg>
-    </div>
-  );
-}
+// Origin copilot icon (no brain emoji) - unused
 
 export default function AskAIPage() {
   const [email, setEmail] = useState('');
@@ -290,14 +277,14 @@ export default function AskAIPage() {
 
         recognition.onerror = (e: any) => {
           if (shouldListenRef.current && e.error !== 'not-allowed') {
-            try { recognition.start(); } catch {}
+            try { recognition.start(); } catch (err) { console.warn('speech start error', err); }
           } else {
             setIsListening(false);
           }
         };
         recognition.onend = () => {
           if (shouldListenRef.current) {
-            try { recognition.start(); } catch {}
+            try { recognition.start(); } catch (err) { console.warn('speech auto-restart error', err); }
           } else {
             setIsListening(false);
           }
@@ -305,14 +292,14 @@ export default function AskAIPage() {
         recognitionRef.current = recognition;
 
         if (shouldListenRef.current) {
-          try { recognition.start(); } catch {}
+          try { recognition.start(); } catch (err) { console.warn('speech init start error', err); }
         }
       }
     }
     return () => {
       if (recognitionRef.current) {
         shouldListenRef.current = false;
-        try { recognitionRef.current.stop(); } catch {}
+        try { recognitionRef.current.stop(); } catch (err) { console.warn('speech stop error', err); }
       }
       window.speechSynthesis?.cancel();
     };
@@ -321,11 +308,11 @@ export default function AskAIPage() {
   const toggleListening = () => {
     if (isListening) {
       shouldListenRef.current = false;
-      try { recognitionRef.current?.stop(); } catch {}
+      try { recognitionRef.current?.stop(); } catch (err) { console.warn('speech toggle stop error', err); }
       setIsListening(false);
     } else {
       shouldListenRef.current = true;
-      try { recognitionRef.current?.start(); } catch {}
+      try { recognitionRef.current?.start(); } catch (err) { console.warn('speech toggle start error', err); }
       setIsListening(true);
     }
   };
