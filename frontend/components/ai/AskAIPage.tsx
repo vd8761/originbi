@@ -256,19 +256,32 @@ export default function AskAIPage() {
         recognition.continuous = true;
         recognition.interimResults = true;
         
+        let previousInput = '';
+        recognition.onstart = () => {
+          previousInput = inputRef.current?.value || '';
+        };
+
         recognition.onresult = (event: any) => {
-          let currentTranscript = '';
+          let currentInterim = '';
+          let currentFinal = '';
+          
           for (let i = event.resultIndex; i < event.results.length; ++i) {
             if (event.results[i].isFinal) {
-              currentTranscript += event.results[i][0].transcript;
+              currentFinal += event.results[i][0].transcript;
+            } else {
+              currentInterim += event.results[i][0].transcript;
             }
           }
-          if (currentTranscript) {
-            setInput(prev => (prev + ' ' + currentTranscript).trim());
-            if (inputRef.current) {
-              inputRef.current.style.height = 'auto';
-              inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
-            }
+          
+          if (currentFinal) {
+            previousInput = (previousInput + ' ' + currentFinal).trim();
+          }
+          
+          setInput((previousInput + ' ' + currentInterim).trim());
+          
+          if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+            inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
           }
         };
 
