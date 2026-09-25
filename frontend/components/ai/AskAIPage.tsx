@@ -196,6 +196,7 @@ export default function AskAIPage() {
   const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -247,32 +248,42 @@ export default function AskAIPage() {
 
   const toggleListening = async () => {
     if (isListening) {
+      // Stop recording — onstop will fire and handle transcription
+      setIsListening(false);
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
-      setIsListening(false);
     } else {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
         audioChunksRef.current = [];
 
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : 'audio/webm'
+        });
+        mediaRecorderRef.current = mediaRecorder;
+
         mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
+          if (event.data && event.data.size > 0) {
             audioChunksRef.current.push(event.data);
           }
         };
 
         mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          audioChunksRef.current = [];
-          
+          // Stop all mic tracks
           stream.getTracks().forEach(track => track.stop());
 
-          if (audioBlob.size === 0) return;
+          const chunks = audioChunksRef.current;
+          audioChunksRef.current = [];
 
-          setLoading(true);
+          if (chunks.length === 0) return;
+
+          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+          if (audioBlob.size < 1000) return; // too short, ignore
+
+          setIsTranscribing(true);
           try {
             const formData = new FormData();
             formData.append('file', audioBlob, 'audio.webm');
@@ -282,24 +293,28 @@ export default function AskAIPage() {
               body: formData,
             });
 
-            if (!res.ok) throw new Error('Transcription failed');
-            
             const data = await res.json();
-            if (data.text) {
-              setInput(prev => (prev + ' ' + data.text).trim());
-              if (inputRef.current) {
-                inputRef.current.style.height = 'auto';
-                inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
-              }
+            if (res.ok && data.text && data.text.trim()) {
+              const transcribed = data.text.trim();
+              setInput(prev => prev ? prev + ' ' + transcribed : transcribed);
+              // Resize textarea
+              setTimeout(() => {
+                if (inputRef.current) {
+                  inputRef.current.style.height = 'auto';
+                  inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
+                  inputRef.current.focus();
+                }
+              }, 50);
             }
           } catch (err) {
             console.error('Transcription error:', err);
           } finally {
-            setLoading(false);
+            setIsTranscribing(false);
           }
         };
 
-        mediaRecorder.start();
+        // Request data every 250ms so chunks accumulate properly
+        mediaRecorder.start(250);
         setIsListening(true);
       } catch (err) {
         console.error('Microphone access denied:', err);
@@ -776,21 +791,44 @@ export default function AskAIPage() {
                       t.style.height = Math.min(t.scrollHeight, 200) + 'px';
                     }}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                    placeholder="Ask about your team…"
+                    placeholder={isListening ? 'Listening... tap mic to stop & transcribe' : 'Ask about your team…'}
                     rows={1}
                     disabled={loading || streamingContent !== null}
                     className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                   />
+                  {/* Recording overlay when mic is active */}
+                  {isListening && (
+                    <div className="absolute inset-x-0 top-0 flex items-center gap-2.5 px-4 py-3.5 pointer-events-none">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+                      </span>
+                      <span className="text-[14px] text-red-500 font-medium">Recording — tap mic to stop</span>
+                    </div>
+                  )}
+                  {/* Transcribing spinner */}
+                  {isTranscribing && (
+                    <div className="absolute inset-x-0 top-0 flex items-center gap-2.5 px-4 py-3.5 pointer-events-none">
+                      <svg className="animate-spin h-4 w-4 text-[#6b7280] shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="text-[14px] text-[#6b7280]">Transcribing your voice…</span>
+                    </div>
+                  )}
                   {/* Actions — bottom-right inside textarea box */}
                   <div className="absolute bottom-3 right-3 flex items-center gap-2">
                     <button
                       onClick={toggleListening}
+                      disabled={isTranscribing}
                       className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all shadow-sm ${
                         isListening 
                           ? 'bg-red-500 text-white animate-pulse' 
+                          : isTranscribing
+                          ? 'bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#9ca3af] cursor-not-allowed'
                           : 'bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#6b7280] dark:text-[#9ca3af] hover:bg-[#e5e7eb] dark:hover:bg-[#4b5563]'
                       }`}
-                      title={isListening ? "Stop listening" : "Dictate with voice"}
+                      title={isListening ? "Tap to stop & transcribe" : isTranscribing ? "Transcribing..." : "Dictate with voice"}
                     >
                       <Mic className="w-4 h-4" />
                     </button>
