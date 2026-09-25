@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Pencil, Trash2, Check, X, Square } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Square, Mic, Volume2, VolumeX } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
@@ -13,14 +13,6 @@ interface Employee {
   discPattern: { D: string; I: string; S: string; C: string; };
 }
 interface Transcript { id: string; name: string; transcript: string; }
-
-const THINKING_LABELS = [
-  'Originating…',
-  'Cooking…',
-  'Analyzing your team…',
-  'Connecting the dots…',
-  'Drafting response…',
-];
 
 function getISTDateInfo(dateStr?: string | Date) {
   const d = dateStr ? new Date(dateStr) : new Date();
@@ -61,20 +53,35 @@ const ALL_SUGGESTIONS = [
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Previous 30 days', 'Older'];
 const CACHE_TTL = 60 * 60 * 1000;
 
-// Animated thinking indicator — cycles through status labels with pulse dots
-function ThinkingIndicator() {
-  const [labelIdx, setLabelIdx] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLabelIdx(p => (p + 1) % THINKING_LABELS.length);
-    }, 1800);
-    return () => clearInterval(interval);
-  }, []);
+function getThinkingPhrase(query?: string) {
+  if (!query) return 'Analyzing your team…';
+  const lower = query.toLowerCase();
+  
+  if (lower.includes('leader') || lower.includes('promot') || lower.includes('succession') || lower.includes('manager')) {
+    return 'Analyzing leadership potential…';
+  }
+  if (lower.includes('team') || lower.includes('group') || lower.includes('cross-functional') || lower.includes('collaborat')) {
+    return 'Evaluating team dynamics…';
+  }
+  if (lower.includes('communicat') || lower.includes('detail') || lower.includes('conflict') || lower.includes('trait')) {
+    return 'Reviewing behavioral profiles…';
+  }
+  if (lower.includes('perform') || lower.includes('drive') || lower.includes('result') || lower.includes('motiv')) {
+    return 'Analyzing performance traits…';
+  }
+  if (lower.includes('develop') || lower.includes('coach') || lower.includes('train') || lower.includes('gap')) {
+    return 'Assessing development needs…';
+  }
+  
+  return 'Analyzing your team…';
+}
 
+// Animated thinking indicator
+function ThinkingIndicator({ query }: { query?: string }) {
   return (
     <div className="flex items-center gap-2.5 py-1">
       {/* Animated pulse dots */}
-      <span className="flex items-center gap-[4px]">
+      <span className="flex items-center gap-[4px] shrink-0">
         {[0, 1, 2].map(i => (
           <span
             key={i}
@@ -86,11 +93,10 @@ function ThinkingIndicator() {
         ))}
       </span>
       <span
-        className="text-[13px] text-[#8e8ea0] font-medium"
-        key={labelIdx}
+        className="text-[13px] text-[#8e8ea0] font-medium truncate"
         style={{ animation: 'originFadeIn 0.4s ease-in-out' }}
       >
-        {THINKING_LABELS[labelIdx]}
+        {getThinkingPhrase(query)}
       </span>
       <style>{`
         @keyframes thinkPulse {
@@ -201,6 +207,9 @@ export default function AskAIPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessionSearch, setSessionSearch] = useState('');
   const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const recognitionRef = useRef<any>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -238,6 +247,64 @@ export default function AskAIPage() {
   useEffect(() => { if (email) { loadSessions(); loadCache(); } }, [email]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streamingContent]);
   useEffect(() => { if (editingId) titleRef.current?.focus(); }, [editingId]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        
+        recognition.onresult = (event: any) => {
+          let currentTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              currentTranscript += event.results[i][0].transcript;
+            }
+          }
+          if (currentTranscript) {
+            setInput(prev => (prev + ' ' + currentTranscript).trim());
+            if (inputRef.current) {
+              inputRef.current.style.height = 'auto';
+              inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px';
+            }
+          }
+        };
+
+        recognition.onerror = () => setIsListening(false);
+        recognition.onend = () => setIsListening(false);
+        recognitionRef.current = recognition;
+      }
+    }
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      window.speechSynthesis?.cancel();
+    };
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      recognitionRef.current?.start();
+      setIsListening(true);
+    }
+  };
+
+  const readAloud = (text: string) => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    const cleanText = text.replace(/[*_#`]/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.onend = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const loadCache = useCallback(async () => {
     const key = `originbi_emp_cache_${email}`;
@@ -635,6 +702,14 @@ export default function AskAIPage() {
                             <div className="flex items-center gap-0.5 mt-3 -ml-2">
                               <CopyButton text={msg.content} />
                               <DownloadButton text={msg.content} />
+                              <button
+                                onClick={() => readAloud(msg.content)}
+                                title={isSpeaking ? "Stop speaking" : "Read aloud"}
+                                className="flex items-center gap-1 text-[12px] text-[#8e8ea0] hover:text-[#374151] dark:hover:text-[#d1d5db] transition-colors px-2 py-1 rounded-md hover:bg-[#f3f4f6] dark:hover:bg-[#2d2d2d]"
+                              >
+                                {isSpeaking ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                                {isSpeaking ? "Stop" : "Read"}
+                              </button>
                             </div>
                           </>
                         )}
@@ -661,8 +736,8 @@ export default function AskAIPage() {
                   {/* Thinking indicator — only while fetching, before stream starts */}
                   {loading && streamingContent === null && (
                     <div className="flex gap-4">
-                      <div className="flex-1">
-                        <ThinkingIndicator />
+                      <div className="flex-1 min-w-0">
+                        <ThinkingIndicator query={messages[messages.length - 1]?.content} />
                       </div>
                     </div>
                   )}
@@ -691,8 +766,19 @@ export default function AskAIPage() {
                     disabled={loading || streamingContent !== null}
                     className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60"
                   />
-                  {/* Send / Stop button — bottom-right inside textarea box */}
-                  <div className="absolute bottom-3 right-3">
+                  {/* Actions — bottom-right inside textarea box */}
+                  <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                    <button
+                      onClick={toggleListening}
+                      className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all shadow-sm ${
+                        isListening 
+                          ? 'bg-red-500 text-white animate-pulse' 
+                          : 'bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#6b7280] dark:text-[#9ca3af] hover:bg-[#e5e7eb] dark:hover:bg-[#4b5563]'
+                      }`}
+                      title={isListening ? "Stop listening" : "Dictate with voice"}
+                    >
+                      <Mic className="w-4 h-4" />
+                    </button>
                     {(loading || streamingContent !== null) ? (
                       /* Stop button while generating/streaming */
                       <button
