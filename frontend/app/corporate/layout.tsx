@@ -23,7 +23,9 @@ export default function CorporateLayout({
         '/corporate/register',
         '/corporate/forgot-password',
         '/corporate/reset-password',
-        '/corporate/ask-ai'
+        '/corporate/ask-ai',
+        '/corporate/policy',
+        '/corporate/terms',
     ];
     const showHeader = !hideHeaderRoutes.some(
         route => pathname === route || pathname.startsWith(`${route}/`)
