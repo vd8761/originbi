@@ -43,13 +43,13 @@
         "fast-csv": "^5.0.5",
         "groq-sdk": "^0.8.0",
         "openai": "^4.67.0",
-        "mysql2": "^3.15.3",
-        "nodemailer": "^9.0.3",
+        "mysql2": "^3.23.1",
+        "nodemailer": "^9.1.1",
         "pg": "^8.16.3",
         "razorpay": "^2.9.6",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.1",
-        "typeorm": "^0.3.30"
+        "typeorm": "^0.3.31"
     },
     "devDependencies": {
         "@eslint/eslintrc": "^3.2.0",
