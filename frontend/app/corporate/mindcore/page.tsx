@@ -415,7 +415,7 @@ export default function OriginBIArchitecture() {
   const [signals, setSignals] = useState(128430);
 
   const { pos, vis, bounds } = useMemo(() => layoutAll(open), [open]);
-  const toggle = useCallback((id: string) => setOpen((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; }), []);
+  const toggle = useCallback((id: string) => setOpen((prev) => { const s = new Set(prev); if (s.has(id)) { s.delete(id); } else { s.add(id); } return s; }), []);
 
   /* live counter */
   useEffect(() => {
@@ -446,8 +446,7 @@ export default function OriginBIArchitecture() {
     setView((v) => { const k = clamp(v.k * f, MIN_K, MAX_K); const r = k / v.k; return { k, x: vw / 2 - (vw / 2 - v.x) * r, y: vh / 2 - (vh / 2 - v.y) * r }; });
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(() => { fit(false); }, []);
+  useLayoutEffect(() => { fit(false); }, [fit]);
 
   /* wheel / pinch zoom toward cursor */
   useEffect(() => {
