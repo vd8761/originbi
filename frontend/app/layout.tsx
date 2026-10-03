@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        {/* eslint-disable-next-line */}
         <script
           // Theme initialiser runs before paint to avoid flash of wrong theme.
           // suppressHydrationWarning on <html> ensures React ignores class mismatches.
