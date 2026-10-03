@@ -511,7 +511,7 @@ export default function OriginBIArchitecture() {
       ref={ref}
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}
       onClickCapture={(e) => { if (suppress.current) { e.stopPropagation(); e.preventDefault(); } }}
-      className={`relative h-full min-h-[640px] w-full select-none touch-none overflow-hidden bg-[#F8FAFC] ${grabbing ? "cursor-grabbing" : spaceDown ? "cursor-grab" : "cursor-default"}`}
+      className={`relative h-[calc(100vh-80px)] min-h-[640px] w-full select-none touch-none overflow-hidden bg-[#F8FAFC] ${grabbing ? "cursor-grabbing" : spaceDown ? "cursor-grab" : "cursor-default"}`}
     >
       {/* soft gradient blurs */}
       <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(900px circle at 12% 8%, rgba(34,211,238,.30), transparent 60%), radial-gradient(1000px circle at 92% 96%, rgba(167,139,250,.28), transparent 60%)" }} />
@@ -535,7 +535,8 @@ export default function OriginBIArchitecture() {
           {/* inputs → engine (top dock) */}
           {DOCK.map((d, i) => {
             const cx = (i - (DOCK.length - 1) / 2) * 204;
-            return <Flow key={d.name} d={vPath(cx, DOCK_Y + 26, (cx / (DOCK.length * 204)) * 120, ENGINE.y)} color={d.color} dur={3 + (i % 3) * 0.4} n={2} reduced={reduced} />;
+            const isConnected = d.id === "google_drive";
+            return <Flow key={d.name} d={vPath(cx, DOCK_Y + 26, (cx / (DOCK.length * 204)) * 120, ENGINE.y)} color={isConnected ? d.color : "#94a3b8"} dur={3 + (i % 3) * 0.4} n={isConnected ? 2 : 1} reduced={reduced} />;
           })}
           {/* tree → engine (left) */}
           <AnimatePresence>
@@ -563,14 +564,21 @@ export default function OriginBIArchitecture() {
           return (
             <div key={d.name} className={`${GLASS} absolute flex h-[52px] w-[184px] items-center gap-2.5 px-3`} style={{ left: cx - 92, top: DOCK_Y - 26 }}>
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg shadow-sm border border-slate-100 bg-white overflow-hidden p-1.5">
-                <img src={getAppIconUrl(d.id)} alt={d.name} className="w-full h-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<span class="text-[11px] font-bold" style="color: ' + d.color + '">' + d.ab + '</span>'; }} />
+                <img src={getAppIconUrl(d.id)} alt={d.name} className={`w-full h-full object-contain ${d.id !== 'google_drive' ? 'opacity-50 grayscale' : ''}`} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<span class="text-[11px] font-bold" style="color: ' + d.color + '">' + d.ab + '</span>'; }} />
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-[13px] font-medium text-slate-800">{d.name}</span>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-600">
-                  <span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:animate-none" /><span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" /></span>
-                  Connected
-                </span>
+                {d.id === "google_drive" ? (
+                  <span className="flex items-center gap-1 text-[10px] text-emerald-600">
+                    <span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:animate-none" /><span className="relative h-1.5 w-1.5 rounded-full bg-emerald-500" /></span>
+                    Connected
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                    Not Connected
+                  </span>
+                )}
               </span>
             </div>
           );
@@ -584,7 +592,7 @@ export default function OriginBIArchitecture() {
           <div className="relative h-full w-full rounded-3xl border border-white bg-gradient-to-br from-white via-white to-cyan-50 p-4 shadow-2xl shadow-cyan-900/10 ring-1 ring-slate-200/80">
             <div className="text-base font-semibold tracking-tight text-slate-900">OriginBI Intelligence Engine</div>
             <ul className="mt-3 space-y-2 text-[12.5px] text-slate-600">
-              <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 motion-safe:animate-pulse" />Live Aggregation Active<span className="ml-auto tabular-nums text-slate-400">{signals.toLocaleString()}</span></li>
+              <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500 motion-safe:animate-pulse" />Overall Aggregation<span className="ml-auto tabular-nums text-slate-400">{signals.toLocaleString()}</span></li>
               <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500" />14-D Behavioral Core</li>
               <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-cyan-500" />Multi-Tenant Realtime Sync</li>
             </ul>
