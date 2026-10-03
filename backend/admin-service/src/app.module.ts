@@ -27,6 +27,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { SmsModule } from './sms/sms.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { MindcoreModule } from './mindcore/mindcore.module';
 
 @Module({
   imports: [
@@ -132,6 +133,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     SmsModule,
     RemindersModule,
     IntegrationsModule,
+    MindcoreModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })
