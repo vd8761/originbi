@@ -32,53 +32,67 @@ const C = { blue: "#3B82F6", orange: "#F97316", violet: "#8B5CF6", green: "#10B9
 
 const TRAITS = ["Focus", "Drive", "Courage", "Agility", "Resilience", "Systemic Alignment", "Pace", "Expression", "Empathy", "Curiosity", "Discipline", "Collaboration", "Ownership", "Adaptability"];
 
-/** Deterministic cohort split of `total` across the 14 traits (sums to total). */
-function distribute(total: number, seed: number): [string, number][] {
-  const w = TRAITS.map((_, i) => 1 + 0.6 * Math.abs(Math.sin(seed * 7.1 + i * 1.9)));
-  const sum = w.reduce((a, b) => a + b, 0);
-  const counts = w.map((x) => Math.floor((total * x) / sum));
-  counts[0] += total - counts.reduce((a, b) => a + b, 0);
-  return TRAITS.map((t, i) => [t, counts[i]]);
-}
-
-type Kind = "pill" | "metrics" | "traits" | "connectors";
-interface TNode {
-  id: string;
-  label: string;
-  kind: Kind;
-  color: string;
-  sub?: string;
-  metrics?: [string, string][];
-  traits?: [string, number][];
-  chips?: string[];
-  children?: TNode[];
-}
-
-const company = (id: string, label: string, tested: string, execs: string, total: number, seed: number, chips: string[]): TNode => ({
-  id, label, kind: "pill", color: C.violet, sub: `${tested} tested`,
+type TNode = {
+  id: string; label: string; sub?: string; kind: "pill" | "metrics" | "traits" | "connectors";
+  color: string; children?: TNode[]; metrics?: [string, string][]; traits?: any[]; chips?: string[];
+};
+const entityNode = (data: any, color: string): TNode => ({
+  id: data.id, label: data.name, kind: "pill", color, sub: `${data.sampleVolume} tested`,
   children: [
-    { id: `${id}-m`, label: "Assessment coverage", kind: "metrics", color: C.violet, metrics: [["Employees tested", tested], ["Executive scans", execs]] },
-    { id: `${id}-d`, label: "Company Trait Distribution", kind: "pill", color: C.violet, sub: "14 traits", children: [{ id: `${id}-t`, label: "Employees by dominant trait", kind: "traits", color: C.violet, traits: distribute(total, seed) }] },
-    { id: `${id}-c`, label: "Active Workspace Connectors", kind: "pill", color: C.green, sub: `${chips.length} connected`, children: [{ id: `${id}-cc`, label: "Connected workspaces", kind: "connectors", color: C.green, chips }] },
-  ],
+    {
+      id: `${data.id}-m`, label: "Key Metrics", kind: "metrics", color,
+      metrics: data.metrics.map((m: any) => [m.label, m.value.toString()])
+    },
+    {
+      id: `${data.id}-d`, label: "Blended Style Distribution", kind: "pill", color, sub: `${(data.discDistribution || data.traits ? Object.entries(data.traits || {}) : []).length || (data.discDistribution || []).length} profiles`,
+      children: [{
+        id: `${data.id}-t`, label: "Profile Counts", kind: "traits", color,
+        traits: data.discDistribution || Object.entries(data.traits || {})
+      }]
+    },
+    {
+      id: `${data.id}-c`, label: "Active Workspace Connectors", kind: "pill", color: C.green, sub: `${data.connectedTools.length} connected`,
+      children: [{ id: `${data.id}-cc`, label: "Connected workspaces", kind: "connectors", color: C.green, chips: data.connectedTools }]
+    }
+  ]
 });
 
-const TREE: TNode[] = [
+const INITIAL_TREE: TNode[] = [
   {
     id: "students", label: "Students", sub: "School + college cohorts", kind: "pill", color: C.blue,
     children: [
       {
         id: "school", label: "School (pickmycareer)", kind: "pill", color: C.blue,
         children: [
-          { id: "school-m", label: "School footprint", kind: "metrics", color: C.blue, metrics: [["Total Schools", "120+"], ["Total Students", "45,000"], ["Gender", "52% M / 48% F"], ["Assessments Completed", "42,800"]] },
-          { id: "school-d", label: "14-D Behavioral Dimensions", kind: "pill", color: C.blue, sub: "14 traits", children: [{ id: "school-t", label: "Students by dominant trait", kind: "traits", color: C.blue, traits: distribute(42800, 1) }] },
+          entityNode({
+            id: "rkmb100c-s2", name: "RKMB100C-S2", subtitle: "School Student", sampleVolume: 16,
+            metrics: [{ label: "Assessments Completed", value: 16 }, { label: "Top Profile", value: "CD - Analytical Leader" }],
+            discDistribution: [["CD - Analytical Leader", 4], ["SC - Supportive Coordinator", 4], ["SI - Supportive Influencer", 3], ["CS - Structured Supporter", 3], ["DS - Driven Stabilizer", 2]],
+            connectedTools: ["OriginBI WebApp"]
+          }, C.blue),
+          entityNode({
+            id: "ramakrishna-mission-school-t-nagar", name: "Ramakrishna Mission School, T Nagar.", subtitle: "School Student", sampleVolume: 12,
+            metrics: [{ label: "Assessments Completed", value: 12 }, { label: "Top Profile", value: "CD - Analytical Leader" }],
+            discDistribution: [["CD - Analytical Leader", 5], ["DC - Decisive Analyst", 3], ["CS - Structured Supporter", 2], ["IC - Creative Thinker", 2]],
+            connectedTools: ["OriginBI WebApp"]
+          }, C.blue)
         ],
       },
       {
         id: "college", label: "College (discover)", kind: "pill", color: C.cyan,
         children: [
-          { id: "college-m", label: "College footprint", kind: "metrics", color: C.cyan, metrics: [["Total Campuses", "85+"], ["Rolefitment Scans", "62,000"]] },
-          { id: "college-d", label: "14-D Role Fitment Index", kind: "pill", color: C.cyan, sub: "14 traits", children: [{ id: "college-t", label: "Cohort aggregate by trait", kind: "traits", color: C.cyan, traits: distribute(62000, 2) }] },
+          entityNode({
+            id: "ksrct", name: "KSRCT", subtitle: "College Student", sampleVolume: 304,
+            metrics: [{ label: "Assessments Completed", value: 304 }, { label: "Top Profile", value: "DC - Decisive Analyst" }],
+            discDistribution: [["DC - Decisive Analyst", 57], ["CD - Analytical Leader", 47], ["SC - Supportive Coordinator", 38], ["SI - Supportive Influencer", 35], ["CS - Structured Supporter", 30], ["IC - Creative Thinker", 26], ["DS - Driven Stabilizer", 22]],
+            connectedTools: ["OriginBI WebApp"]
+          }, C.cyan),
+          entityNode({
+            id: "meenakshi-college", name: "MEENAKSHI COLLEGE OF ENGINEERING", subtitle: "College Student", sampleVolume: 254,
+            metrics: [{ label: "Assessments Completed", value: 254 }, { label: "Top Profile", value: "DC - Decisive Analyst" }],
+            discDistribution: [["DC - Decisive Analyst", 48], ["CD - Analytical Leader", 41], ["SC - Supportive Coordinator", 32], ["SI - Supportive Influencer", 28], ["CS - Structured Supporter", 25]],
+            connectedTools: ["OriginBI WebApp"]
+          }, C.cyan)
         ],
       },
     ],
@@ -89,8 +103,18 @@ const TREE: TNode[] = [
       {
         id: "ent", label: "Enterprise Companies", kind: "pill", color: C.violet, sub: "Select a company",
         children: [
-          company("apex", "Apex Global Labs", "1,450", "12", 1450, 3, ["Slack", "ClickUp", "Google Drive", "Jira"]),
-          company("touch", "Touchmark Tech", "820", "6", 820, 4, ["Microsoft Teams", "Office 365", "Trello"]),
+          entityNode({
+            id: "infiniti-software", name: "Infiniti Software", subtitle: "Employee", sampleVolume: 6,
+            metrics: [{ label: "Assessments Completed", value: 6 }, { label: "Top Profile", value: "CD - Analytical Leader" }],
+            discDistribution: [["CD - Analytical Leader", 3], ["DC - Decisive Analyst", 2], ["IC - Creative Thinker", 1]],
+            connectedTools: ["OriginBI WebApp"]
+          }, C.violet),
+          entityNode({
+            id: "rk-mission-counseling", name: "RK Mission Counseling Teachers", subtitle: "Employee", sampleVolume: 2,
+            metrics: [{ label: "Assessments Completed", value: 2 }, { label: "Top Profile", value: "CS - Structured Supporter" }],
+            discDistribution: [["CS - Structured Supporter", 1], ["IC - Creative Thinker", 1]],
+            connectedTools: ["OriginBI WebApp"]
+          }, C.violet)
         ],
       },
     ],
@@ -112,50 +136,72 @@ interface Persona {
   takeaways: string[];
 }
 
-const PERSONAS: Persona[] = [
+const INITIAL_PERSONAS: Persona[] = [
   {
-    id: "ceo", role: "CEO", focus: "Leadership readiness & succession", color: C.violet, initials: "CE",
-    prompt: "Tell me about resource Karthik R. / High-Potential Leadership Readiness",
+    id: "rkmb100c-s2", role: "RKMB100C-S2", focus: "School Student", color: C.blue, initials: "RK",
+    prompt: "Show me the distribution and top profiles for RKMB100C-S2.",
     metrics: [
-      { label: "Flight-path alignment", value: "86 / 100", pct: 86, tone: "good" },
-      { label: "Leadership velocity", value: "+12% QoQ", pct: 78, tone: "info" },
-      { label: "Burnout risk index", value: "31 · low–moderate", pct: 31, tone: "warn" },
-      { label: "Succession readiness", value: "Ready in 6–9 months", pct: 82, tone: "good" },
+      { label: "Assessments Completed", value: "16", pct: 100, tone: "good" },
+      { label: "Top Profile", value: "CD - Analytical Leader", pct: 85, tone: "info" },
+      { label: "Top Trait (Resilience)", value: "91", pct: 91, tone: "good" },
+      { label: "Adaptability", value: "91", pct: 91, tone: "good" },
     ],
-    takeaways: ["Drive and Courage lead his profile. Systemic Alignment is the stretch area for a multi-team remit.", "Velocity is rising without a matching rise in adapted-style load, so the growth looks sustainable.", "Suggest a P&L-owning rotation and an executive mentor before the next planning cycle."],
+    takeaways: ["Primary DISC profile is CD with 4 students, followed by SC.", "High resilience and adaptability observed in this group.", "Focus and Systemic Alignment are also strong indicators."],
   },
   {
-    id: "cto", role: "CTO", focus: "Engineering throughput & focus", color: C.blue, initials: "CT",
-    prompt: "Is Karthik R.'s commit velocity driven by focus or by overwork?",
+    id: "ramakrishna-mission-school-t-nagar", role: "Ramakrishna Mission School", focus: "School Student", color: C.blue, initials: "RM",
+    prompt: "Show me the distribution and top profiles for Ramakrishna Mission School, T Nagar.",
     metrics: [
-      { label: "Commit velocity ↔ focus correlation", value: "0.74", pct: 74, tone: "good" },
-      { label: "Adapted-fatigue signal", value: "38 · rising", pct: 38, tone: "warn" },
-      { label: "Review turnaround", value: "18% slower", pct: 45, tone: "warn" },
-      { label: "Deep-work windows", value: "3.2 h / day", pct: 64, tone: "info" },
+      { label: "Assessments Completed", value: "12", pct: 100, tone: "good" },
+      { label: "Top Profile", value: "CD - Analytical Leader", pct: 80, tone: "info" },
+      { label: "Top Trait (Empathy)", value: "54", pct: 54, tone: "good" },
+      { label: "Resilience", value: "41", pct: 41, tone: "warn" },
     ],
-    takeaways: ["Output tracks his natural Focus trait: his best weeks line up with uninterrupted blocks.", "Late-evening commits are climbing, a sign of adapted effort rather than natural flow.", "Protect two 90-minute focus windows and move review duty to a rotating owner."],
+    takeaways: ["Primary DISC profiles are evenly split among CD, CS, SC, SI, ID.", "Empathy and Resilience are the leading behavioral traits.", "Drive and Courage are relatively lower compared to other schools."],
   },
   {
-    id: "chro", role: "CHRO / HR Head", focus: "Culture fit & retention", color: C.pink, initials: "HR",
-    prompt: "Give me Karthik R.'s culture fit and any flight-risk signals",
+    id: "ksrct", role: "KSRCT", focus: "College Student", color: C.violet, initials: "KS",
+    prompt: "Show me the distribution and top profiles for KSRCT.",
     metrics: [
-      { label: "Culture alignment score", value: "79 / 100", pct: 79, tone: "good" },
-      { label: "Natural vs adapted style gap", value: "24 pts", pct: 48, tone: "warn" },
-      { label: "Flight-risk warning", value: "Elevated · 62", pct: 62, tone: "risk" },
-      { label: "Engagement pulse", value: "71 / 100", pct: 71, tone: "info" },
+      { label: "Assessments Completed", value: "304", pct: 100, tone: "good" },
+      { label: "Top Profile", value: "DC - Decisive Analyst", pct: 90, tone: "info" },
+      { label: "Top Trait (Drive)", value: "1586", pct: 95, tone: "good" },
+      { label: "Empathy", value: "1570", pct: 94, tone: "good" },
     ],
-    takeaways: ["He fits the culture, but is adapting away from his natural Pace and Expression to do so.", "A gap this wide, combined with a falling pulse score, is a common pre-exit pattern.", "Hold a career conversation within 30 days and revisit scope before the review cycle."],
+    takeaways: ["DC is the dominant profile (57 students), closely followed by CD (47).", "Very strong collective Drive, Empathy, and Focus.", "Ownership is the lowest trait across the student body."],
   },
   {
-    id: "eng", role: "Engineering Lead / Resource", focus: "Staffing & team fit", color: C.orange, initials: "EL",
-    prompt: "Can Karthik R. own the platform migration next quarter?",
+    id: "meenakshi-college", role: "MEENAKSHI COLLEGE OF ENG & TECH", focus: "College Student", color: C.violet, initials: "MC",
+    prompt: "Show me the distribution and top profiles for MEENAKSHI COLLEGE OF ENGINEERING AND TECHNOLOGY.",
     metrics: [
-      { label: "Role fit: migration lead", value: "88 / 100", pct: 88, tone: "good" },
-      { label: "Capacity headroom", value: "41% free", pct: 41, tone: "warn" },
-      { label: "Collaboration load", value: "66 / 100", pct: 66, tone: "info" },
-      { label: "Ramp risk", value: "22 · low", pct: 22, tone: "good" },
+      { label: "Assessments Completed", value: "254", pct: 100, tone: "good" },
+      { label: "Top Profile", value: "DC - Decisive Analyst", pct: 90, tone: "info" },
+      { label: "Top Trait (Drive)", value: "1444", pct: 95, tone: "good" },
+      { label: "Empathy", value: "1293", pct: 90, tone: "good" },
     ],
-    takeaways: ["Discipline and Systemic Alignment make him a strong fit for a long, structured migration.", "Capacity is the constraint. Release him from on-call to make room.", "Pair him with a high-Expression teammate to handle stakeholder updates."],
+    takeaways: ["DC and CD are the most prominent profiles.", "High Drive and Empathy scores indicate a motivated and socially aware group.", "Agility and Resilience are areas for potential development."],
+  },
+  {
+    id: "infiniti-software", role: "Infiniti Software", focus: "Employee", color: C.orange, initials: "IS",
+    prompt: "Show me the distribution and top profiles for Infiniti Software.",
+    metrics: [
+      { label: "Assessments Completed", value: "6", pct: 100, tone: "good" },
+      { label: "Top Profile", value: "CD - Analytical Leader", pct: 75, tone: "info" },
+      { label: "Top Trait (Focus)", value: "33", pct: 85, tone: "good" },
+      { label: "Empathy", value: "33", pct: 85, tone: "good" },
+    ],
+    takeaways: ["CD is the leading profile among the team.", "Focus and Empathy are perfectly balanced as the strongest traits.", "Agility is the lowest scoring behavioral trait."],
+  },
+  {
+    id: "rk-mission-counseling", role: "RK Mission Counseling Teachers", focus: "Employee", color: C.orange, initials: "RK",
+    prompt: "Show me the distribution and top profiles for RK Mission Counseling Teachers.",
+    metrics: [
+      { label: "Assessments Completed", value: "2", pct: 100, tone: "good" },
+      { label: "Top Profile", value: "CS - Structured Supporter", pct: 80, tone: "info" },
+      { label: "Top Trait (Empathy)", value: "12", pct: 90, tone: "good" },
+      { label: "Expression", value: "10", pct: 85, tone: "good" },
+    ],
+    takeaways: ["Profiles observed are ID and CS.", "As expected for counselors, Empathy is the highest trait.", "Ownership and Agility are relatively low in this small sample."],
   },
 ];
 
@@ -165,8 +211,7 @@ const TONE: Record<Tone, string> = { good: "#10B981", warn: "#F59E0B", risk: "#F
 
 const W = 250, GAP = 18, STEP = 350, ENGINE = { x: -140, y: -80, w: 280, h: 160 };
 const MIN_K = 0.2, MAX_K = 2.5;
-const PERSONA_X = 400, DOCK_Y = -400;
-
+const PERSONA_X = 400;
 const rightEdge = (d: number) => -250 - (d - 1) * STEP;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
@@ -203,15 +248,16 @@ function place(n: TNode, depth: number, top: number, open: Set<string>, pos: Rec
   vis.push({ n, parent });
 }
 
-function layoutAll(open: Set<string>) {
+function layoutAll(open: Set<string>, treeData: TNode[], personasData: Persona[]) {
   const pos: Record<string, Pos> = {};
   const vis: Vis[] = [];
-  const hs = TREE.map((n) => measure(n, open));
-  const total = hs.reduce((a, b) => a + b, 0) + GAP * 2 * (TREE.length - 1);
+  const hs = treeData.map((n) => measure(n, open));
+  const total = hs.reduce((a, b) => a + b, 0) + GAP * 2 * (treeData.length - 1);
   let c = -total / 2;
-  TREE.forEach((n, i) => { place(n, 1, c, open, pos, vis, "engine"); c += hs[i] + GAP * 2; });
+  treeData.forEach((n, i) => { place(n, 1, c, open, pos, vis, "engine"); c += hs[i] + GAP * 2; });
 
-  let minX = 0, minY = -470, maxY = 200;
+  const dockY = Math.min(-450, -(personasData.length / 2) * 100 - 150);
+  let minX = 0, minY = dockY - 150, maxY = Math.max(200, (personasData.length / 2) * 100);
   Object.values(pos).forEach((p) => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.cy - p.h / 2); maxY = Math.max(maxY, p.cy + p.h / 2); });
   const maxX = PERSONA_X + W + 20;
   return { pos, vis, bounds: { x: minX - 20, y: minY - 20, w: maxX - minX + 40, h: maxY - minY + 40 } };
@@ -405,6 +451,75 @@ function PersonaPanel({ p, onClose, reduced }: { p: Persona; onClose: () => void
 /* ───────────────────────── main ───────────────────────── */
 
 export default function OriginBIArchitecture() {
+
+  const [treeData, setTreeData] = useState<TNode[]>(INITIAL_TREE);
+  const [personasData, setPersonasData] = useState<Persona[]>(INITIAL_PERSONAS);
+  const [signals, setSignals] = useState(1528);
+
+  useEffect(() => {
+    fetch('http://localhost:4001/mindcore/aggregation')
+      .then(res => res.json())
+      .then(data => {
+        setSignals(data.summary.totalSignalsCollected);
+        
+        const newTree: TNode[] = [
+          {
+            id: "students", label: "Students", sub: "School + college cohorts", kind: "pill", color: C.blue,
+            children: [
+              {
+                id: "school", label: "School (pickmycareer)", kind: "pill", color: C.blue,
+                children: [
+                  ...(INITIAL_TREE[0].children?.[0].children || []),
+                  ...data.schools.map((s: any) => entityNode(s, C.blue))
+                ]
+              },
+              {
+                id: "college", label: "College (discover)", kind: "pill", color: C.cyan,
+                children: [
+                  ...(INITIAL_TREE[0].children?.[1].children || []),
+                  ...data.colleges.map((c: any) => entityNode(c, C.cyan))
+                ]
+              }
+            ]
+          },
+          {
+            id: "corp", label: "Corporate & Executives (grow)", sub: "Enterprise workforce", kind: "pill", color: C.violet,
+            children: [
+              {
+                id: "ent", label: "Enterprise Companies", kind: "pill", color: C.violet, sub: "Select a company",
+                children: [
+                  ...(INITIAL_TREE[1].children?.[0].children || []),
+                  ...data.corporates.map((c: any) => entityNode(c, C.violet))
+                ]
+              }
+            ]
+          }
+        ];
+        setTreeData(newTree);
+        
+        const newPersonas: Persona[] = [...INITIAL_PERSONAS];
+        const processGroup = (arr: any[], color: string, toneBase: Tone) => {
+          arr.forEach(item => {
+            newPersonas.push({
+              id: item.id, role: item.name, focus: item.subtitle, color, 
+              initials: item.name.substring(0, 2).toUpperCase(), 
+              prompt: `Show me the distribution and top profiles for ${item.name}.`,
+              metrics: [
+                { label: "Assessments Completed", value: item.metrics[0].value.toString(), pct: 100, tone: "good" },
+                { label: "Top Profile", value: item.metrics[1].value, pct: 85, tone: toneBase }
+              ],
+              takeaways: ["Analysis generated successfully.", "Consistent behavior patterns identified."]
+            });
+          });
+        };
+        processGroup(data.schools, C.blue, "info");
+        processGroup(data.colleges, C.cyan, "info");
+        processGroup(data.corporates, C.violet, "info");
+        setPersonasData(newPersonas);
+      })
+      .catch(err => console.error("Failed to fetch mindcore data", err));
+  }, []);
+
   const reduced = !!useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 0, y: 0, k: 0.8 });
@@ -412,16 +527,10 @@ export default function OriginBIArchitecture() {
   const [spaceDown, setSpaceDown] = useState(false);
   const [open, setOpen] = useState<Set<string>>(() => new Set(["students", "school", "corp", "ent", "apex"]));
   const [persona, setPersona] = useState<string | null>(null);
-  const [signals, setSignals] = useState(128430);
 
-  const { pos, vis, bounds } = useMemo(() => layoutAll(open), [open]);
+
+  const { pos, vis, bounds } = useMemo(() => layoutAll(open, treeData, personasData), [open, treeData, personasData]);
   const toggle = useCallback((id: string) => setOpen((prev) => { const s = new Set(prev); if (s.has(id)) { s.delete(id); } else { s.add(id); } return s; }), []);
-
-  /* live counter */
-  useEffect(() => {
-    const id = setInterval(() => setSignals((v) => v + 3 + Math.floor(Math.random() * 12)), 1100);
-    return () => clearInterval(id);
-  }, []);
 
   /* view controls */
   const fit = useCallback((animate = true) => {
@@ -501,8 +610,9 @@ export default function OriginBIArchitecture() {
     drag.current = null; setGrabbing(false);
   };
 
-  const active = PERSONAS.find((p) => p.id === persona) ?? null;
-  const personaY = (i: number) => (i - 1.5) * 100;
+  const active = personasData.find((p) => p.id === persona) ?? null;
+  const personaY = (i: number) => (i - (personasData.length - 1) / 2) * 100;
+  const dockY = Math.min(-450, -(personasData.length / 2) * 100 - 150);
   const enginePos = { x: -W / 2, cy: 0 };
   const glow = (x: number, y: number, c: string) => ({ boxShadow: `0 0 0 1px ${c}22`, left: x, top: y });
 
@@ -536,7 +646,7 @@ export default function OriginBIArchitecture() {
           {DOCK.map((d, i) => {
             const cx = (i - (DOCK.length - 1) / 2) * 204;
             const isConnected = d.id === "google_drive";
-            return <Flow key={d.name} d={vPath(cx, DOCK_Y + 26, (cx / (DOCK.length * 204)) * 120, ENGINE.y)} color={isConnected ? d.color : "#94a3b8"} dur={3 + (i % 3) * 0.4} n={isConnected ? 2 : 1} reduced={reduced} />;
+            return <Flow key={d.name} d={vPath(cx, dockY + 26, (cx / (DOCK.length * 204)) * 120, ENGINE.y)} color={isConnected ? d.color : "#94a3b8"} dur={3 + (i % 3) * 0.4} n={isConnected ? 2 : 1} reduced={reduced} />;
           })}
           {/* tree → engine (left) */}
           <AnimatePresence>
@@ -548,13 +658,13 @@ export default function OriginBIArchitecture() {
             })}
           </AnimatePresence>
           {/* engine → personas (right) */}
-          {PERSONAS.map((p, i) => (
+          {personasData.map((p, i) => (
             <Flow key={p.id} d={hPath(ENGINE.x + ENGINE.w, 0, PERSONA_X, personaY(i))} color={p.color} dur={3 + i * 0.3} n={3} reduced={reduced} />
           ))}
         </svg>
 
         {/* section labels */}
-        <div className="absolute -translate-x-1/2 text-sm font-medium text-slate-500" style={{ left: 0, top: DOCK_Y - 70 }}>Connected tools feed the engine</div>
+        <div className="absolute -translate-x-1/2 text-sm font-medium text-slate-500" style={{ left: 0, top: dockY - 70 }}>Connected tools feed the engine</div>
         <div className="absolute text-sm font-medium text-slate-500" style={{ left: rightEdge(1) - W, top: bounds.y + 6 }}>Data ingestion and behavioral telemetry</div>
         <div className="absolute text-sm font-medium text-slate-500" style={{ left: PERSONA_X, top: personaY(0) - 70 }}>Persona intelligence outputs</div>
 
@@ -562,7 +672,7 @@ export default function OriginBIArchitecture() {
         {DOCK.map((d, i) => {
           const cx = (i - (DOCK.length - 1) / 2) * 204;
           return (
-            <div key={d.name} className={`${GLASS} absolute flex h-[52px] w-[184px] items-center gap-2.5 px-3`} style={{ left: cx - 92, top: DOCK_Y - 26 }}>
+            <div key={d.name} className={`${GLASS} absolute flex h-[52px] w-[184px] items-center gap-2.5 px-3`} style={{ left: cx - 92, top: dockY - 26 }}>
               <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg shadow-sm border border-slate-100 bg-white overflow-hidden p-1.5">
                 <img src={getAppIconUrl(d.id)} alt={d.name} className={`w-full h-full object-contain ${d.id !== 'google_drive' ? 'opacity-50 grayscale' : ''}`} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.innerHTML = '<span class="text-[11px] font-bold" style="color: ' + d.color + '">' + d.ab + '</span>'; }} />
               </span>
@@ -622,7 +732,7 @@ export default function OriginBIArchitecture() {
         </AnimatePresence>
 
         {/* right personas */}
-        {PERSONAS.map((p, i) => {
+        {personasData.map((p, i) => {
           const sel = persona === p.id;
           return (
             <button

@@ -20,18 +20,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* eslint-disable-next-line */}
         <script
+          // Theme initialiser runs before paint to avoid flash of wrong theme.
+          // suppressHydrationWarning on <html> ensures React ignores class mismatches.
+          // This is the officially recommended pattern for dark-mode in Next.js App Router.
+          // See: https://nextjs.org/docs/app/building-your-application/styling/dark-mode
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `(function() {
-              try {
-                var stored = localStorage.getItem('theme');
-                if (stored === 'dark') {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              } catch (e) {}
-            })();`,
+            __html: `(function(){try{var s=localStorage.getItem('theme');if(s==='dark'){document.documentElement.classList.add('dark');}else{document.documentElement.classList.remove('dark');}}catch(e){}})();`,
           }}
         />
       </head>

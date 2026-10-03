@@ -24,7 +24,6 @@ export default function CorporateLayout({
         '/corporate/forgot-password',
         '/corporate/reset-password',
         '/corporate/ask-ai',
-        '/corporate/mindcore',
     ];
     const showHeader = !hideHeaderRoutes.some(
         route => pathname === route || pathname.startsWith(`${route}/`)
