@@ -32,6 +32,10 @@ const C = { blue: "#3B82F6", orange: "#F97316", violet: "#8B5CF6", green: "#10B9
 
 const TRAITS = ["Focus", "Drive", "Courage", "Agility", "Resilience", "Systemic Alignment", "Pace", "Expression", "Empathy", "Curiosity", "Discipline", "Collaboration", "Ownership", "Adaptability"];
 
+type TNode = {
+  id: string; label: string; sub?: string; kind: "pill" | "metrics" | "traits" | "connectors";
+  color: string; children?: TNode[]; metrics?: [string, string][]; traits?: any[]; chips?: string[];
+};
 const entityNode = (data: any, color: string): TNode => ({
   id: data.id, label: data.name, kind: "pill", color, sub: `${data.sampleVolume} tested`,
   children: [
