@@ -484,8 +484,10 @@ const Header: React.FC<HeaderProps> = ({
                     />
                     <NavItem
                         icon={
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 2c.23 6.14 3.86 9.77 10 10-6.14.23-9.77 3.86-10 10-.23-6.14-3.86-9.77-10-10C6.14 11.77 9.77 8.14 10 2z" />
+                                <path d="M19 0c.1 2.5 1.5 4 4 4.1-2.5.1-4 1.5-4.1 4-.1-2.5-1.5-4-4-4.1 2.5-.1 4-1.5 4.1-4z" />
+                                <path d="M20 16c.07 1.66 1 2.66 2.66 2.73-1.66.07-2.66 1-2.73 2.66-.07-1.66-1-2.66-2.66-2.73C19 18.66 20 17.66 20 16z" />
                             </svg>
                         }
                         label="Mindcore"
