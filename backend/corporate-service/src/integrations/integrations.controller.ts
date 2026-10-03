@@ -14,7 +14,7 @@ export class IntegrationsController {
 
   // ─── OAuth: Start Google Authorization ───
   @Get('oauth/google/start')
-  async startGoogleOAuth(
+  startGoogleOAuth(
     @Query('email') email: string,
     @Query('appId') appId: string,
     @Res() res: Response,
