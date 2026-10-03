@@ -1,4 +1,14 @@
-import { Controller, Get, Put, Delete, Param, Body, Query, BadRequestException, Res } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  BadRequestException,
+  Res,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { IntegrationsService } from './integrations.service';
 
@@ -19,7 +29,8 @@ export class IntegrationsController {
     @Query('appId') appId: string,
     @Res() res: Response,
   ) {
-    if (!email || !appId) throw new BadRequestException('Email and appId are required');
+    if (!email || !appId)
+      throw new BadRequestException('Email and appId are required');
     const url = this.integrationsService.generateGoogleOAuthUrl(email, appId);
     return res.redirect(url);
   }
@@ -32,7 +43,10 @@ export class IntegrationsController {
     @Res() res: Response,
   ) {
     try {
-      const result = await this.integrationsService.handleGoogleCallback(code, state);
+      const result = await this.integrationsService.handleGoogleCallback(
+        code,
+        state,
+      );
       // Close the popup and notify the parent window
       return res.send(`
         <!DOCTYPE html>

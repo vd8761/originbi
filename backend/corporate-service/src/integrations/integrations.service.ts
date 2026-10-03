@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TenantAppConfig, CorporateAccount } from '@originbi/shared-entities';
@@ -20,7 +24,8 @@ export class IntegrationsService {
     return new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI || `${process.env.API_URL}/corporate/integrations/oauth/google/callback`,
+      process.env.GOOGLE_REDIRECT_URI ||
+        `${process.env.API_URL}/corporate/integrations/oauth/google/callback`,
     );
   }
 
@@ -31,7 +36,9 @@ export class IntegrationsService {
     const oauth2Client = this.getGoogleOAuthClient();
 
     // Encode state to identify the tenant after callback
-    const state = Buffer.from(JSON.stringify({ email, appId })).toString('base64url');
+    const state = Buffer.from(JSON.stringify({ email, appId })).toString(
+      'base64url',
+    );
 
     const scopes = [
       'https://www.googleapis.com/auth/userinfo.email',
@@ -53,8 +60,12 @@ export class IntegrationsService {
   // ─────────────────────────────────────────────────────────
   //  Step 2: Handle Google OAuth Callback
   // ─────────────────────────────────────────────────────────
-  async handleGoogleCallback(code: string, state: string): Promise<{ email: string; connectedAccount: string }> {
-    if (!code || !state) throw new BadRequestException('Missing OAuth code or state');
+  async handleGoogleCallback(
+    code: string,
+    state: string,
+  ): Promise<{ email: string; connectedAccount: string }> {
+    if (!code || !state)
+      throw new BadRequestException('Missing OAuth code or state');
 
     // Decode state
     let tenantEmail: string;
@@ -83,7 +94,8 @@ export class IntegrationsService {
     const googleName = person.names?.[0]?.displayName;
     const googlePicture = person.photos?.[0]?.url;
 
-    if (!googleEmail) throw new BadRequestException('Could not retrieve Google account email');
+    if (!googleEmail)
+      throw new BadRequestException('Could not retrieve Google account email');
 
     // Find the corporate account
     const account = await this.corporateAccountRepo.findOne({
@@ -96,7 +108,8 @@ export class IntegrationsService {
     const config = await this.tenantAppConfigRepo.findOne({
       where: { tenant_id: account.id as any, app_id: appId },
     });
-    if (!config) throw new NotFoundException('Integration not assigned to tenant');
+    if (!config)
+      throw new NotFoundException('Integration not assigned to tenant');
 
     // Securely store tokens + connected Google account
     config.configured_features = {
@@ -134,8 +147,8 @@ export class IntegrationsService {
 
     // Return only globally active apps
     return configs
-      .filter(c => c.app?.is_globally_active)
-      .map(c => ({
+      .filter((c) => c.app?.is_globally_active)
+      .map((c) => ({
         id: c.app_id,
         name: c.app.name,
         display_name: c.app.display_name,
@@ -163,9 +176,13 @@ export class IntegrationsService {
     const config = await this.tenantAppConfigRepo.findOne({
       where: { tenant_id: account.id as any, app_id: appId },
     });
-    if (!config) throw new NotFoundException('Integration not assigned to tenant');
+    if (!config)
+      throw new NotFoundException('Integration not assigned to tenant');
 
-    config.configured_features = { ...(config.configured_features || {}), ...payload };
+    config.configured_features = {
+      ...(config.configured_features || {}),
+      ...payload,
+    };
     config.status = 'connected';
 
     await this.tenantAppConfigRepo.save(config);
