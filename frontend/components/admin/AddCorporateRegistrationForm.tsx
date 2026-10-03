@@ -45,6 +45,7 @@ const AddCorporateRegistrationForm: React.FC<
     businessLocations: initialData?.businessLocations || initialData?.business_locations || "",
     sendEmail: true,
     counsellingAccess: initialData?.counsellingAccess || [],
+    integrationAppIds: initialData?.integrationAppIds || [],
   });
 
   useEffect(() => {
@@ -68,11 +69,44 @@ const AddCorporateRegistrationForm: React.FC<
         businessLocations: initialData?.businessLocations || initialData?.business_locations || "",
         sendEmail: true,
         counsellingAccess: initialData?.counsellingAccess || [],
+        integrationAppIds: initialData?.integrationAppIds || [],
       });
     }
   }, [initialData]);
 
   const [availableTypes, setAvailableTypes] = useState<{ id: number; name: string }[]>([]);
+  const [availableApps, setAvailableApps] = useState<{ id: string; display_name: string; name: string; is_globally_active: boolean }[]>([]);
+
+  const getAppIconUrl = (name: string) => {
+    if (name === 'google_drive') return 'https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg';
+    const map: Record<string, string> = {
+      slack: 'slack.com',
+      jira: 'atlassian.com',
+      salesforce: 'salesforce.com',
+      hubspot: 'hubspot.com',
+      microsoft_teams: 'teams.microsoft.com',
+      notion: 'notion.so',
+      zoom: 'zoom.us',
+      github: 'github.com',
+      clickup: 'clickup.com',
+      zoho_crm: 'zoho.com',
+      asana: 'asana.com',
+      trello: 'trello.com',
+      monday: 'monday.com',
+      zendesk: 'zendesk.com',
+      freshdesk: 'freshdesk.com',
+      gitlab: 'gitlab.com',
+      bitbucket: 'bitbucket.org',
+      workday: 'workday.com',
+      bamboohr: 'bamboohr.com',
+      gusto: 'gusto.com',
+      deel: 'deel.com',
+      adp: 'adp.com',
+      rippling: 'rippling.com',
+    };
+    const domain = map[name] || `${name.replace('_', '')}.com`;
+    return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+  };
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,18 +133,27 @@ const AddCorporateRegistrationForm: React.FC<
   useEffect(() => {
     const fetchTypes = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('originbi_id_token') || localStorage.getItem('token');
         const res = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001'}/admin/counselling/types`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
           const data = await res.json();
-          // Filter valid types if needed, though backend currently filters deleted
           const items = Array.isArray(data) ? data : (data.data || []);
           setAvailableTypes(items);
         }
+        
+        // Fetch Integrations
+        const resApps = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001'}/integrations`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (resApps.ok) {
+          const appsData = await resApps.json();
+          const allApps = Array.isArray(appsData) ? appsData : [];
+          setAvailableApps(allApps.filter(app => app.is_globally_active));
+        }
       } catch (err) {
-        console.error("Failed to fetch counselling types", err);
+        console.error("Failed to fetch counselling types or apps", err);
       }
     };
     fetchTypes();
@@ -607,6 +650,73 @@ const AddCorporateRegistrationForm: React.FC<
                       }`}>
                       {type.name}
                     </span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Row 6 – Integration Apps Access */}
+        <div className="mt-8 pt-6 border-t border-gray-100 dark:border-white/5">
+          <h3 className="text-sm font-bold text-brand-text-light-primary dark:text-white mb-4">
+            Integration Apps
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {availableApps.length === 0 ? (
+              <p className="text-xs text-brand-text-light-secondary dark:text-brand-text-secondary italic">
+                No integration apps found. Please seed them in Master Config.
+              </p>
+            ) : (
+              availableApps.map((app) => {
+                const isChecked = formData.integrationAppIds?.includes(app.id);
+                return (
+                  <label
+                    key={app.id}
+                    className={`flex items-center space-x-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 ${isChecked
+                      ? "bg-brand-green/5 border-brand-green dark:bg-brand-green/20"
+                      : "bg-gray-50 dark:bg-white/5 border-transparent hover:border-gray-200 dark:hover:border-white/10"
+                      }`}
+                  >
+                    <div className="relative flex items-center">
+                      <input
+                        type="checkbox"
+                        className="peer appearance-none w-5 h-5 border-2 border-gray-300 dark:border-gray-500 rounded-md checked:bg-brand-green checked:border-brand-green transition-all"
+                        checked={isChecked || false}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => {
+                            const current = prev.integrationAppIds || [];
+                            const updated = checked
+                              ? [...current, app.id]
+                              : current.filter(id => id !== app.id);
+                            return { ...prev, integrationAppIds: updated };
+                          });
+                        }}
+                      />
+                      <svg
+                        className="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center p-1.5 shrink-0 transition-all ${isChecked ? 'bg-white shadow-sm ring-1 ring-brand-green/20' : 'bg-gray-100 dark:bg-white/10 opacity-70 grayscale group-hover:grayscale-0 group-hover:opacity-100'}`}>
+                        <img 
+                          src={getAppIconUrl(app.name)} 
+                          alt={app.display_name}
+                          className="w-full h-full object-contain"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      </div>
+                      <span className={`text-sm font-semibold truncate ${isChecked ? "text-brand-green dark:text-brand-green" : "text-gray-700 dark:text-gray-300"}`}>
+                        {app.display_name}
+                      </span>
+                    </div>
                   </label>
                 );
               })

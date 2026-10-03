@@ -97,6 +97,11 @@ export { IatKeypress } from './iat-keypress.entity';
 export { IatReport } from './iat-report.entity';
 export { IatReportJob } from './iat-report-job.entity';
 
+// Integrations
+export { MasterApp } from './master-app.entity';
+export { TenantAppConfig } from './tenant-app-config.entity';
+export { EncryptionUtil } from './encryption.util';
+
 // ============================================
 // Usage in services:
 //

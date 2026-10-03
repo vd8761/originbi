@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --max_old_space_size=8192 node_modules/next/dist/bin/next dev --webpack",
+    "dev": "node --max_old_space_size=2048 node_modules/next/dist/bin/next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -25,7 +25,7 @@
     "axios": "^1.18.0",
     "date-fns": "^4.1.0",
     "flag-icons": "^7.5.0",
-    "framer-motion": "^12.40.0",
+    "framer-motion": "^12.43.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.555.0",
     "next": "^16.2.6",

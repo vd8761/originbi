@@ -72,6 +72,9 @@ export class CreateCorporateRegistrationDto {
   @IsOptional()
   counsellingAccess?: number[];
 
+  @IsOptional()
+  integrationAppIds?: string[];
+
   // Snake_case aliases for Update compatibility
   @IsOptional()
   @IsString()

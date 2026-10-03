@@ -781,7 +781,7 @@ export default function AskAIPage() {
                     to   { transform: scaleY(1);   opacity: 1; }
                   }
                 `}</style>
-                <div className="relative bg-white dark:bg-[#2d2d2d] border border-[#e5e7eb] dark:border-[#3d3d3d] rounded-2xl shadow-sm focus-within:border-[#9ca3af] dark:focus-within:border-[#6b7280] transition-colors overflow-hidden">
+                <div className="relative bg-white dark:bg-[#2d2d2d] border border-[#e5e7eb] dark:border-[#3d3d3d] rounded-2xl shadow-sm focus-within:border-[#9ca3af] dark:focus-within:border-[#6b7280] transition-colors">
                   {/* Normal textarea — hidden during voice states */}
                   {!isListening && !isTranscribing && (
                     <textarea

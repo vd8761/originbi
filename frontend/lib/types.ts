@@ -206,6 +206,7 @@ export interface CreateCorporateRegistrationDto {
   status: boolean;
   sendEmail?: boolean;
   counsellingAccess?: number[];
+  integrationAppIds?: string[];
 }
 
 // Common Shared Types
