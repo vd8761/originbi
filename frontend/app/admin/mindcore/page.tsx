@@ -44,7 +44,7 @@ const entityNode = (data: any, color: string): TNode => ({
       metrics: data.metrics.map((m: any) => [m.label, m.value.toString()])
     },
     {
-      id: `${data.id}-d`, label: "Blended Style Distribution", kind: "pill", color, sub: `${(data.discDistribution || data.traits ? Object.entries(data.traits || {}) : []).length || (data.discDistribution || []).length} profiles`,
+      id: `${data.id}-d`, label: "Behavioral Core", kind: "pill", color, sub: `${(data.discDistribution || data.traits ? Object.entries(data.traits || {}) : []).length || (data.discDistribution || []).length} profiles`,
       children: [{
         id: `${data.id}-t`, label: "Profile Counts", kind: "traits", color,
         traits: data.discDistribution || Object.entries(data.traits || {})
