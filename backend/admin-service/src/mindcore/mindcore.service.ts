@@ -21,15 +21,15 @@ export class MindcoreService {
           g.name as group_name,
           BOOL_OR(r.school_level IS NOT NULL) as has_school_level,
           BOOL_OR(r.corporate_account_id IS NOT NULL) as is_corporate,
-          COUNT(a.id) as sample_volume,
+          COUNT(DISTINCT r.id) as sample_volume,
           MODE() WITHIN GROUP (ORDER BY pt.code) as top_profile_code,
           MODE() WITHIN GROUP (ORDER BY pt.blended_style_name) as top_profile_name
-        FROM assessment_attempts a
-        JOIN registrations r ON a.registration_id = r.id
+        FROM registrations r
+        LEFT JOIN assessment_attempts a ON a.registration_id = r.id
         LEFT JOIN groups g ON r.group_id = g.id
         LEFT JOIN personality_traits pt ON a.dominant_trait_id = pt.id
         GROUP BY g.id, g.name
-        HAVING COUNT(a.id) > 0
+        HAVING COUNT(DISTINCT r.id) > 0
       ),
       ranked AS (
         SELECT *,
@@ -107,9 +107,9 @@ export class MindcoreService {
         totalSignalsCollected,
         lastUpdated: new Date().toISOString()
       },
-      schools: schools.slice(0, 2),
-      colleges: colleges.slice(0, 2),
-      corporates: corporates.slice(0, 2)
+      schools: schools,
+      colleges: colleges,
+      corporates: corporates
     };
   }
 }
