@@ -45,7 +45,8 @@ interface HeaderProps {
   | "settings"
   | "candidates"
   | "counselling"
-  | "ask-ai";
+  | "ask-ai"
+  | "mindcore";
   portalMode?: "student" | "corporate" | "admin";
   onSwitchPortal?: () => void;
   onNavigate?: (view: any) => void;
@@ -568,6 +569,17 @@ const Header: React.FC<HeaderProps> = ({
             isMobile={isMobile}
             onClick={() => handleNavClick("settings")}
           />
+          <NavItem
+            icon={
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            }
+            label="Mindcore"
+            active={activeView === "mindcore"}
+            isMobile={isMobile}
+            onClick={() => window.open('/corporate/mindcore', '_blank')}
+          />
 
         </>
       ) : (
@@ -888,24 +900,6 @@ const Header: React.FC<HeaderProps> = ({
                   className="w-9 h-9 2xl:w-9 2xl:h-9 rounded-full border border-brand-light-tertiary dark:border-transparent"
                 />
               )}
-              <div className="hidden xl:block">
-                <p className="font-semibold text-sm 2xl:text-sm leading-tight text-[#19211C] dark:text-brand-text-primary">
-                  {portalMode === "corporate" && !corporateData ? (
-                    <span className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1 inline-block"></span>
-                  ) : (
-                    corporateData?.full_name ||
-                    (portalMode === "corporate" ? "User" : "Student User")
-                  )}
-                </p>
-                <p className="text-xs 2xl:text-[12px] text-[#19211C] dark:text-brand-text-secondary leading-tight">
-                  {portalMode === "corporate" && !corporateData ? (
-                    <span className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse inline-block"></span>
-                  ) : (
-                    corporateData?.email ||
-                    (portalMode === "corporate" ? "" : "student@originbi.com")
-                  )}
-                </p>
-              </div>
               <ChevronDownIcon
                 className={`w-3 h-3 2xl:w-4 2xl:h-4 text-brand-text-light-secondary dark:text-brand-text-secondary transition-transform hidden sm:block ${isProfileOpen ? "rotate-180" : ""
                   }`}
@@ -914,6 +908,24 @@ const Header: React.FC<HeaderProps> = ({
 
             {isProfileOpen && (
               <div className="absolute right-0 top-full mt-2 w-64 bg-brand-light-secondary dark:bg-brand-dark-secondary rounded-xl shadow-2xl z-[100] border border-brand-light-tertiary dark:border-brand-dark-tertiary/50 overflow-hidden">
+                <div className="p-3 border-b border-gray-100 dark:border-gray-800">
+                  <p className="font-semibold text-sm 2xl:text-sm leading-tight text-[#19211C] dark:text-brand-text-primary">
+                    {portalMode === "corporate" && !corporateData ? (
+                      <span className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1 inline-block"></span>
+                    ) : (
+                      corporateData?.full_name ||
+                      (portalMode === "corporate" ? "User" : "Student User")
+                    )}
+                  </p>
+                  <p className="text-xs 2xl:text-[12px] text-gray-500 dark:text-brand-text-secondary leading-tight mt-1">
+                    {portalMode === "corporate" && !corporateData ? (
+                      <span className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse inline-block"></span>
+                    ) : (
+                      corporateData?.email ||
+                      (portalMode === "corporate" ? "" : "student@originbi.com")
+                    )}
+                  </p>
+                </div>
                 <div className="p-2">
                   <button
                     onClick={() => {
@@ -934,9 +946,11 @@ const Header: React.FC<HeaderProps> = ({
                     </span>
                   </button>
 
+                  <div className="h-px bg-gray-100 dark:bg-gray-800 my-1"></div>
+
                   <button
                     onClick={onLogout}
-                    className="w-full flex items-center px-3 py-2 text-sm font-medium text-brand-text-light-primary dark:text-white rounded-lg hover:bg-brand-light-tertiary dark:hover:bg-brand-dark-tertiary transition-colors"
+                    className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                   >
                     <LogoutIcon className="w-5 h-5 mr-3" />
                     <span>Logout</span>

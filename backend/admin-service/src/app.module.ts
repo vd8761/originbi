@@ -26,6 +26,7 @@ import { SettingsModule } from './settings/settings.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { SmsModule } from './sms/sms.module';
 import { RemindersModule } from './reminders/reminders.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -130,6 +131,7 @@ import { RemindersModule } from './reminders/reminders.module';
     WhatsappModule,
     SmsModule,
     RemindersModule,
+    IntegrationsModule,
   ],
   controllers: [TestController, MailAssetsController, HealthController],
 })

@@ -22,7 +22,8 @@ export default function AdminLayout({
     const publicRoutes = [
         '/admin/login',
         '/admin/forgot-password',
-        '/admin/reset-password'
+        '/admin/reset-password',
+        '/admin/mindcore'
     ];
 
     // Check if the current path is one of the public routes
@@ -88,7 +89,7 @@ export default function AdminLayout({
                 {isPublic ? (
                     /* --- PUBLIC LAYOUT (No Header, No Auth Check) --- */
                     <div className="relative z-10 w-full min-h-screen">
-                        <div className="w-full h-full px-4 sm:px-6 lg:px-8 2xl:px-12 max-w-[2000px] mx-auto transition-all duration-300 relative">
+                        <div className={`w-full h-full transition-all duration-300 relative ${pathname.includes('mindcore') ? '' : 'px-4 sm:px-6 lg:px-8 2xl:px-12 max-w-[2000px] mx-auto'}`}>
                             {children}
                         </div>
                     </div>

@@ -11,7 +11,13 @@ import {
   JDMatchResult,
   CandidateProfile,
 } from './jd-matching.service';
-import { IsString, IsOptional, IsNumber, IsBoolean, IsArray } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  IsArray,
+} from 'class-validator';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DTOs
@@ -150,7 +156,7 @@ export class JDMatchingController {
         dto.message,
         dto.history || [],
       );
-      
+
       return {
         success: true,
         answer: hrAnswer,
@@ -205,11 +211,13 @@ export class JDMatchingController {
     if (!email) {
       throw new BadRequestException('x-user-id header (email) is required');
     }
-    const corporateId = await this.jdMatchingService.getCorporateAccountId(email);
+    const corporateId =
+      await this.jdMatchingService.getCorporateAccountId(email);
     if (!corporateId) {
       throw new BadRequestException('Could not identify corporate account');
     }
-    const candidates = await this.jdMatchingService.fetchCorporateCandidates(corporateId);
+    const candidates =
+      await this.jdMatchingService.fetchCorporateCandidates(corporateId);
     return candidates;
   }
 

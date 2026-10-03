@@ -16,6 +16,7 @@ import {
   CorporateAccount,
   CorporateCreditLedger,
   CorporateCounsellingAccess,
+  TenantAppConfig,
 } from '@originbi/shared-entities';
 import { CreateCorporateRegistrationDto } from './dto/create-corporate-registration.dto';
 import { getCorporateWelcomeEmailTemplate } from '../mail/templates/corporate-welcome.template';
@@ -266,10 +267,17 @@ export class CorporateService {
         select: ['counsellingTypeId'],
       });
 
+    const integrationRecords = await this.dataSource
+      .getRepository(TenantAppConfig)
+      .find({
+        where: { tenant_id: account.id as any }, // tenant_id is bigint
+      });
+
     return {
       ...account,
       email: account.user?.email,
       counsellingAccess: accessRecords.map((a) => Number(a.counsellingTypeId)),
+      integrationAppIds: integrationRecords.map((r) => r.app_id),
       // Map to snake_case to match findAll and potentially frontend expectations
       full_name: account.fullName || account.user?.metadata?.fullName || '',
       company_name: account.companyName, // Explicitly mapping these ensures they exist even if spread
@@ -468,6 +476,38 @@ export class CorporateService {
             }),
           );
           await manager.save(accessEntities);
+        }
+      }
+
+      // 4. Update Integration Apps if provided
+      if (dto.integrationAppIds && Array.isArray(dto.integrationAppIds)) {
+        const tenantAppConfigRepo = manager.getRepository(TenantAppConfig);
+        
+        // Find existing configurations
+        const existingConfigs = await tenantAppConfigRepo.find({
+          where: { tenant_id: account.id as any }
+        });
+        
+        const existingAppIds = existingConfigs.map(c => c.app_id);
+        const newAppIds = dto.integrationAppIds;
+        
+        // Determine which to remove and which to add
+        const toRemove = existingConfigs.filter(c => !newAppIds.includes(c.app_id));
+        const toAddIds = newAppIds.filter(id => !existingAppIds.includes(id));
+        
+        // Delete removed
+        if (toRemove.length > 0) {
+          await tenantAppConfigRepo.remove(toRemove);
+        }
+        
+        // Add new (default disconnected, empty credentials)
+        if (toAddIds.length > 0) {
+          const newConfigs = toAddIds.map(appId => tenantAppConfigRepo.create({
+            tenant_id: account.id as any,
+            app_id: appId,
+            status: 'disconnected'
+          }));
+          await tenantAppConfigRepo.save(newConfigs);
         }
       }
 
@@ -804,6 +844,19 @@ export class CorporateService {
             }),
           );
           await manager.save(accessEntities);
+        }
+
+        // E. Integration Apps
+        if (dto.integrationAppIds && Array.isArray(dto.integrationAppIds)) {
+          const tenantAppConfigRepo = manager.getRepository(TenantAppConfig);
+          if (dto.integrationAppIds.length > 0) {
+            const newConfigs = dto.integrationAppIds.map(appId => tenantAppConfigRepo.create({
+              tenant_id: corporateAccount.id as any,
+              app_id: appId,
+              status: 'disconnected'
+            }));
+            await tenantAppConfigRepo.save(newConfigs);
+          }
         }
 
         // Send Email (check global toggle)

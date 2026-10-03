@@ -88,9 +88,9 @@ export interface CandidateProfile {
   groupName: string | null;
   currentRole?: string | null;
   departmentName?: string | null;
-  registrationType?: string | null;   // COLLEGE_STUDENT | EMPLOYEE | CXO_GENERAL | SCHOOL_STUDENT
-  currentYear?: string | null;         // For college students
-  schoolStream?: string | null;        // For school students
+  registrationType?: string | null; // COLLEGE_STUDENT | EMPLOYEE | CXO_GENERAL | SCHOOL_STUDENT
+  currentYear?: string | null; // For college students
+  schoolStream?: string | null; // For school students
 }
 
 export interface ScoredCandidate {
@@ -804,12 +804,16 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         discScoreS: row.disc_s ? parseFloat(row.disc_s) : null,
         discScoreC: row.disc_c ? parseFloat(row.disc_c) : null,
         totalScore: row.total_score ? parseFloat(row.total_score) : null,
-        sincerityIndex: row.sincerity_index ? parseFloat(row.sincerity_index) : null,
+        sincerityIndex: row.sincerity_index
+          ? parseFloat(row.sincerity_index)
+          : null,
         sincerityClass: row.sincerity_class,
         attemptCount: parseInt(row.attempt_count) || 0,
         bestScore: row.best_score ? parseFloat(row.best_score) : null,
         assessmentStatus: row.assessment_status || 'UNKNOWN',
-        corporateAccountId: row.corporate_account_id ? parseInt(row.corporate_account_id) : null,
+        corporateAccountId: row.corporate_account_id
+          ? parseInt(row.corporate_account_id)
+          : null,
         groupId: row.group_id ? parseInt(row.group_id) : null,
         groupName: row.group_name || null,
         currentRole: row.current_role || row.designation || null,
@@ -1502,8 +1506,12 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
       score: sc.compositeScore,
       tier: sc.tier,
       group: sc.candidate.groupName || 'General',
-      strengths: sc.matchReasons.filter(r => !r.toLowerCase().includes('agile')).join('; '),
-      gaps: sc.developmentAreas.filter(a => !a.toLowerCase().includes('agile')).join('; '),
+      strengths: sc.matchReasons
+        .filter((r) => !r.toLowerCase().includes('agile'))
+        .join('; '),
+      gaps: sc.developmentAreas
+        .filter((a) => !a.toLowerCase().includes('agile'))
+        .join('; '),
     }));
 
     const prompt = `You are an expert talent analyst. Generate brief, specific insights for each candidate matched to this role.
@@ -1936,7 +1944,10 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
         temperature: 0,
         max_tokens: 30,
       });
-      const intent = (res.choices[0]?.message?.content || 'general').trim().toLowerCase().replace(/[^a-z_]/g, '');
+      const intent = (res.choices[0]?.message?.content || 'general')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z_]/g, '');
       this.logger.log(`🧭 Intent classified: ${intent}`);
       return intent;
     } catch {
@@ -1949,52 +1960,63 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
    * Behaviorally rich but no raw numeric scores are exposed.
    */
   private buildEmployeeDataStr(candidates: CandidateProfile[]): string {
-    const firstNames = candidates.map(c => c.fullName.split(' ')[0].toLowerCase());
+    const firstNames = candidates.map((c) =>
+      c.fullName.split(' ')[0].toLowerCase(),
+    );
     const isDuplicate = (name: string) =>
-      firstNames.filter(n => n === name.split(' ')[0].toLowerCase()).length > 1;
+      firstNames.filter((n) => n === name.split(' ')[0].toLowerCase()).length >
+      1;
 
-    return candidates.map(c => {
-      const level = (v: number | null) =>
-        v == null ? 'Unknown' : v >= 18 ? 'High' : v >= 12 ? 'Moderate' : 'Low';
+    return candidates
+      .map((c) => {
+        const level = (v: number | null) =>
+          v == null
+            ? 'Unknown'
+            : v >= 18
+              ? 'High'
+              : v >= 12
+                ? 'Moderate'
+                : 'Low';
 
-      const displayName = isDuplicate(c.fullName)
-        ? `${c.fullName} [${c.groupName || 'No Group'} | ${c.currentRole || 'No Designation'}]`
-        : c.fullName;
+        const displayName = isDuplicate(c.fullName)
+          ? `${c.fullName} [${c.groupName || 'No Group'} | ${c.currentRole || 'No Designation'}]`
+          : c.fullName;
 
-      // Build type-specific context line
-      const rType = (c.registrationType || '').toUpperCase();
-      let contextLine = '';
-      if (rType.includes('COLLEGE') || rType.includes('SCHOOL')) {
-        // Academic profile
-        const parts: string[] = [];
-        if (c.groupName) parts.push(`Institution: ${c.groupName}`);
-        if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
-        if (c.currentYear) parts.push(`Year: ${c.currentYear}`);
-        if (c.schoolStream) parts.push(`Stream: ${c.schoolStream}`);
-        if (c.gender) parts.push(`Gender: ${c.gender}`);
-        contextLine = parts.join(' | ');
-      } else if (rType.includes('CXO')) {
-        // CXO profile
-        const parts: string[] = [];
-        if (c.currentRole) parts.push(`Role: ${c.currentRole}`);
-        if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
-        if (c.groupName) parts.push(`Group: ${c.groupName}`);
-        if (c.gender) parts.push(`Gender: ${c.gender}`);
-        contextLine = parts.join(' | ');
-      } else {
-        // Employee (default)
-        const parts: string[] = [];
-        if (c.groupName) parts.push(`Group: ${c.groupName}`);
-        if (c.currentRole) parts.push(`Role: ${c.currentRole}`);
-        if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
-        if (c.gender) parts.push(`Gender: ${c.gender}`);
-        contextLine = parts.join(' | ');
-      }
+        // Build type-specific context line
+        const rType = (c.registrationType || '').toUpperCase();
+        let contextLine = '';
+        if (rType.includes('COLLEGE') || rType.includes('SCHOOL')) {
+          // Academic profile
+          const parts: string[] = [];
+          if (c.groupName) parts.push(`Institution: ${c.groupName}`);
+          if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
+          if (c.currentYear) parts.push(`Year: ${c.currentYear}`);
+          if (c.schoolStream) parts.push(`Stream: ${c.schoolStream}`);
+          if (c.gender) parts.push(`Gender: ${c.gender}`);
+          contextLine = parts.join(' | ');
+        } else if (rType.includes('CXO')) {
+          // CXO profile
+          const parts: string[] = [];
+          if (c.currentRole) parts.push(`Role: ${c.currentRole}`);
+          if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
+          if (c.groupName) parts.push(`Group: ${c.groupName}`);
+          if (c.gender) parts.push(`Gender: ${c.gender}`);
+          contextLine = parts.join(' | ');
+        } else {
+          // Employee (default)
+          const parts: string[] = [];
+          if (c.groupName) parts.push(`Group: ${c.groupName}`);
+          if (c.currentRole) parts.push(`Role: ${c.currentRole}`);
+          if (c.departmentName) parts.push(`Dept: ${c.departmentName}`);
+          if (c.gender) parts.push(`Gender: ${c.gender}`);
+          contextLine = parts.join(' | ');
+        }
 
-      return `[${displayName}]
+        return `[${displayName}]
 ${contextLine || `Group: ${c.groupName || 'Unassigned'} | Gender: ${c.gender || 'N/A'}`}
 Behavioral Profile: Drive=${level(c.discScoreD)}, Influence=${level(c.discScoreI)}, Steadiness=${level(c.discScoreS)}, Compliance=${level(c.discScoreC)}`;
-    }).join('\n\n');
+      })
+      .join('\n\n');
   }
 
   /** Shared corporate system role prefix injected into all specialized prompts */
@@ -2044,52 +2066,121 @@ RESPONSE RULES:
     const intent = await this.classifyIntent(query);
     const employeeData = this.buildEmployeeDataStr(candidates);
 
-    this.logger.log(`🎯 Routing to handler: ${intent} | ${candidates.length} employees | history: ${history.length} msgs`);
+    this.logger.log(
+      `🎯 Routing to handler: ${intent} | ${candidates.length} employees | history: ${history.length} msgs`,
+    );
 
     let answer: string;
     switch (intent) {
       case 'individual_profile':
-        answer = await this.handleIndividualProfile(query, candidates, employeeData, history);
+        answer = await this.handleIndividualProfile(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'role_fitment':
-        answer = await this.handleRoleFitment(query, candidates, employeeData, history);
+        answer = await this.handleRoleFitment(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'team_formation':
       case 'project_team':
-        answer = await this.handleTeamFormation(query, candidates, employeeData, history);
+        answer = await this.handleTeamFormation(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'manager_guidance':
-        answer = await this.handleManagerGuidance(query, candidates, employeeData, history);
+        answer = await this.handleManagerGuidance(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'team_dynamics':
-        answer = await this.handleTeamDynamics(query, candidates, employeeData, history);
+        answer = await this.handleTeamDynamics(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'succession_planning':
-        answer = await this.handleSuccessionPlanning(query, candidates, employeeData, history);
+        answer = await this.handleSuccessionPlanning(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'capability_mapping':
-        answer = await this.handleCapabilityMapping(query, candidates, employeeData, history);
+        answer = await this.handleCapabilityMapping(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'learning_dev':
-        answer = await this.handleLearningDev(query, candidates, employeeData, history);
+        answer = await this.handleLearningDev(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'workforce_planning':
-        answer = await this.handleWorkforcePlanning(query, candidates, employeeData, history);
+        answer = await this.handleWorkforcePlanning(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'recruitment_intel':
-        answer = await this.handleRecruitmentIntel(query, candidates, employeeData, history);
+        answer = await this.handleRecruitmentIntel(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'people_strategy':
-        answer = await this.handlePeopleStrategy(query, candidates, employeeData, history);
+        answer = await this.handlePeopleStrategy(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       case 'jd_filter':
-        answer = await this.handleJDFilter(query, candidates, employeeData, history);
+        answer = await this.handleJDFilter(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
         break;
       default:
-        answer = await this.handleGeneralHRQuery(query, candidates, employeeData, history);
+        answer = await this.handleGeneralHRQuery(
+          query,
+          candidates,
+          employeeData,
+          history,
+        );
     }
 
-    this.logger.log(`✅ HR Query [${intent}] processed in ${Date.now() - startTime}ms`);
+    this.logger.log(
+      `✅ HR Query [${intent}] processed in ${Date.now() - startTime}ms`,
+    );
     return answer;
   }
 
@@ -2129,7 +2220,12 @@ ${employeeData}`;
     employeeData: string,
     history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
-    const roleContext = candidates.map(c => `${c.fullName}: ${c.currentRole || 'Role not specified'} | Group: ${c.groupName || 'N/A'}`).join('\n');
+    const roleContext = candidates
+      .map(
+        (c) =>
+          `${c.fullName}: ${c.currentRole || 'Role not specified'} | Group: ${c.groupName || 'N/A'}`,
+      )
+      .join('\n');
 
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2268,18 +2364,24 @@ ${employeeData}`;
   ): Promise<string> {
     // Pre-rank by leadership indicators (High D + High I in DISC = natural leadership signals)
     const leadershipRanked = [...candidates]
-      .map(c => ({
+      .map((c) => ({
         name: c.fullName,
         style: c.personalityStyle,
         group: c.groupName,
         role: c.currentRole,
-        leaderScore: ((c.discScoreD ?? 0) * 0.5) + ((c.discScoreI ?? 0) * 0.3) + ((c.discScoreC ?? 0) * 0.2),
+        leaderScore:
+          (c.discScoreD ?? 0) * 0.5 +
+          (c.discScoreI ?? 0) * 0.3 +
+          (c.discScoreC ?? 0) * 0.2,
       }))
       .sort((a, b) => b.leaderScore - a.leaderScore)
       .slice(0, 8);
 
     const leadershipContext = leadershipRanked
-      .map((e, i) => `${i + 1}. ${e.name} | Style: ${e.style || 'Unknown'} | Group: ${e.group || 'N/A'} | Role: ${e.role || 'N/A'}`)
+      .map(
+        (e, i) =>
+          `${i + 1}. ${e.name} | Style: ${e.style || 'Unknown'} | Group: ${e.group || 'N/A'} | Role: ${e.role || 'N/A'}`,
+      )
       .join('\n');
 
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
@@ -2326,24 +2428,27 @@ ${employeeData}`;
   ): Promise<string> {
     // Build a behavioral capability distribution summary
     const total = candidates.length;
-    const highD = candidates.filter(c => (c.discScoreD ?? 0) >= 18).length;
-    const highI = candidates.filter(c => (c.discScoreI ?? 0) >= 18).length;
-    const highS = candidates.filter(c => (c.discScoreS ?? 0) >= 18).length;
-    const highC = candidates.filter(c => (c.discScoreC ?? 0) >= 18).length;
+    const highD = candidates.filter((c) => (c.discScoreD ?? 0) >= 18).length;
+    const highI = candidates.filter((c) => (c.discScoreI ?? 0) >= 18).length;
+    const highS = candidates.filter((c) => (c.discScoreS ?? 0) >= 18).length;
+    const highC = candidates.filter((c) => (c.discScoreC ?? 0) >= 18).length;
 
     const styleMap: Record<string, number> = {};
-    candidates.forEach(c => {
+    candidates.forEach((c) => {
       const s = c.personalityStyle || 'Unknown';
       styleMap[s] = (styleMap[s] || 0) + 1;
     });
     const topStyles = Object.entries(styleMap)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([style, count]) => `${style}: ${count} employees (${Math.round((count / total) * 100)}%)`)
+      .map(
+        ([style, count]) =>
+          `${style}: ${count} employees (${Math.round((count / total) * 100)}%)`,
+      )
       .join('\n');
 
     const groupMap: Record<string, number> = {};
-    candidates.forEach(c => {
+    candidates.forEach((c) => {
       const g = c.groupName || 'Unassigned';
       groupMap[g] = (groupMap[g] || 0) + 1;
     });
@@ -2432,10 +2537,18 @@ ${employeeData}`;
     history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     const total = candidates.length;
-    const highLeaders = candidates.filter(c => (c.discScoreD ?? 0) >= 18 && (c.discScoreI ?? 0) >= 14).length;
-    const highExecutors = candidates.filter(c => (c.discScoreS ?? 0) >= 18).length;
-    const highAnalysts = candidates.filter(c => (c.discScoreC ?? 0) >= 18).length;
-    const highConnectors = candidates.filter(c => (c.discScoreI ?? 0) >= 18).length;
+    const highLeaders = candidates.filter(
+      (c) => (c.discScoreD ?? 0) >= 18 && (c.discScoreI ?? 0) >= 14,
+    ).length;
+    const highExecutors = candidates.filter(
+      (c) => (c.discScoreS ?? 0) >= 18,
+    ).length;
+    const highAnalysts = candidates.filter(
+      (c) => (c.discScoreC ?? 0) >= 18,
+    ).length;
+    const highConnectors = candidates.filter(
+      (c) => (c.discScoreI ?? 0) >= 18,
+    ).length;
 
     const planningContext = `STRATEGIC WORKFORCE SNAPSHOT:
 Total Workforce: ${total} behaviorally profiled employees
@@ -2483,15 +2596,19 @@ ${employeeData}`;
   ): Promise<string> {
     // Identify the top performers behaviorally (highest total scores) to extract patterns
     const topPerformers = [...candidates]
-      .filter(c => c.bestScore != null)
+      .filter((c) => c.bestScore != null)
       .sort((a, b) => (b.bestScore ?? 0) - (a.bestScore ?? 0))
       .slice(0, 5);
 
-    const topProfileContext = topPerformers.length > 0
-      ? topPerformers.map(c =>
-          `${c.fullName}: ${c.personalityStyle || 'Unknown'} | Group: ${c.groupName || 'N/A'} | D:${c.discScoreD ?? 'N/A'} I:${c.discScoreI ?? 'N/A'} S:${c.discScoreS ?? 'N/A'} C:${c.discScoreC ?? 'N/A'}`
-        ).join('\n')
-      : 'No scored performance data available — analysis will be based on behavioral profile distribution.';
+    const topProfileContext =
+      topPerformers.length > 0
+        ? topPerformers
+            .map(
+              (c) =>
+                `${c.fullName}: ${c.personalityStyle || 'Unknown'} | Group: ${c.groupName || 'N/A'} | D:${c.discScoreD ?? 'N/A'} I:${c.discScoreI ?? 'N/A'} S:${c.discScoreS ?? 'N/A'} C:${c.discScoreC ?? 'N/A'}`,
+            )
+            .join('\n')
+        : 'No scored performance data available — analysis will be based on behavioral profile distribution.';
 
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2527,7 +2644,7 @@ ${employeeData}`;
     const total = candidates.length;
     const genderMap: Record<string, number> = {};
     const styleMap: Record<string, number> = {};
-    candidates.forEach(c => {
+    candidates.forEach((c) => {
       const g = c.gender || 'Unknown';
       genderMap[g] = (genderMap[g] || 0) + 1;
       const s = c.personalityStyle || 'Unknown';
@@ -2542,7 +2659,9 @@ ${employeeData}`;
 
     const demographicContext = `WORKFORCE DEMOGRAPHIC & BEHAVIORAL SUMMARY:
 Total: ${total} employees | Top Styles: ${topStyles}
-Gender: ${Object.entries(genderMap).map(([g, n]) => `${g}: ${n}`).join(', ')}`;
+Gender: ${Object.entries(genderMap)
+      .map(([g, n]) => `${g}: ${n}`)
+      .join(', ')}`;
 
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2578,17 +2697,26 @@ ${employeeData}`;
     employeeData: string,
     history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
-    const nameList = candidates.map(c => {
-      const rType = (c.registrationType || '').toUpperCase();
-      let info = '';
-      if (rType.includes('COLLEGE') || rType.includes('SCHOOL')) {
-        info = [c.groupName, c.departmentName, c.currentYear ? `Year ${c.currentYear}` : null]
-          .filter(Boolean).join(' | ');
-      } else {
-        info = [c.currentRole, c.departmentName, c.groupName].filter(Boolean).join(' | ');
-      }
-      return `- ${c.fullName}${info ? ` (${info})` : ''}`;
-    }).join('\n');
+    const nameList = candidates
+      .map((c) => {
+        const rType = (c.registrationType || '').toUpperCase();
+        let info = '';
+        if (rType.includes('COLLEGE') || rType.includes('SCHOOL')) {
+          info = [
+            c.groupName,
+            c.departmentName,
+            c.currentYear ? `Year ${c.currentYear}` : null,
+          ]
+            .filter(Boolean)
+            .join(' | ');
+        } else {
+          info = [c.currentRole, c.departmentName, c.groupName]
+            .filter(Boolean)
+            .join(' | ');
+        }
+        return `- ${c.fullName}${info ? ` (${info})` : ''}`;
+      })
+      .join('\n');
 
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
@@ -2677,7 +2805,7 @@ RULES:
 4. Keep each candidate section concise but insightful.`;
 
     const transcriptBlock = transcripts
-      .map(t => `\n━━━ CANDIDATE: ${t.name} ━━━\n${t.transcript}`)
+      .map((t) => `\n━━━ CANDIDATE: ${t.name} ━━━\n${t.transcript}`)
       .join('\n\n');
 
     const userQuery = `JOB DESCRIPTION:\n${jdText}\n\n${transcriptBlock}`;
@@ -2688,7 +2816,10 @@ RULES:
   // ─── ALIAS: getCorporateIdByEmail ─────────────────────────────────────────
   // Used by the /employees GET endpoint in the controller.
 
-  async getCorporateIdByEmail(email: string, authHeader?: string): Promise<number | null> {
+  async getCorporateIdByEmail(
+    email: string,
+    authHeader?: string,
+  ): Promise<number | null> {
     try {
       return await this.getCorporateAccountId(email);
     } catch {
@@ -2705,8 +2836,8 @@ RULES:
     history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
     try {
-      const historyMessages = history.map(m => ({
-        role: m.role as 'user' | 'assistant',
+      const historyMessages = history.map((m) => ({
+        role: m.role,
         content: m.content,
       }));
 
@@ -2714,13 +2845,16 @@ RULES:
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          ...historyMessages,          // inject prior conversation turns
+          ...historyMessages, // inject prior conversation turns
           { role: 'user', content: userQuery },
         ],
         temperature: 0.3,
         max_tokens: maxTokens,
       });
-      return completion.choices[0]?.message?.content || 'I could not process your request at this time.';
+      return (
+        completion.choices[0]?.message?.content ||
+        'I could not process your request at this time.'
+      );
     } catch (error) {
       this.logger.error('OpenAI LLM Error:', error);
       return 'An error occurred while analyzing the employee profiles. Please try again.';

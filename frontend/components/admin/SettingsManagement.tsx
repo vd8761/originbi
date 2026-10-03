@@ -12,6 +12,7 @@ import {
     WhatsappIcon,
     SearchIcon,
 } from "../icons";
+import IntegrationsMasterConfig from "./IntegrationsMasterConfig";
 
 // Type definitions matching backend OriginbiSetting
 interface SettingItem {
@@ -119,6 +120,7 @@ const SETTINGS_GROUPS: { id: string; label: string; categories: string[] }[] = [
     { id: 'communications', label: 'Communications', categories: ['email', 'sms', 'whatsapp', 'affiliate'] },
     { id: 'assessment_engine', label: 'Assessment engine', categories: ['levels', 'assessment', 'iat', 'metaphor'] },
     { id: 'reports_access', label: 'Reports & access', categories: ['report'] },
+    { id: 'platform_integrations', label: 'Platform Integrations', categories: ['integrations'] },
 ];
 
 const CATEGORY_META: Record<string, CategoryMeta> = {
@@ -205,6 +207,12 @@ const CATEGORY_META: Record<string, CategoryMeta> = {
             { id: 'access', title: 'Access and security', keys: ['report_password_enabled', 'report_admin_password'] },
             { id: 'preview', title: 'Student preview', keys: ['show_report_preview_after_exam', 'student_preview_variant_mba', 'student_preview_variant_non_mba', 'student_preview_blocked_message', 'show_iat_metaphor_to_student'] },
         ],
+    },
+    integrations: {
+        label: 'App Integrations',
+        description: 'Enable or disable third-party applications for all corporate tenants globally.',
+        icon: SettingsIcon,
+        sections: [],
     },
 };
 
@@ -357,6 +365,9 @@ export default function SettingsManagement() {
                 data['report'].push({ ...manualReportConfig, originalCategory: 'email' });
             }
             
+            // Ensure integrations tab is present even if DB doesn't have it
+            if (!data['integrations']) data['integrations'] = [];
+
             setSettingsGrouped(data);
             
             // Set first category as active by default
@@ -1102,13 +1113,15 @@ export default function SettingsManagement() {
                                                 <span className="flex-1 text-left text-[14px] font-semibold tracking-wide truncate">
                                                     {meta.label}
                                                 </span>
-                                                <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
-                                                    isActive
-                                                        ? 'bg-brand-green/10 text-brand-green'
-                                                        : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400'
-                                                }`}>
-                                                    {count}
-                                                </span>
+                                                {category !== 'integrations' && (
+                                                    <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
+                                                        isActive
+                                                            ? 'bg-brand-green/10 text-brand-green'
+                                                            : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400'
+                                                    }`}>
+                                                        {count}
+                                                    </span>
+                                                )}
                                             </button>
                                         );
                                     })}
@@ -1134,8 +1147,13 @@ export default function SettingsManagement() {
                             </p>
                         </div>
                     </div>
-
-                    {isSearching ? renderSearchResults(query) : renderCategoryBody(activeCategory)}
+                    {activeCategory === 'integrations' ? (
+                        <div className="bg-white dark:bg-white/5 rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 min-h-[500px]">
+                            <IntegrationsMasterConfig />
+                        </div>
+                    ) : (
+                        isSearching ? renderSearchResults(query) : renderCategoryBody(activeCategory)
+                    )}
                 </div>
             </div>
 

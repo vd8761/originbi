@@ -11,6 +11,7 @@ import {
   CorporateCreditLedger,
   User as AdminUser,
   CorporateCounsellingAccess,
+  TenantAppConfig,
 } from '@originbi/shared-entities';
 
 @Module({
@@ -20,6 +21,7 @@ import {
       CorporateCreditLedger,
       AdminUser,
       CorporateCounsellingAccess,
+      TenantAppConfig,
     ]),
     HttpModule,
     NotificationModule,
