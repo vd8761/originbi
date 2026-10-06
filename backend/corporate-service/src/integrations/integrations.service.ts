@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TenantAppConfig, CorporateAccount } from '@originbi/shared-entities';
+import { CorporateIntegration } from '../entities/corporate-integration.entity';
 import { google } from 'googleapis';
 
 @Injectable()
@@ -15,6 +16,8 @@ export class IntegrationsService {
     private readonly tenantAppConfigRepo: Repository<TenantAppConfig>,
     @InjectRepository(CorporateAccount)
     private readonly corporateAccountRepo: Repository<CorporateAccount>,
+    @InjectRepository(CorporateIntegration)
+    private readonly corporateIntegrationRepo: Repository<CorporateIntegration>,
   ) {}
 
   // ─────────────────────────────────────────────────────────
@@ -58,7 +61,7 @@ export class IntegrationsService {
   }
 
   // ─────────────────────────────────────────────────────────
-  //  Step 2: Handle Google OAuth Callback
+  //  Step 2: Handle Google OAuth Callback (Legacy without Passport)
   // ─────────────────────────────────────────────────────────
   async handleGoogleCallback(
     code: string,
@@ -130,6 +133,81 @@ export class IntegrationsService {
   }
 
   // ─────────────────────────────────────────────────────────
+  //  Step 2: Handle Google OAuth Callback (With Passport)
+  // ─────────────────────────────────────────────────────────
+  async handleGoogleCallbackPassport(
+    user: any,
+    state: string,
+  ): Promise<{ email: string; connectedAccount: string }> {
+    if (!user || !state)
+      throw new BadRequestException('Missing user profile or state');
+
+    // Decode state
+    let tenantEmail: string;
+    let appId: string;
+    try {
+      const decoded = JSON.parse(Buffer.from(state, 'base64url').toString());
+      tenantEmail = decoded.email;
+      appId = decoded.appId;
+    } catch {
+      throw new BadRequestException('Invalid OAuth state');
+    }
+
+    const googleEmail = user.email;
+    const googleName = `${user.firstName} ${user.lastName}`.trim();
+    const googlePicture = user.picture;
+
+    // Find the corporate account
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email: tenantEmail } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    // Update or create CorporateIntegration record
+    let integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
+    });
+
+    if (!integration) {
+      integration = this.corporateIntegrationRepo.create({
+        corporateAccount: account,
+        provider: 'google_drive',
+      });
+    }
+
+    integration.access_token = user.accessToken;
+    integration.refresh_token = user.refreshToken || integration.refresh_token; // keep old refresh token if not provided
+    integration.metadata = {
+      connectedAccount: googleEmail,
+      connectedName: googleName,
+      connectedPicture: googlePicture,
+      connectedAt: new Date().toISOString(),
+    };
+    integration.status = 'active';
+
+    await this.corporateIntegrationRepo.save(integration);
+
+    // Also update TenantAppConfig to keep backward compatibility with frontend
+    const config = await this.tenantAppConfigRepo.findOne({
+      where: { tenant_id: account.id as any, app_id: appId },
+    });
+    if (config) {
+      config.configured_features = {
+        ...(config.configured_features || {}),
+        connectedAccount: googleEmail,
+        connectedName: googleName,
+        connectedPicture: googlePicture,
+        connectedAt: new Date().toISOString(),
+      };
+      config.status = 'connected';
+      await this.tenantAppConfigRepo.save(config);
+    }
+
+    return { email: tenantEmail, connectedAccount: googleEmail };
+  }
+
+  // ─────────────────────────────────────────────────────────
   //  Get tenant integrations (unchanged)
   // ─────────────────────────────────────────────────────────
   async getMyIntegrations(email: string) {
@@ -161,6 +239,112 @@ export class IntegrationsService {
         connectedPicture: c.configured_features?.connectedPicture || null,
         connectedAt: c.configured_features?.connectedAt || null,
       }));
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  List Google Drive Files
+  // ─────────────────────────────────────────────────────────
+  async listGoogleDriveFiles(email: string, search?: string) {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    console.log(`[listGoogleDriveFiles] Account found:`, account ? account.id : 'No');
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
+    });
+    console.log(`[listGoogleDriveFiles] Integration found:`, integration ? integration.id : 'No');
+
+    if (!integration || !integration.access_token) {
+      throw new BadRequestException('Google Drive is not connected');
+    }
+
+    const oauth2Client = this.getGoogleOAuthClient();
+    oauth2Client.setCredentials({
+      access_token: integration.access_token,
+      refresh_token: integration.refresh_token,
+    });
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    try {
+      let q = "mimeType != 'application/vnd.google-apps.folder' and trashed = false";
+      if (search && search.trim() !== '') {
+        const safeSearch = search.trim().replace(/'/g, "\\'");
+        q += ` and name contains '${safeSearch}'`;
+      }
+
+      const response = await drive.files.list({
+        q,
+        pageSize: 50,
+        orderBy: 'modifiedTime desc',
+        fields: 'nextPageToken, files(id, name, mimeType, webViewLink)',
+      });
+
+      return {
+        success: true,
+        files: response.data.files || [],
+      };
+    } catch (error: any) {
+      throw new BadRequestException(`Failed to fetch files: ${error.message}`);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  Get Google Drive File Content
+  // ─────────────────────────────────────────────────────────
+  async getGoogleDriveFileContent(email: string, fileId: string) {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
+    });
+    if (!integration || !integration.access_token) {
+      throw new BadRequestException('Google Drive is not connected');
+    }
+
+    const oauth2Client = this.getGoogleOAuthClient();
+    oauth2Client.setCredentials({
+      access_token: integration.access_token,
+      refresh_token: integration.refresh_token,
+    });
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    try {
+      const fileMeta = await drive.files.get({ fileId, fields: 'mimeType, name' });
+      const mimeType = fileMeta.data.mimeType;
+
+      let content = '';
+
+      if (mimeType?.includes('application/vnd.google-apps.document')) {
+        const response = await drive.files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' });
+        content = response.data as any;
+      } else if (mimeType?.includes('application/vnd.google-apps.spreadsheet')) {
+        const response = await drive.files.export({ fileId, mimeType: 'text/csv' }, { responseType: 'text' });
+        content = response.data as any;
+      } else if (mimeType?.includes('application/vnd.google-apps.presentation')) {
+        const response = await drive.files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' });
+        content = response.data as any;
+      } else {
+        const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'text' });
+        content = response.data as any;
+      }
+
+      // Truncate if too large to prevent blowing up the LLM context
+      if (typeof content === 'string' && content.length > 50000) {
+        content = content.substring(0, 50000) + '\n\n...[Content Truncated]...';
+      }
+
+      return { success: true, content };
+    } catch (error: any) {
+      console.error(`[getGoogleDriveFileContent] Failed: ${error.message}`);
+      return { success: false, error: 'Failed to extract text from this file format or file is too large.' };
+    }
   }
 
   // ─────────────────────────────────────────────────────────

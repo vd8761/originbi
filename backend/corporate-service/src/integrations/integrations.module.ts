@@ -5,15 +5,22 @@ import {
   CorporateAccount,
   MasterApp,
 } from '@originbi/shared-entities';
+import { CorporateIntegration } from '../entities/corporate-integration.entity';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
+import { GoogleStrategy } from './strategies/google.strategy';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TenantAppConfig, CorporateAccount, MasterApp]),
+    TypeOrmModule.forFeature([
+      TenantAppConfig,
+      CorporateAccount,
+      MasterApp,
+      CorporateIntegration,
+    ]),
   ],
   controllers: [IntegrationsController],
-  providers: [IntegrationsService],
+  providers: [IntegrationsService, GoogleStrategy],
   exports: [IntegrationsService],
 })
 export class IntegrationsModule {}
