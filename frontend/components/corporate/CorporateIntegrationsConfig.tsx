@@ -81,8 +81,10 @@ export default function CorporateIntegrationsConfig() {
   // Modal
   const [selectedApp, setSelectedApp] = useState<TenantApp | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [oauthStep, setOauthStep] = useState<"initial" | "connecting">("initial");
+  const [oauthStep, setOauthStep] = useState<"initial" | "connecting" | "folder_selection">("initial");
   const [isSaving, setIsSaving] = useState(false);
+  const [driveFolders, setDriveFolders] = useState<{ id: string, name: string }[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
 
   // Disconnect confirm
   const [disconnectTarget, setDisconnectTarget] = useState<TenantApp | null>(null);
@@ -96,11 +98,32 @@ export default function CorporateIntegrationsConfig() {
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
       if (!res.ok) throw new Error("Failed to fetch integrations");
-      setApps(await res.json());
+      const data = await res.json();
+      setApps(data);
+      return data as TenantApp[];
     } catch (err: any) {
       setError(err.message);
+      return [];
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const fetchDriveFolders = useCallback(async () => {
+    setFoldersLoading(true);
+    setDriveFolders([]);
+    try {
+      const email = getCurrentUserEmail();
+      const url = `${CORPORATE_API}/corporate/integrations/google/files?email=${encodeURIComponent(email)}&search=folders_only`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${getToken()}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setDriveFolders(data.files || []);
+      }
+    } catch {
+      setDriveFolders([]);
+    } finally {
+      setFoldersLoading(false);
     }
   }, []);
 
@@ -114,11 +137,19 @@ export default function CorporateIntegrationsConfig() {
       const apiOrigin = CORPORATE_API ? new URL(CORPORATE_API).origin : window.location.origin;
       if (event.origin !== window.location.origin && event.origin !== apiOrigin) return;
       if (event.data?.type === "OAUTH_SUCCESS") {
-        // OAuth succeeded — refresh the app list
-        setIsModalOpen(false);
-        setOauthStep("initial");
         setIsSaving(false);
-        await fetchApps();
+        const freshApps = await fetchApps();
+        if (selectedApp && isGoogleApp(selectedApp.name)) {
+          // Update selectedApp to the freshly connected version
+          const freshApp = freshApps.find(a => a.id === selectedApp.id);
+          if (freshApp) setSelectedApp(freshApp);
+          setOauthStep("folder_selection");
+          setShowFolderSelector(true);
+          fetchDriveFolders();
+        } else {
+          setIsModalOpen(false);
+          setOauthStep("initial");
+        }
       }
       if (event.data?.type === "OAUTH_ERROR") {
         setIsSaving(false);
@@ -128,7 +159,7 @@ export default function CorporateIntegrationsConfig() {
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [fetchApps]);
+  }, [fetchApps, selectedApp]);
 
   // ─── Launch Google OAuth popup ───
   const launchGoogleOAuth = (app: TenantApp) => {
@@ -165,6 +196,10 @@ export default function CorporateIntegrationsConfig() {
         }
       );
       if (!res.ok) throw new Error("Failed to disconnect");
+      if (isGoogleApp(app.name)) {
+        localStorage.removeItem('googleDriveSyncFolder');
+        setSelectedSyncFolder(null);
+      }
       setDisconnectTarget(null);
       await fetchApps();
     } catch (err: any) {
@@ -177,6 +212,19 @@ export default function CorporateIntegrationsConfig() {
     setOauthStep("initial");
     setIsModalOpen(true);
   };
+  
+  const [selectedSyncFolder, setSelectedSyncFolder] = useState<{ id: string, name: string } | null>(null);
+  const [showFolderSelector, setShowFolderSelector] = useState(false);
+  const [folderSearchQuery, setFolderSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('googleDriveSyncFolder');
+      if (saved) {
+        try { setSelectedSyncFolder(JSON.parse(saved)); } catch { /* ignore */ }
+      }
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -222,7 +270,8 @@ export default function CorporateIntegrationsConfig() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {apps.map((app) => {
-            const isConnected = app.status === "connected";
+            const hasFolderIfGoogle = isGoogleApp(app.name) ? !!(typeof window !== 'undefined' && localStorage.getItem('googleDriveSyncFolder')) : true;
+            const isConnected = app.status === "connected" && hasFolderIfGoogle;
             return (
               <div
                 key={app.id}
@@ -304,18 +353,7 @@ export default function CorporateIntegrationsConfig() {
                     >
                       {isConnected ? "Manage" : "Connect"}
                     </button>
-                    {isConnected && (
-                      <button
-                        onClick={() => setDisconnectTarget(app)}
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 border border-gray-200/70 dark:border-white/10 transition-all duration-200"
-                        title="Disconnect"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                    </div>
                 </div>
               </div>
             );
@@ -398,6 +436,103 @@ export default function CorporateIntegrationsConfig() {
                       </li>
                     </ul>
                   </div>
+
+                  {isGoogleApp(selectedApp.name) && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-gray-800 dark:text-gray-200">Knowledge Base Folder</p>
+                        {!showFolderSelector && !selectedSyncFolder && (
+                          <button onClick={() => {
+                            setShowFolderSelector(true);
+                            fetchDriveFolders();
+                          }} className="text-[13px] font-semibold text-brand-green hover:text-emerald-600 transition-colors">
+                            Select Folder
+                          </button>
+                        )}
+                      </div>
+                      
+                      {selectedSyncFolder ? (
+                        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-xl">
+                          <div className="flex items-center gap-3">
+                            <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                            <div>
+                              <p className="text-[14px] font-medium text-gray-900 dark:text-white">{selectedSyncFolder.name}</p>
+                              <p className="text-[12px] text-gray-500">Synced to Ask AI context</p>
+                            </div>
+                          </div>
+                          <button onClick={async () => {
+                            setSelectedSyncFolder(null);
+                            localStorage.removeItem('googleDriveSyncFolder');
+                            try {
+                              const email = getCurrentUserEmail();
+                              await fetch(`${CORPORATE_API}/corporate/integrations/google/sync-folder?email=${encodeURIComponent(email)}`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                                body: JSON.stringify({ folderId: '', folderName: '' }),
+                              });
+                            } catch { /* ignore */ }
+                          }} className="text-red-500 hover:text-red-700 p-2">✕</button>
+                        </div>
+                      ) : showFolderSelector ? (
+                        <div className="border border-gray-200 dark:border-white/10 rounded-xl overflow-hidden">
+                          <div className="bg-gray-50 dark:bg-white/5 px-4 py-3 border-b border-gray-200 dark:border-white/10 space-y-2">
+                            <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wider">Select a folder to sync</p>
+                            <input 
+                              type="text" 
+                              placeholder="Search folders..."
+                              value={folderSearchQuery}
+                              onChange={(e) => setFolderSearchQuery(e.target.value)}
+                              className="w-full px-3 py-1.5 text-sm bg-white dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg focus:outline-none focus:border-brand-green"
+                            />
+                          </div>
+                          <div className="max-h-48 overflow-y-auto p-2">
+                            {foldersLoading ? (
+                              <div className="flex items-center justify-center py-6 gap-2">
+                                <div className="w-4 h-4 border-2 border-brand-green border-t-transparent rounded-full animate-spin" />
+                                <p className="text-sm text-gray-500">Loading your folders...</p>
+                              </div>
+                            ) : driveFolders.length > 0 ? driveFolders
+                              .filter(f => f.name.toLowerCase().includes(folderSearchQuery.toLowerCase()))
+                              .map((folder) => (
+                              <button 
+                                key={folder.id}
+                                onClick={async () => { 
+                                  const f = { id: folder.id, name: folder.name };
+                                  setSelectedSyncFolder(f); 
+                                  localStorage.setItem('googleDriveSyncFolder', JSON.stringify(f));
+                                  setShowFolderSelector(false); 
+                                  setOauthStep("initial");
+                                  setIsModalOpen(false);
+                                  // Persist to backend — restricts AI to only this folder
+                                  try {
+                                    const email = getCurrentUserEmail();
+                                    await fetch(`${CORPORATE_API}/corporate/integrations/google/sync-folder?email=${encodeURIComponent(email)}`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                                      body: JSON.stringify({ folderId: folder.id, folderName: folder.name }),
+                                    });
+                                  } catch (e) { console.error('Failed to save folder to backend', e); }
+                                }}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-white/5 rounded-lg text-left"
+                              >
+                                <svg className="w-5 h-5 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                                <span className="text-[14px] font-medium text-gray-700 dark:text-gray-300">{folder.name}</span>
+                              </button>
+                            )) : (
+                              <div className="text-center py-4">
+                                <p className="text-xs text-gray-400">No folders found in your Google Drive.</p>
+                              </div>
+                            )}
+                            {!foldersLoading && driveFolders.filter(f => f.name.toLowerCase().includes(folderSearchQuery.toLowerCase())).length === 0 && driveFolders.length > 0 && (
+                              <p className="text-xs text-center py-4 text-gray-400">No folders match your search.</p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[13px] text-gray-500">No folder is currently syncing. Click "Select Folder" to connect a knowledge base.</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-white/5">
                     {isGoogleApp(selectedApp.name) && (
