@@ -38,18 +38,14 @@ export class IntegrationsController {
     const state = Buffer.from(JSON.stringify({ email, appId })).toString(
       'base64url',
     );
-    // Dynamic AuthGuard to pass state
-    const guard = AuthGuard('google');
-    // @ts-ignore - access options
-    const authFn = new guard().getAuthenticateOptions ? new guard().getAuthenticateOptions(req) : {};
-    
     // We import passport directly to use its authenticate method for dynamic state
     const passport = require('passport');
-    return passport.authenticate('google', {
+    const authMiddleware = passport.authenticate('google', {
       state,
       accessType: 'offline',
       prompt: 'consent',
-    })(req, res, (err: any) => {
+    });
+    authMiddleware(req, res, (err: any) => {
       if (err) throw err;
     });
   }
