@@ -120,7 +120,7 @@ export default function CorporateIntegrationsConfig() {
         const data = await res.json();
         setDriveFolders(data.files || []);
       }
-    } catch (e) {
+    } catch {
       setDriveFolders([]);
     } finally {
       setFoldersLoading(false);
@@ -221,7 +221,7 @@ export default function CorporateIntegrationsConfig() {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('googleDriveSyncFolder');
       if (saved) {
-        try { setSelectedSyncFolder(JSON.parse(saved)); } catch (e) {}
+        try { setSelectedSyncFolder(JSON.parse(saved)); } catch { /* ignore */ }
       }
     }
   }, []);
@@ -470,7 +470,7 @@ export default function CorporateIntegrationsConfig() {
                                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
                                 body: JSON.stringify({ folderId: '', folderName: '' }),
                               });
-                            } catch (e) {}
+                            } catch { /* ignore */ }
                           }} className="text-red-500 hover:text-red-700 p-2">✕</button>
                         </div>
                       ) : showFolderSelector ? (
