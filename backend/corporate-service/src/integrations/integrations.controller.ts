@@ -57,11 +57,12 @@ export class IntegrationsController {
     try {
       // req.user contains the profile and tokens extracted by GoogleStrategy
       // req.oauthState contains the state we passed (tenant email and appId)
-      
-      const result = await this.integrationsService.handleGoogleCallbackPassport(
-        req.user,
-        req.oauthState, // or req.query.state
-      );
+
+      const result =
+        await this.integrationsService.handleGoogleCallbackPassport(
+          req.user,
+          req.oauthState, // or req.query.state
+        );
       // Close the popup and notify the parent window
       return res.send(`
         <!DOCTYPE html>

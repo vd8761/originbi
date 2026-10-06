@@ -9,8 +9,15 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     super({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_REDIRECT_URI || `${process.env.API_URL || 'http://localhost:3002'}/corporate/integrations/oauth/google/callback`,
-      scope: ['email', 'profile', 'https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/contacts.readonly'],
+      callbackURL:
+        process.env.GOOGLE_REDIRECT_URI ||
+        `${process.env.API_URL || 'http://localhost:3002'}/corporate/integrations/oauth/google/callback`,
+      scope: [
+        'email',
+        'profile',
+        'https://www.googleapis.com/auth/drive.readonly',
+        'https://www.googleapis.com/auth/contacts.readonly',
+      ],
       passReqToCallback: true,
     });
   }
@@ -31,10 +38,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       accessToken,
       refreshToken,
     };
-    
+
     // We can pass the request query state to the callback to identify the tenant
     request.oauthState = request.query.state;
-    
+
     done(null, user);
   }
 }

@@ -249,13 +249,19 @@ export class IntegrationsService {
       where: { user: { email } },
       relations: ['user'],
     });
-    console.log(`[listGoogleDriveFiles] Account found:`, account ? account.id : 'No');
+    console.log(
+      `[listGoogleDriveFiles] Account found:`,
+      account ? account.id : 'No',
+    );
     if (!account) throw new NotFoundException('Corporate account not found');
 
     const integration = await this.corporateIntegrationRepo.findOne({
       where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
     });
-    console.log(`[listGoogleDriveFiles] Integration found:`, integration ? integration.id : 'No');
+    console.log(
+      `[listGoogleDriveFiles] Integration found:`,
+      integration ? integration.id : 'No',
+    );
 
     if (!integration || !integration.access_token) {
       throw new BadRequestException('Google Drive is not connected');
@@ -269,9 +275,10 @@ export class IntegrationsService {
 
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     try {
-      let q = "mimeType != 'application/vnd.google-apps.folder' and trashed = false";
+      let q =
+        "mimeType != 'application/vnd.google-apps.folder' and trashed = false";
       if (search && search.trim() !== '') {
-        const safeSearch = search.trim().replace(/'/g, "\\'");
+        const safeSearch = search.trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         q += ` and name contains '${safeSearch}'`;
       }
 
@@ -316,22 +323,41 @@ export class IntegrationsService {
 
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     try {
-      const fileMeta = await drive.files.get({ fileId, fields: 'mimeType, name' });
+      const fileMeta = await drive.files.get({
+        fileId,
+        fields: 'mimeType, name',
+      });
       const mimeType = fileMeta.data.mimeType;
 
       let content = '';
 
       if (mimeType?.includes('application/vnd.google-apps.document')) {
-        const response = await drive.files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' });
+        const response = await drive.files.export(
+          { fileId, mimeType: 'text/plain' },
+          { responseType: 'text' },
+        );
         content = response.data as any;
-      } else if (mimeType?.includes('application/vnd.google-apps.spreadsheet')) {
-        const response = await drive.files.export({ fileId, mimeType: 'text/csv' }, { responseType: 'text' });
+      } else if (
+        mimeType?.includes('application/vnd.google-apps.spreadsheet')
+      ) {
+        const response = await drive.files.export(
+          { fileId, mimeType: 'text/csv' },
+          { responseType: 'text' },
+        );
         content = response.data as any;
-      } else if (mimeType?.includes('application/vnd.google-apps.presentation')) {
-        const response = await drive.files.export({ fileId, mimeType: 'text/plain' }, { responseType: 'text' });
+      } else if (
+        mimeType?.includes('application/vnd.google-apps.presentation')
+      ) {
+        const response = await drive.files.export(
+          { fileId, mimeType: 'text/plain' },
+          { responseType: 'text' },
+        );
         content = response.data as any;
       } else {
-        const response = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'text' });
+        const response = await drive.files.get(
+          { fileId, alt: 'media' },
+          { responseType: 'text' },
+        );
         content = response.data as any;
       }
 
@@ -343,7 +369,11 @@ export class IntegrationsService {
       return { success: true, content };
     } catch (error: any) {
       console.error(`[getGoogleDriveFileContent] Failed: ${error.message}`);
-      return { success: false, error: 'Failed to extract text from this file format or file is too large.' };
+      return {
+        success: false,
+        error:
+          'Failed to extract text from this file format or file is too large.',
+      };
     }
   }
 

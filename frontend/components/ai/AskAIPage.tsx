@@ -414,8 +414,8 @@ export default function AskAIPage() {
       if (streamAbortRef.current) break;
       built += word;
       setStreamingContent(built);
-      // Speed: shorter chunks render faster; longer words slightly slower
-      await new Promise(r => setTimeout(r, Math.min(word.length * 8, 30)));
+      // Speed: dramatically reduced to make UI feel much more responsive and eliminate artificial latency
+      await new Promise(r => setTimeout(r, 2));
     }
     // Commit final complete message to messages array
     setStreamingContent(null);
@@ -446,22 +446,26 @@ export default function AskAIPage() {
       const fileNames = attachedFiles.map(f => f.name).join(', ');
       uiPrompt += `\n\n[Attached Google Drive Files: ${fileNames}]`;
       
-      let attachmentContext = '\n\n[Attached Google Drive Files:';
-      for (const file of attachedFiles) {
+      // Fetch all file contents concurrently for maximum speed
+      const fetchPromises = attachedFiles.map(async (file) => {
         try {
           const url = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/file-content?email=${encodeURIComponent(email)}&fileId=${encodeURIComponent(file.id)}`;
           const res = await fetch(url);
           const data = await res.json();
           
           if (data.success && data.content) {
-            attachmentContext += `\n\n--- File: ${file.name} ---\n${data.content}\n--- End of ${file.name} ---`;
+            return `\n\n--- File: ${file.name} ---\n${data.content}\n--- End of ${file.name} ---`;
           } else {
-            attachmentContext += `\n\n--- File: ${file.name} ---\n[Could not read file content: ${data.error || 'Unknown error'}]\n--- End of ${file.name} ---`;
+            return `\n\n--- File: ${file.name} ---\n[Could not read file content: ${data.error || 'Unknown error'}]\n--- End of ${file.name} ---`;
           }
         } catch (e) {
-          attachmentContext += `\n\n--- File: ${file.name} ---\n[Failed to download file]\n--- End of ${file.name} ---`;
+          return `\n\n--- File: ${file.name} ---\n[Failed to download file]\n--- End of ${file.name} ---`;
         }
-      }
+      });
+      
+      const fileContents = await Promise.all(fetchPromises);
+      let attachmentContext = '\n\n[Attached Google Drive Files:';
+      attachmentContext += fileContents.join('');
       attachmentContext += '\n]';
       apiPrompt += attachmentContext;
     }
