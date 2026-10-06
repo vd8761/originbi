@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Delete,
   Param,
@@ -110,6 +111,22 @@ export class IntegrationsController {
   ) {
     if (!email) throw new BadRequestException('Email is required');
     return this.integrationsService.listGoogleDriveFiles(email, search);
+  }
+
+  @Post('google/sync-folder')
+  async saveSyncFolder(
+    @Query('email') email: string,
+    @Body() body: { folderId: string; folderName: string },
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!body.folderId) throw new BadRequestException('Folder ID is required');
+    return this.integrationsService.saveSyncFolder(email, body.folderId, body.folderName);
+  }
+
+  @Get('google/folder-context')
+  async getFolderContext(@Query('email') email: string) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.integrationsService.getFolderContext(email);
   }
 
   @Get('google/file-content')

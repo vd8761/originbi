@@ -46,7 +46,7 @@ export class IntegrationsService {
     const scopes = [
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/drive.file', // scoped drive access
+      'https://www.googleapis.com/auth/drive.readonly', // read access to list and read files
       'https://www.googleapis.com/auth/contacts.readonly', // people API
     ];
 
@@ -249,22 +249,15 @@ export class IntegrationsService {
       where: { user: { email } },
       relations: ['user'],
     });
-    console.log(
-      `[listGoogleDriveFiles] Account found:`,
-      account ? account.id : 'No',
-    );
     if (!account) throw new NotFoundException('Corporate account not found');
 
+    // Tokens are saved by Passport callback in corporate_integrations table
     const integration = await this.corporateIntegrationRepo.findOne({
-      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
+      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
     });
-    console.log(
-      `[listGoogleDriveFiles] Integration found:`,
-      integration ? integration.id : 'No',
-    );
 
     if (!integration || !integration.access_token) {
-      throw new BadRequestException('Google Drive is not connected');
+      throw new BadRequestException('Google Drive is not connected or token is missing');
     }
 
     const oauth2Client = this.getGoogleOAuthClient();
@@ -275,27 +268,65 @@ export class IntegrationsService {
 
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     try {
-      let q =
-        "mimeType != 'application/vnd.google-apps.folder' and trashed = false";
-      if (search && search.trim() !== '') {
-        const safeSearch = search.trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-        q += ` and name contains '${safeSearch}'`;
+      let q: string;
+      if (search === 'folders_only') {
+        // Return only top-level (root-parented), non-hidden Google Drive folders
+        q = "mimeType = 'application/vnd.google-apps.folder' and 'root' in parents and trashed = false";
+      } else {
+        q = "mimeType != 'application/vnd.google-apps.folder' and trashed = false";
+        if (search && search.trim() !== '') {
+          const safeSearch = search.trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          q += ` and name contains '${safeSearch}'`;
+        }
       }
 
       const response = await drive.files.list({
         q,
-        pageSize: 50,
-        orderBy: 'modifiedTime desc',
+        pageSize: 100,
+        orderBy: 'name',
         fields: 'nextPageToken, files(id, name, mimeType, webViewLink)',
       });
 
+      let files = response.data.files || [];
+      // Remove hidden/system folders (those starting with '.')
+      if (search === 'folders_only') {
+        files = files.filter(f => f.name && !f.name.startsWith('.'));
+      }
+
       return {
         success: true,
-        files: response.data.files || [],
+        files,
       };
     } catch (error: any) {
       throw new BadRequestException(`Failed to fetch files: ${error.message}`);
     }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  Save Selected Sync Folder
+  // ─────────────────────────────────────────────────────────
+  async saveSyncFolder(email: string, folderId: string, folderName: string) {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
+    });
+    if (!integration) throw new NotFoundException('Google Drive integration not found');
+
+    // Save the selected folder ID to metadata — only files inside this folder will be indexed
+    integration.metadata = {
+      ...(integration.metadata || {}),
+      syncFolderId: folderId,
+      syncFolderName: folderName,
+      syncedAt: new Date().toISOString(),
+    };
+    await this.corporateIntegrationRepo.save(integration);
+
+    return { success: true, folderId, folderName };
   }
 
   // ─────────────────────────────────────────────────────────
@@ -309,7 +340,7 @@ export class IntegrationsService {
     if (!account) throw new NotFoundException('Corporate account not found');
 
     const integration = await this.corporateIntegrationRepo.findOne({
-      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
+      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
     });
     if (!integration || !integration.access_token) {
       throw new BadRequestException('Google Drive is not connected');
@@ -374,6 +405,79 @@ export class IntegrationsService {
         error:
           'Failed to extract text from this file format or file is too large.',
       };
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  Get Combined Folder Context for Knowledge Base
+  // ─────────────────────────────────────────────────────────
+  async getFolderContext(email: string): Promise<{ success: boolean; content: string }> {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
+    });
+    
+    if (!integration || !integration.access_token) {
+      return { success: false, content: '' };
+    }
+
+    const folderId = integration.metadata?.syncFolderId;
+    if (!folderId) {
+      return { success: false, content: '' };
+    }
+
+    const oauth2Client = this.getGoogleOAuthClient();
+    oauth2Client.setCredentials({
+      access_token: integration.access_token,
+      refresh_token: integration.refresh_token,
+    });
+
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    
+    try {
+      // Find up to 5 text/doc files inside the synced folder
+      const response = await drive.files.list({
+        q: `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
+        pageSize: 5,
+        fields: 'files(id, name, mimeType)',
+      });
+
+      const files = response.data.files || [];
+      if (files.length === 0) {
+        return { success: true, content: 'Knowledge Base folder is empty.' };
+      }
+
+      const filePromises = files.map(async (file) => {
+        try {
+          let text = '';
+          const mimeType = file.mimeType;
+          if (mimeType?.includes('application/vnd.google-apps.document') || mimeType?.includes('application/vnd.google-apps.presentation')) {
+            const r = await drive.files.export({ fileId: file.id as string, mimeType: 'text/plain' }, { responseType: 'text' });
+            text = r.data as any;
+          } else if (mimeType?.includes('application/vnd.google-apps.spreadsheet')) {
+            const r = await drive.files.export({ fileId: file.id as string, mimeType: 'text/csv' }, { responseType: 'text' });
+            text = r.data as any;
+          } else {
+            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'text' });
+            text = r.data as any;
+          }
+          if (typeof text === 'string' && text.length > 20000) {
+            text = text.substring(0, 20000) + '...';
+          }
+          return `\n\n--- KnowledgeBase Document: ${file.name} ---\n${text}`;
+        } catch (e) {
+          return '';
+        }
+      });
+
+      const contents = await Promise.all(filePromises);
+      return { success: true, content: contents.join('') };
+    } catch (e) {
+      return { success: false, content: '' };
     }
   }
 

@@ -48,8 +48,7 @@ const FALLBACK_PHRASES = [
   'Reviewing details...',
   'Processing query...',
   'Formulating insights...',
-  'Looking into this for you...',
-  'Gathering your team details...'
+  'Looking into this for you...'
 ];
 
 function getThinkingPhrase(query?: string) {
@@ -57,6 +56,10 @@ function getThinkingPhrase(query?: string) {
   const fallback = FALLBACK_PHRASES[query ? (query.length % FALLBACK_PHRASES.length) : 0];
 
   if (!query) return fallback;
+
+  if (query.includes('@KnowledgeBase')) {
+    return 'Searching Knowledge Base...';
+  }
 
   // 1. Extract file name for fallback
   let fileNameFallback = '';
@@ -212,6 +215,8 @@ export default function AskAIPage() {
   const [driveSearchQuery, setDriveSearchQuery] = useState('');
   const [driveLoading, setDriveLoading] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
+  const [connectedFolder, setConnectedFolder] = useState<{ id: string, name: string } | null>(null);
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
   // Typewriter streaming state: holds the reply being "typed" out
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ask' | 'interviews'>('ask');
@@ -541,6 +546,22 @@ export default function AskAIPage() {
       attachmentContext += fileContents.join('');
       attachmentContext += '\n]';
       apiPrompt += attachmentContext;
+    }
+
+    if (basePrompt.includes('@KnowledgeBase')) {
+      try {
+        const url = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/folder-context?email=${encodeURIComponent(email)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data.success && data.content) {
+          apiPrompt += `\n\n[User is querying their synced Knowledge Base (Google Drive Folder). Use the following synced documents to accurately answer their question. If the answer is not in these documents, say so.]\n\n${data.content}`;
+        } else {
+          apiPrompt += `\n\n[System Note: The Knowledge Base is empty or not properly synced.]`;
+        }
+      } catch (e) {
+        apiPrompt += `\n\n[System Note: Failed to fetch Knowledge Base context.]`;
+      }
     }
 
     if (!apiPrompt) {
@@ -949,7 +970,16 @@ export default function AskAIPage() {
                     <textarea
                       ref={inputRef}
                       value={input}
-                      onChange={e => setInput(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setInput(val);
+                        const lastAt = val.lastIndexOf('@');
+                        if (lastAt !== -1 && !val.substring(lastAt).includes(' ')) {
+                          setShowMentionMenu(true);
+                        } else {
+                          setShowMentionMenu(false);
+                        }
+                      }}
                       onInput={e => {
                         const t = e.target as HTMLTextAreaElement;
                         t.style.height = 'auto';
@@ -961,6 +991,30 @@ export default function AskAIPage() {
                       disabled={loading || streamingContent !== null}
                       className="w-full bg-transparent px-4 pt-4 pb-12 text-[15px] text-[#111827] dark:text-[#f9fafb] placeholder-[#9ca3af] resize-none outline-none min-h-[52px] max-h-[200px] leading-relaxed disabled:opacity-60 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                     />
+                  )}
+
+                  {/* Mention Popover */}
+                  {showMentionMenu && !isListening && !isTranscribing && (
+                    <div className="absolute bottom-full left-4 mb-2 w-64 bg-white dark:bg-[#2d2d2d] border border-[#e5e7eb] dark:border-[#3d3d3d] rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+                      <div className="px-3 py-2 text-[11px] font-semibold text-[#9ca3af] uppercase tracking-wider bg-[#f9fafb] dark:bg-[#1f2937] border-b border-[#e5e7eb] dark:border-[#3d3d3d]">Connectors</div>
+                      <button 
+                        onClick={() => {
+                          const lastAt = input.lastIndexOf('@');
+                          setInput(input.substring(0, lastAt) + '@KnowledgeBase ');
+                          setShowMentionMenu(false);
+                          if (inputRef.current) inputRef.current.focus();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-3 hover:bg-[#f3f4f6] dark:hover:bg-[#3d3d3d] transition-colors text-left"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4 text-[#10b981]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-medium text-[#111827] dark:text-white">Knowledge Base</p>
+                          <p className="text-[11px] text-[#6b7280] dark:text-[#9ca3af]">Google Drive Folder Sync</p>
+                        </div>
+                      </button>
+                    </div>
                   )}
                   {/* Voice recording state — replaces textarea */}
                   {isListening && (
@@ -992,13 +1046,7 @@ export default function AskAIPage() {
                   )}
                   {/* Actions — bottom-right inside textarea box */}
                   <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                    <button
-                      onClick={openDrivePicker}
-                      className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#6b7280] dark:text-[#9ca3af] hover:bg-[#e5e7eb] dark:hover:bg-[#4b5563] transition-all shadow-sm"
-                      title="Attach from Google Drive"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                    </button>
+
                     <button
                       onClick={toggleListening}
                       disabled={isTranscribing}
@@ -1126,7 +1174,7 @@ export default function AskAIPage() {
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-[#10b981]" viewBox="0 0 24 24" fill="currentColor"><path d="M21.17 3.25Q22.5 5.25 22.5 8v8q0 2.75-1.33 4.75T18 22.5H6q-1.84 0-3.17-2T1.5 16V8q0-2.75 1.33-4.75T6 1.5h12q1.84 0 3.17 2z" opacity="0.2" /><path d="M13.5 16.5l-4-6h8l-4 6zM8 12.5l-3 4.5h6l-3-4.5zM16 12.5l-3 4.5h6l-3-4.5z" /></svg>
-                  <h3 className="font-semibold text-[#111827] dark:text-white">Google Drive</h3>
+                  <h3 className="font-semibold text-[#111827] dark:text-white">Connect Knowledge Folder</h3>
                 </div>
                 <button onClick={() => setDriveModalOpen(false)} className="text-[#9ca3af] hover:text-[#374151]"><X className="w-5 h-5" /></button>
               </div>
@@ -1153,7 +1201,25 @@ export default function AskAIPage() {
                 </button>
               </div>
             </div>
-
+            
+            {connectedFolder ? (
+              <div className="flex-1 p-6 flex flex-col items-center justify-center text-center gap-4 bg-white dark:bg-[#2d2d2d]">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-[#10b981]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <div>
+                  <h4 className="text-[16px] font-semibold text-[#111827] dark:text-white mb-1">Folder Connected</h4>
+                  <p className="text-[14px] text-[#6b7280] dark:text-[#9ca3af]">OriginBI is synced with: <strong className="text-[#111827] dark:text-white">{connectedFolder.name}</strong></p>
+                  <p className="text-[12px] text-[#9ca3af] mt-1">All files in this folder are being automatically indexed.</p>
+                </div>
+                <button 
+                  onClick={() => setConnectedFolder(null)}
+                  className="mt-2 px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg text-[13px] font-medium transition-colors"
+                >
+                  Disconnect Folder
+                </button>
+              </div>
+            ) : (
             <div className="flex-1 overflow-y-auto p-4">
               {driveLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-3">
@@ -1181,12 +1247,13 @@ export default function AskAIPage() {
                         <svg className="w-5 h-5 text-[#9ca3af]" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" /></svg>
                         <span className="text-[14px] text-[#374151] dark:text-[#d1d5db] font-medium">{file.name}</span>
                       </div>
-                      <span className="text-[11px] text-[#9ca3af] bg-[#e5e7eb] dark:bg-[#4b5563] px-2 py-0.5 rounded-md">Attach</span>
+                      <span className="text-[11px] text-[#9ca3af] bg-[#e5e7eb] dark:bg-[#4b5563] px-2 py-0.5 rounded-md">Connect</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       )}
