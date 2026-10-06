@@ -8,8 +8,11 @@ import {
   Query,
   BadRequestException,
   Res,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request } from 'express';
+import { AuthGuard } from '@nestjs/passport';
 import { IntegrationsService } from './integrations.service';
 
 @Controller('corporate/integrations')
@@ -27,26 +30,39 @@ export class IntegrationsController {
   startGoogleOAuth(
     @Query('email') email: string,
     @Query('appId') appId: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     if (!email || !appId)
       throw new BadRequestException('Email and appId are required');
-    const url = this.integrationsService.generateGoogleOAuthUrl(email, appId);
-    return res.redirect(url);
+    const state = Buffer.from(JSON.stringify({ email, appId })).toString(
+      'base64url',
+    );
+    // We import passport directly to use its authenticate method for dynamic state
+    const passport = require('passport');
+    const authMiddleware = passport.authenticate('google', {
+      state,
+      accessType: 'offline',
+      prompt: 'consent',
+    });
+    authMiddleware(req, res, (err: any) => {
+      if (err) throw err;
+    });
   }
 
   // ─── OAuth: Google Callback ───
   @Get('oauth/google/callback')
-  async handleGoogleCallback(
-    @Query('code') code: string,
-    @Query('state') state: string,
-    @Res() res: Response,
-  ) {
+  @UseGuards(AuthGuard('google'))
+  async handleGoogleCallback(@Req() req: any, @Res() res: Response) {
     try {
-      const result = await this.integrationsService.handleGoogleCallback(
-        code,
-        state,
-      );
+      // req.user contains the profile and tokens extracted by GoogleStrategy
+      // req.oauthState contains the state we passed (tenant email and appId)
+
+      const result =
+        await this.integrationsService.handleGoogleCallbackPassport(
+          req.user,
+          req.oauthState, // or req.query.state
+        );
       // Close the popup and notify the parent window
       return res.send(`
         <!DOCTYPE html>
@@ -85,6 +101,25 @@ export class IntegrationsController {
         </html>
       `);
     }
+  }
+
+  @Get('google/files')
+  async listGoogleDriveFiles(
+    @Query('email') email: string,
+    @Query('search') search?: string,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.integrationsService.listGoogleDriveFiles(email, search);
+  }
+
+  @Get('google/file-content')
+  async getGoogleDriveFileContent(
+    @Query('email') email: string,
+    @Query('fileId') fileId: string,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!fileId) throw new BadRequestException('File ID is required');
+    return this.integrationsService.getGoogleDriveFileContent(email, fileId);
   }
 
   @Put(':appId')

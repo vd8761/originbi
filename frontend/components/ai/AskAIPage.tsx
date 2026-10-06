@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Pencil, Trash2, Check, X, Square, Mic, Volume2, VolumeX } from 'lucide-react';
+import { Pencil, Trash2, Check, X, Square, Mic, Volume2, VolumeX, Search } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
@@ -183,6 +183,11 @@ export default function AskAIPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [driveModalOpen, setDriveModalOpen] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<any[]>([]);
+  const [driveSearchQuery, setDriveSearchQuery] = useState('');
+  const [driveLoading, setDriveLoading] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<any[]>([]);
   // Typewriter streaming state: holds the reply being "typed" out
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'ask' | 'interviews'>('ask');
@@ -409,8 +414,8 @@ export default function AskAIPage() {
       if (streamAbortRef.current) break;
       built += word;
       setStreamingContent(built);
-      // Speed: shorter chunks render faster; longer words slightly slower
-      await new Promise(r => setTimeout(r, Math.min(word.length * 8, 30)));
+      // Speed: dramatically reduced to make UI feel much more responsive and eliminate artificial latency
+      await new Promise(r => setTimeout(r, 2));
     }
     // Commit final complete message to messages array
     setStreamingContent(null);
@@ -427,21 +432,68 @@ export default function AskAIPage() {
   };
 
   const send = async (text?: string) => {
-    const prompt = (text || input).trim();
-    if (!prompt || loading) return;
+    const basePrompt = (text || input).trim();
+    if (!basePrompt && attachedFiles.length === 0 && !loading) return;
+
+    let apiPrompt = basePrompt;
+    let uiPrompt = basePrompt;
+
+    // Append attachment info
+    if (attachedFiles.length > 0) {
+      // Show loading while downloading files
+      setLoading(true);
+      
+      const fileNames = attachedFiles.map(f => f.name).join(', ');
+      uiPrompt += `\n\n[Attached Google Drive Files: ${fileNames}]`;
+      
+      // Fetch all file contents concurrently for maximum speed
+      const fetchPromises = attachedFiles.map(async (file) => {
+        try {
+          const url = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/file-content?email=${encodeURIComponent(email)}&fileId=${encodeURIComponent(file.id)}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          
+          if (data.success && data.content) {
+            return `\n\n--- File: ${file.name} ---\n${data.content}\n--- End of ${file.name} ---`;
+          } else {
+            return `\n\n--- File: ${file.name} ---\n[Could not read file content: ${data.error || 'Unknown error'}]\n--- End of ${file.name} ---`;
+          }
+        } catch (e) {
+          return `\n\n--- File: ${file.name} ---\n[Failed to download file]\n--- End of ${file.name} ---`;
+        }
+      });
+      
+      const fileContents = await Promise.all(fetchPromises);
+      let attachmentContext = '\n\n[Attached Google Drive Files:';
+      attachmentContext += fileContents.join('');
+      attachmentContext += '\n]';
+      apiPrompt += attachmentContext;
+    }
+    
+    if (!apiPrompt) {
+      setLoading(false);
+      return;
+    }
+
     const isFirst = messages.length === 0;
-    const updated: Message[] = [...messages, { role: 'user', content: prompt }];
-    setMessages(updated); setInput('');
+    
+    // UI shows uiPrompt, Backend gets apiPrompt
+    const updatedUI: Message[] = [...messages, { role: 'user', content: uiPrompt }];
+    const updatedAPI: Message[] = [...messages, { role: 'user', content: apiPrompt }];
+    
+    setMessages(updatedUI); 
+    setInput('');
+    setAttachedFiles([]);
     if (inputRef.current) {
       inputRef.current.style.height = 'auto';
       setTimeout(() => inputRef.current?.focus(), 10);
     }
-    setLoading(true);
+    if (!loading) setLoading(true); // Ensure loading is true if no files attached
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
-        body: JSON.stringify({ prompt, sessionId: activeSessionId, userRole: 'CORPORATE', messages: updated.slice(-8) }),
+        body: JSON.stringify({ prompt: apiPrompt, sessionId: activeSessionId, userRole: 'CORPORATE', messages: updatedAPI.slice(-8) }),
       });
       const data = await res.json();
       const reply = data.reply || 'Sorry, I could not process that.';
@@ -462,7 +514,7 @@ export default function AskAIPage() {
               const tr = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
-                body: JSON.stringify({ prompt: `Generate a concise 5-7 word chat title (no quotes, no punctuation) for a conversation starting with: "${prompt.substring(0, 100)}"`, sessionId: null, userRole: 'CORPORATE', messages: [], noSession: true }),
+                body: JSON.stringify({ prompt: `Generate a concise 5-7 word chat title (no quotes, no punctuation) for a conversation starting with: "${basePrompt.substring(0, 100)}"`, sessionId: null, userRole: 'CORPORATE', messages: [], noSession: true }),
               });
               if (tr.ok) {
                 const td = await tr.json();
@@ -489,6 +541,44 @@ export default function AskAIPage() {
       setMessages(p => [...p, { role: 'assistant', content: '⚠️ Connection error. Please check the corporate service is running.' }]);
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
+
+  const fetchDriveFiles = async (search = '') => {
+    setDriveLoading(true);
+    try {
+      const url = new URL(`${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/files`);
+      url.searchParams.append('email', email);
+      if (search) url.searchParams.append('search', search);
+
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setDriveFiles(data.files || []);
+        } else {
+          setDriveFiles([{ id: 'error', name: `API Error: ${data.message || 'Unknown'}` }]);
+        }
+      } else {
+        try {
+          const errData = await res.json();
+          setDriveFiles([{ id: 'error', name: `HTTP ${res.status}: ${errData.message}` }]);
+        } catch {
+          setDriveFiles([{ id: 'error', name: `HTTP ${res.status} Error` }]);
+        }
+      }
+    } catch (e: any) {
+      setDriveFiles([{ id: 'error', name: `Network/CORS Error: ${e.message}` }]);
+      console.error('Drive fetch error', e);
+    } finally {
+      setDriveLoading(false);
+    }
+  };
+
+  const openDrivePicker = async () => {
+    setDriveModalOpen(true);
+    if (driveFiles.length === 0) {
+      fetchDriveFiles();
     }
   };
 
@@ -782,6 +872,18 @@ export default function AskAIPage() {
                   }
                 `}</style>
                 <div className="relative bg-white dark:bg-[#2d2d2d] border border-[#e5e7eb] dark:border-[#3d3d3d] rounded-2xl shadow-sm focus-within:border-[#9ca3af] dark:focus-within:border-[#6b7280] transition-colors">
+                  {/* Attached Files Display */}
+                  {attachedFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1 border-b border-[#e5e7eb] dark:border-[#3d3d3d]">
+                      {attachedFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[12px] px-2 py-1 rounded-md text-[#374151] dark:text-[#d1d5db]">
+                          <svg className="w-3.5 h-3.5 text-[#10b981]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+                          <span className="truncate max-w-[150px]">{file.name}</span>
+                          <button onClick={() => setAttachedFiles(p => p.filter(f => f.id !== file.id))} className="text-[#9ca3af] hover:text-red-500 ml-1">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {/* Normal textarea — hidden during voice states */}
                   {!isListening && !isTranscribing && (
                     <textarea
@@ -830,6 +932,13 @@ export default function AskAIPage() {
                   )}
                   {/* Actions — bottom-right inside textarea box */}
                   <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                    <button
+                      onClick={openDrivePicker}
+                      className="w-9 h-9 flex items-center justify-center rounded-lg bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#6b7280] dark:text-[#9ca3af] hover:bg-[#e5e7eb] dark:hover:bg-[#4b5563] transition-all shadow-sm"
+                      title="Attach from Google Drive"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                    </button>
                     <button
                       onClick={toggleListening}
                       disabled={isTranscribing}
@@ -949,6 +1058,79 @@ export default function AskAIPage() {
           </div>
         )}
       </div>
+
+      {/* ── GOOGLE DRIVE PICKER MODAL ── */}
+      {driveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setDriveModalOpen(false)}>
+          <div className="bg-white dark:bg-[#2d2d2d] w-[90%] max-w-lg rounded-2xl shadow-xl flex flex-col max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-[#e5e7eb] dark:border-[#3d3d3d] flex flex-col gap-3 bg-[#f9fafb] dark:bg-[#1f2937]">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-[#10b981]" viewBox="0 0 24 24" fill="currentColor"><path d="M21.17 3.25Q22.5 5.25 22.5 8v8q0 2.75-1.33 4.75T18 22.5H6q-1.84 0-3.17-2T1.5 16V8q0-2.75 1.33-4.75T6 1.5h12q1.84 0 3.17 2z" opacity="0.2"/><path d="M13.5 16.5l-4-6h8l-4 6zM8 12.5l-3 4.5h6l-3-4.5zM16 12.5l-3 4.5h6l-3-4.5z"/></svg>
+                  <h3 className="font-semibold text-[#111827] dark:text-white">Google Drive</h3>
+                </div>
+                <button onClick={() => setDriveModalOpen(false)} className="text-[#9ca3af] hover:text-[#374151]"><X className="w-5 h-5" /></button>
+              </div>
+              
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search files..."
+                  value={driveSearchQuery}
+                  onChange={(e) => setDriveSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      fetchDriveFiles(driveSearchQuery);
+                    }
+                  }}
+                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#3d3d3d] border border-[#e5e7eb] dark:border-[#4b5563] rounded-lg text-[13px] text-[#374151] dark:text-[#d1d5db] focus:border-[#10b981] outline-none transition-colors"
+                />
+                <Search className="w-4 h-4 text-[#9ca3af] absolute left-3 top-2.5" />
+                <button 
+                  onClick={() => fetchDriveFiles(driveSearchQuery)}
+                  className="absolute right-2 top-1.5 px-2 py-1 bg-[#10b981] text-white text-[11px] font-semibold rounded hover:bg-[#059669] transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              {driveLoading ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                  <span className="w-6 h-6 border-2 border-[#10b981]/30 border-t-[#10b981] rounded-full animate-spin" />
+                  <p className="text-[13px] text-[#6b7280]">Loading files...</p>
+                </div>
+              ) : driveFiles.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-[13px] text-[#6b7280]">No files found or not connected.</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {driveFiles.map(file => (
+                    <button
+                      key={file.id}
+                      onClick={() => {
+                        if (!attachedFiles.find(f => f.id === file.id)) {
+                          setAttachedFiles([...attachedFiles, file]);
+                        }
+                        setDriveModalOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-[#f3f4f6] dark:hover:bg-[#3d3d3d] text-left transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-[#9ca3af]" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                        <span className="text-[14px] text-[#374151] dark:text-[#d1d5db] font-medium">{file.name}</span>
+                      </div>
+                      <span className="text-[11px] text-[#9ca3af] bg-[#e5e7eb] dark:bg-[#4b5563] px-2 py-0.5 rounded-md">Attach</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
