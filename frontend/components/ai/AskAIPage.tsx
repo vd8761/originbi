@@ -37,43 +37,67 @@ function groupSessions(sessions: Session[]) {
   return g;
 }
 
-const ALL_SUGGESTIONS = [
-  { icon: '🎯', label: 'Match employees for a Senior Sales Manager role' },
-  { icon: '⚡', label: 'Who drives results independently without supervision?' },
-  { icon: '🔥', label: 'Form the best 5-person cross-functional project team' },
-  { icon: '🧠', label: 'Who is your best team leader candidate?' },
-  { icon: '🤝', label: 'Who collaborates best under pressure?' },
-  { icon: '💬', label: 'How do I communicate with a detail-oriented employee?' },
-  { icon: '🔎', label: 'Identify our top performers with high drive' },
-  { icon: '📈', label: 'Who has leadership succession potential?' },
-  { icon: '🌱', label: 'Who needs development to become ready for management?' },
-  { icon: '⚖️', label: 'Who can balance compliance and speed effectively?' },
-];
+
 
 const GROUP_ORDER = ['Today', 'Yesterday', 'Previous 7 days', 'Previous 30 days', 'Older'];
 const CACHE_TTL = 60 * 60 * 1000;
 
+const FALLBACK_PHRASES = [
+  'Thinking...',
+  'Analyzing context...',
+  'Reviewing details...',
+  'Processing query...',
+  'Formulating insights...',
+  'Looking into this for you...',
+  'Gathering your team details...'
+];
+
 function getThinkingPhrase(query?: string) {
-  if (!query) return 'Analyzing your team…';
-  const lower = query.toLowerCase();
-  
+  // Deterministically pick a fallback based on query length so it changes per question but never flickers
+  const fallback = FALLBACK_PHRASES[query ? (query.length % FALLBACK_PHRASES.length) : 0];
+
+  if (!query) return fallback;
+
+  // 1. Extract file name for fallback
+  let fileNameFallback = '';
+  const fileMatch = query.match(/\[Attached Google Drive Files:\s*(.+?)\]/);
+  if (fileMatch && fileMatch[1]) {
+    let fileName = fileMatch[1].split(',')[0].trim();
+    if (fileName.length > 30) fileName = fileName.substring(0, 30) + '...';
+    fileNameFallback = `Reading ${fileName}...`;
+  }
+
+  // 2. Strip attachment block to isolate the pure question
+  const actualQuestion = query.replace(/\[Attached Google Drive Files:.*?\]/g, '').trim();
+  if (!actualQuestion) return fileNameFallback || fallback;
+
+  const lower = actualQuestion.toLowerCase();
+
+  // 3. High-quality mapped thinking phrases based on keywords
   if (lower.includes('leader') || lower.includes('promot') || lower.includes('succession') || lower.includes('manager')) {
-    return 'Analyzing leadership potential…';
+    return 'Analyzing leadership potential...';
   }
-  if (lower.includes('team') || lower.includes('group') || lower.includes('cross-functional') || lower.includes('collaborat')) {
-    return 'Evaluating team dynamics…';
+  if (lower.includes('team') || lower.includes('group') || lower.includes('cross-functional') || lower.includes('collaborat') || lower.includes('fit')) {
+    return 'Evaluating team dynamics...';
   }
-  if (lower.includes('communicat') || lower.includes('detail') || lower.includes('conflict') || lower.includes('trait')) {
-    return 'Reviewing behavioral profiles…';
+  if (lower.includes('communicat') || lower.includes('detail') || lower.includes('conflict') || lower.includes('trait') || lower.includes('behavior')) {
+    return 'Reviewing behavioral profiles...';
   }
-  if (lower.includes('perform') || lower.includes('drive') || lower.includes('result') || lower.includes('motiv')) {
-    return 'Analyzing performance traits…';
+  if (lower.includes('perform') || lower.includes('drive') || lower.includes('result') || lower.includes('motiv') || lower.includes('kpi') || lower.includes('metric')) {
+    return 'Analyzing performance traits...';
   }
-  if (lower.includes('develop') || lower.includes('coach') || lower.includes('train') || lower.includes('gap')) {
-    return 'Assessing development needs…';
+  if (lower.includes('develop') || lower.includes('coach') || lower.includes('train') || lower.includes('gap') || lower.includes('improv')) {
+    return 'Assessing development needs...';
   }
-  
-  return 'Analyzing your team…';
+  if (lower.includes('match') || lower.includes('candidate') || lower.includes('hire') || lower.includes('recruit') || lower.includes('role')) {
+    return 'Matching candidates to role...';
+  }
+  if (lower.includes('summar') || lower.includes('key point') || lower.includes('extract')) {
+    return 'Summarizing context...';
+  }
+
+  // 4. Default fallback if it's a specific name or question without keywords
+  return fileNameFallback || fallback;
 }
 
 // Animated thinking indicator
@@ -198,7 +222,7 @@ export default function AskAIPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sessionSearch, setSessionSearch] = useState('');
-  const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
+  const [randomSuggestions, setRandomSuggestions] = useState<{ icon: string, label: string }[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -212,9 +236,44 @@ export default function AskAIPage() {
   const streamAbortRef = useRef(false);
 
   useEffect(() => {
-    const shuffled = [...ALL_SUGGESTIONS].sort(() => 0.5 - Math.random());
-    setRandomSuggestions(shuffled.slice(0, 4));
+    if (attachedFiles.length > 0) {
+      setRandomSuggestions([
+        { icon: '📄', label: 'Summarize the key points of these documents' },
+        { icon: '🔍', label: 'What are the main action items?' },
+        { icon: '📊', label: 'Extract data and metrics from these files' },
+        { icon: '💡', label: 'Provide insights based on this context' },
+      ]);
+    } else {
+      const categories = [
+        [ // Hiring & Succession
+          { icon: '🎯', label: 'Match employees for a Senior Sales Manager role' },
+          { icon: '🔎', label: 'Find candidates for a backend engineering position' },
+          { icon: '🚀', label: 'Who has leadership succession potential?' },
+        ],
+        [ // Team Dynamics
+          { icon: '🔥', label: 'Form the best 5-person cross-functional project team' },
+          { icon: '🤝', label: 'Who collaborates best under pressure?' },
+          { icon: '🧠', label: 'Who is your best team leader candidate?' },
+        ],
+        [ // Performance
+          { icon: '⚡', label: 'Who drives results independently without supervision?' },
+          { icon: '📈', label: 'Identify our top performers with high drive' },
+          { icon: '💎', label: 'Who brings the most innovative ideas to the team?' },
+        ],
+        [ // Coaching & Development
+          { icon: '💬', label: 'How do I communicate with a detail-oriented employee?' },
+          { icon: '🌱', label: 'Who needs development to become ready for management?' },
+          { icon: '⚖️', label: 'Who can balance compliance and speed effectively?' },
+        ]
+      ];
+      // Pick one random suggestion from each category so it's always perfectly balanced
+      const newSuggestions = categories.map(cat => cat[Math.floor(Math.random() * cat.length)]);
+      // Shuffle the 4 categories
+      setRandomSuggestions(newSuggestions.sort(() => 0.5 - Math.random()));
+    }
+  }, [attachedFiles]);
 
+  useEffect(() => {
     let e = sessionStorage.getItem('userEmail') || localStorage.getItem('userEmail') || '';
     if (!e) {
       try {
@@ -435,24 +494,38 @@ export default function AskAIPage() {
     const basePrompt = (text || input).trim();
     if (!basePrompt && attachedFiles.length === 0 && !loading) return;
 
-    let apiPrompt = basePrompt;
-    let uiPrompt = basePrompt;
+    const isFirst = messages.length === 0;
 
-    // Append attachment info
+    // 1. Immediately update UI so there is zero delay/freezing when the user clicks submit
+    let uiPrompt = basePrompt;
     if (attachedFiles.length > 0) {
-      // Show loading while downloading files
-      setLoading(true);
-      
       const fileNames = attachedFiles.map(f => f.name).join(', ');
       uiPrompt += `\n\n[Attached Google Drive Files: ${fileNames}]`;
-      
-      // Fetch all file contents concurrently for maximum speed
-      const fetchPromises = attachedFiles.map(async (file) => {
+    }
+
+    const updatedUI: Message[] = [...messages, { role: 'user', content: uiPrompt }];
+    setMessages(updatedUI);
+    setInput('');
+    setLoading(true);
+
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      setTimeout(() => inputRef.current?.focus(), 10);
+    }
+
+    // 2. Clear attached files from UI (since they are now in the chat bubble)
+    const currentAttachedFiles = [...attachedFiles];
+    setAttachedFiles([]);
+
+    // 3. Now perform the heavy file downloading in the background
+    let apiPrompt = basePrompt;
+    if (currentAttachedFiles.length > 0) {
+      const fetchPromises = currentAttachedFiles.map(async (file) => {
         try {
           const url = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/file-content?email=${encodeURIComponent(email)}&fileId=${encodeURIComponent(file.id)}`;
           const res = await fetch(url);
           const data = await res.json();
-          
+
           if (data.success && data.content) {
             return `\n\n--- File: ${file.name} ---\n${data.content}\n--- End of ${file.name} ---`;
           } else {
@@ -462,33 +535,20 @@ export default function AskAIPage() {
           return `\n\n--- File: ${file.name} ---\n[Failed to download file]\n--- End of ${file.name} ---`;
         }
       });
-      
+
       const fileContents = await Promise.all(fetchPromises);
       let attachmentContext = '\n\n[Attached Google Drive Files:';
       attachmentContext += fileContents.join('');
       attachmentContext += '\n]';
       apiPrompt += attachmentContext;
     }
-    
+
     if (!apiPrompt) {
       setLoading(false);
       return;
     }
 
-    const isFirst = messages.length === 0;
-    
-    // UI shows uiPrompt, Backend gets apiPrompt
-    const updatedUI: Message[] = [...messages, { role: 'user', content: uiPrompt }];
     const updatedAPI: Message[] = [...messages, { role: 'user', content: apiPrompt }];
-    
-    setMessages(updatedUI); 
-    setInput('');
-    setAttachedFiles([]);
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto';
-      setTimeout(() => inputRef.current?.focus(), 10);
-    }
-    if (!loading) setLoading(true); // Ensure loading is true if no files attached
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -877,7 +937,7 @@ export default function AskAIPage() {
                     <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1 border-b border-[#e5e7eb] dark:border-[#3d3d3d]">
                       {attachedFiles.map((file, idx) => (
                         <div key={idx} className="flex items-center gap-1.5 bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[12px] px-2 py-1 rounded-md text-[#374151] dark:text-[#d1d5db]">
-                          <svg className="w-3.5 h-3.5 text-[#10b981]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+                          <svg className="w-3.5 h-3.5 text-[#10b981]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z" /></svg>
                           <span className="truncate max-w-[150px]">{file.name}</span>
                           <button onClick={() => setAttachedFiles(p => p.filter(f => f.id !== file.id))} className="text-[#9ca3af] hover:text-red-500 ml-1">✕</button>
                         </div>
@@ -906,7 +966,7 @@ export default function AskAIPage() {
                   {isListening && (
                     <div className="px-4 pt-4 pb-12 min-h-[56px] flex flex-col justify-center gap-2">
                       <div className="flex items-center gap-2">
-                        {[0.5,0.9,1.3,1,1.5,0.7,1.1,0.5,1.3,0.9,1.5,0.7,0.9,1.2,0.5].map((h, i) => (
+                        {[0.5, 0.9, 1.3, 1, 1.5, 0.7, 1.1, 0.5, 1.3, 0.9, 1.5, 0.7, 0.9, 1.2, 0.5].map((h, i) => (
                           <div
                             key={i}
                             className="w-[3px] rounded-full bg-red-500"
@@ -924,8 +984,8 @@ export default function AskAIPage() {
                   {isTranscribing && (
                     <div className="px-4 pt-4 pb-12 min-h-[56px] flex items-center gap-2.5">
                       <svg className="animate-spin h-4 w-4 text-[#6b7280] shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
                       <span className="text-[14px] text-[#6b7280] dark:text-[#9ca3af]">Transcribing &amp; sending…</span>
                     </div>
@@ -942,13 +1002,12 @@ export default function AskAIPage() {
                     <button
                       onClick={toggleListening}
                       disabled={isTranscribing}
-                      className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all shadow-sm ${
-                        isListening 
-                          ? 'bg-red-500 text-white animate-pulse' 
+                      className={`w-9 h-9 flex items-center justify-center rounded-lg transition-all shadow-sm ${isListening
+                          ? 'bg-red-500 text-white animate-pulse'
                           : isTranscribing
-                          ? 'bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#9ca3af] cursor-not-allowed'
-                          : 'bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#6b7280] dark:text-[#9ca3af] hover:bg-[#e5e7eb] dark:hover:bg-[#4b5563]'
-                      }`}
+                            ? 'bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#9ca3af] cursor-not-allowed'
+                            : 'bg-[#f3f4f6] dark:bg-[#3d3d3d] text-[#6b7280] dark:text-[#9ca3af] hover:bg-[#e5e7eb] dark:hover:bg-[#4b5563]'
+                        }`}
                       title={isListening ? "Tap to stop & transcribe" : isTranscribing ? "Transcribing..." : "Dictate with voice"}
                     >
                       <Mic className="w-4 h-4" />
@@ -1066,12 +1125,12 @@ export default function AskAIPage() {
             <div className="px-6 py-4 border-b border-[#e5e7eb] dark:border-[#3d3d3d] flex flex-col gap-3 bg-[#f9fafb] dark:bg-[#1f2937]">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-[#10b981]" viewBox="0 0 24 24" fill="currentColor"><path d="M21.17 3.25Q22.5 5.25 22.5 8v8q0 2.75-1.33 4.75T18 22.5H6q-1.84 0-3.17-2T1.5 16V8q0-2.75 1.33-4.75T6 1.5h12q1.84 0 3.17 2z" opacity="0.2"/><path d="M13.5 16.5l-4-6h8l-4 6zM8 12.5l-3 4.5h6l-3-4.5zM16 12.5l-3 4.5h6l-3-4.5z"/></svg>
+                  <svg className="w-5 h-5 text-[#10b981]" viewBox="0 0 24 24" fill="currentColor"><path d="M21.17 3.25Q22.5 5.25 22.5 8v8q0 2.75-1.33 4.75T18 22.5H6q-1.84 0-3.17-2T1.5 16V8q0-2.75 1.33-4.75T6 1.5h12q1.84 0 3.17 2z" opacity="0.2" /><path d="M13.5 16.5l-4-6h8l-4 6zM8 12.5l-3 4.5h6l-3-4.5zM16 12.5l-3 4.5h6l-3-4.5z" /></svg>
                   <h3 className="font-semibold text-[#111827] dark:text-white">Google Drive</h3>
                 </div>
                 <button onClick={() => setDriveModalOpen(false)} className="text-[#9ca3af] hover:text-[#374151]"><X className="w-5 h-5" /></button>
               </div>
-              
+
               <div className="relative">
                 <input
                   type="text"
@@ -1086,7 +1145,7 @@ export default function AskAIPage() {
                   className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#3d3d3d] border border-[#e5e7eb] dark:border-[#4b5563] rounded-lg text-[13px] text-[#374151] dark:text-[#d1d5db] focus:border-[#10b981] outline-none transition-colors"
                 />
                 <Search className="w-4 h-4 text-[#9ca3af] absolute left-3 top-2.5" />
-                <button 
+                <button
                   onClick={() => fetchDriveFiles(driveSearchQuery)}
                   className="absolute right-2 top-1.5 px-2 py-1 bg-[#10b981] text-white text-[11px] font-semibold rounded hover:bg-[#059669] transition-colors"
                 >
@@ -1094,7 +1153,7 @@ export default function AskAIPage() {
                 </button>
               </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-4">
               {driveLoading ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-3">
@@ -1119,7 +1178,7 @@ export default function AskAIPage() {
                       className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-[#f3f4f6] dark:hover:bg-[#3d3d3d] text-left transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <svg className="w-5 h-5 text-[#9ca3af]" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                        <svg className="w-5 h-5 text-[#9ca3af]" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" /></svg>
                         <span className="text-[14px] text-[#374151] dark:text-[#d1d5db] font-medium">{file.name}</span>
                       </div>
                       <span className="text-[11px] text-[#9ca3af] bg-[#e5e7eb] dark:bg-[#4b5563] px-2 py-0.5 rounded-md">Attach</span>
