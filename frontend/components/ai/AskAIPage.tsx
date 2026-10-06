@@ -536,7 +536,7 @@ export default function AskAIPage() {
           } else {
             return `\n\n--- File: ${file.name} ---\n[Could not read file content: ${data.error || 'Unknown error'}]\n--- End of ${file.name} ---`;
           }
-        } catch (e) {
+        } catch {
           return `\n\n--- File: ${file.name} ---\n[Failed to download file]\n--- End of ${file.name} ---`;
         }
       });
@@ -559,7 +559,7 @@ export default function AskAIPage() {
         } else {
           apiPrompt += `\n\n[System Note: The Knowledge Base is empty or not properly synced.]`;
         }
-      } catch (e) {
+      } catch {
         apiPrompt += `\n\n[System Note: Failed to fetch Knowledge Base context.]`;
       }
     }
@@ -653,13 +653,6 @@ export default function AskAIPage() {
       console.error('Drive fetch error', e);
     } finally {
       setDriveLoading(false);
-    }
-  };
-
-  const openDrivePicker = async () => {
-    setDriveModalOpen(true);
-    if (driveFiles.length === 0) {
-      fetchDriveFiles();
     }
   };
 
