@@ -284,8 +284,8 @@ export default function CorporateIntegrationsConfig() {
               <div
                 key={app.id}
                 className={`group relative bg-white dark:bg-[#19211C] rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1.5 ${isConnected
-                  ? "shadow-[0_0_0_1.5px_rgb(30,211,106,0.35),0_20px_60px_rgb(30,211,106,0.08)] hover:shadow-[0_0_0_2px_rgb(30,211,106,0.5),0_30px_80px_rgb(30,211,106,0.15)]"
-                  : "shadow-[0_0_0_1px_rgb(0,0,0,0.07),0_8px_30px_rgb(0,0,0,0.05)] hover:shadow-[0_0_0_1px_rgb(0,0,0,0.1),0_20px_60px_rgb(0,0,0,0.1)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.07)]"
+                  ? "shadow-[0_0_0_1.5px_rgb(30,211,106,0.0_8px_30px_rgb35),0_20px_60px_rgb(30,211,106,0.08)] hover:shadow-[0_0_0_2px_rgb(30,211,106,0.5),0_30px_80px_rgb(30,211,106,0.15)]"
+                  : "shadow-[0_0_0_1px_rgb(0,0,0,0.07),(0,0,0,0.05)] hover:shadow-[0_0_0_1px_rgb(0,0,0,0.1),0_20px_60px_rgb(0,0,0,0.1)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.07)]"
                   }`}
               >
                 {/* Card header strip */}
