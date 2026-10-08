@@ -8,7 +8,9 @@ import { Repository } from 'typeorm';
 import { TenantAppConfig, CorporateAccount } from '@originbi/shared-entities';
 import { CorporateIntegration } from '../entities/corporate-integration.entity';
 import { google } from 'googleapis';
-
+import * as xlsx from 'xlsx';
+const pdfParse = require('pdf-parse');
+import * as mammoth from 'mammoth';
 @Injectable()
 export class IntegrationsService {
   constructor(
@@ -223,22 +225,38 @@ export class IntegrationsService {
       relations: ['app'],
     });
 
+    const googleInt = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'google_drive' }
+    });
+
     // Return only globally active apps
     return configs
       .filter((c) => c.app?.is_globally_active)
-      .map((c) => ({
-        id: c.app_id,
-        name: c.app.name,
-        display_name: c.app.display_name,
-        status: c.status,
-        features: c.app.features,
-        configured_features: c.configured_features,
-        // Surface connected account info safely (no tokens)
-        connectedAccount: c.configured_features?.connectedAccount || null,
-        connectedName: c.configured_features?.connectedName || null,
-        connectedPicture: c.configured_features?.connectedPicture || null,
-        connectedAt: c.configured_features?.connectedAt || null,
-      }));
+      .map((c) => {
+        let configuredFeatures = c.configured_features || {};
+        const appNameLower = c.app.name?.toLowerCase() || '';
+        const isGoogle = appNameLower.includes('google') || appNameLower.includes('drive');
+        if (isGoogle && googleInt?.metadata) {
+          configuredFeatures = {
+            ...configuredFeatures,
+            syncFolderId: googleInt.metadata.syncFolderId,
+            syncFolderName: googleInt.metadata.syncFolderName,
+          };
+        }
+        return {
+          id: c.app_id,
+          name: c.app.name,
+          display_name: c.app.display_name,
+          status: c.status,
+          features: c.app.features,
+          configured_features: configuredFeatures,
+          // Surface connected account info safely (no tokens)
+          connectedAccount: configuredFeatures.connectedAccount || null,
+          connectedName: configuredFeatures.connectedName || null,
+          connectedPicture: configuredFeatures.connectedPicture || null,
+          connectedAt: configuredFeatures.connectedAt || null,
+        };
+      });
   }
 
   // ─────────────────────────────────────────────────────────
@@ -253,7 +271,7 @@ export class IntegrationsService {
 
     // Tokens are saved by Passport callback in corporate_integrations table
     const integration = await this.corporateIntegrationRepo.findOne({
-      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
+      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
     });
 
     if (!integration || !integration.access_token) {
@@ -313,7 +331,7 @@ export class IntegrationsService {
     if (!account) throw new NotFoundException('Corporate account not found');
 
     const integration = await this.corporateIntegrationRepo.findOne({
-      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
+      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
     });
     if (!integration) throw new NotFoundException('Google Drive integration not found');
 
@@ -384,6 +402,40 @@ export class IntegrationsService {
           { responseType: 'text' },
         );
         content = response.data as any;
+      } else if (
+        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        mimeType === 'text/csv'
+      ) {
+        const response = await drive.files.get(
+          { fileId, alt: 'media' },
+          { responseType: 'arraybuffer' },
+        );
+        const buffer = Buffer.from(response.data as any);
+        const workbook = xlsx.read(buffer, { type: 'buffer' });
+        let extractedText = '';
+        workbook.SheetNames.forEach((sheetName) => {
+          extractedText += `--- Sheet: ${sheetName} ---\n`;
+          const sheet = workbook.Sheets[sheetName];
+          extractedText += xlsx.utils.sheet_to_csv(sheet);
+          extractedText += '\n\n';
+        });
+        content = extractedText;
+      } else if (mimeType === 'application/pdf') {
+        const response = await drive.files.get(
+          { fileId, alt: 'media' },
+          { responseType: 'arraybuffer' },
+        );
+        const buffer = Buffer.from(response.data as any);
+        const parsed = await pdfParse(buffer);
+        content = parsed.text;
+      } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const response = await drive.files.get(
+          { fileId, alt: 'media' },
+          { responseType: 'arraybuffer' },
+        );
+        const buffer = Buffer.from(response.data as any);
+        const result = await mammoth.extractRawText({ buffer });
+        content = result.value;
       } else {
         const response = await drive.files.get(
           { fileId, alt: 'media' },
@@ -439,10 +491,11 @@ export class IntegrationsService {
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
     
     try {
-      // Find up to 5 text/doc files inside the synced folder
+      // Find up to 15 latest files inside the synced folder
       const response = await drive.files.list({
         q: `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
-        pageSize: 5,
+        pageSize: 15,
+        orderBy: 'modifiedTime desc',
         fields: 'files(id, name, mimeType)',
       });
 
@@ -461,6 +514,24 @@ export class IntegrationsService {
           } else if (mimeType?.includes('application/vnd.google-apps.spreadsheet')) {
             const r = await drive.files.export({ fileId: file.id as string, mimeType: 'text/csv' }, { responseType: 'text' });
             text = r.data as any;
+          } else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || mimeType === 'text/csv') {
+            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'arraybuffer' });
+            const buffer = Buffer.from(r.data as any);
+            const workbook = xlsx.read(buffer, { type: 'buffer' });
+            workbook.SheetNames.forEach((sheetName) => {
+              const sheet = workbook.Sheets[sheetName];
+              text += `\n--- Sheet: ${sheetName} ---\n` + xlsx.utils.sheet_to_csv(sheet);
+            });
+          } else if (mimeType === 'application/pdf') {
+            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'arraybuffer' });
+            const buffer = Buffer.from(r.data as any);
+            const parsed = await pdfParse(buffer);
+            text = parsed.text;
+          } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'arraybuffer' });
+            const buffer = Buffer.from(r.data as any);
+            const result = await mammoth.extractRawText({ buffer });
+            text = result.value;
           } else {
             const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'text' });
             text = r.data as any;
