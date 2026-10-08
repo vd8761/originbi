@@ -210,6 +210,7 @@ export default function AskAIPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [driveModalOpen, setDriveModalOpen] = useState(false);
   const [driveFiles, setDriveFiles] = useState<any[]>([]);
   const [driveSearchQuery, setDriveSearchQuery] = useState('');
@@ -437,11 +438,12 @@ export default function AskAIPage() {
   };
 
   const selectSession = async (s: Session) => {
-    setActiveSessionId(s.id); setMessages([]);
+    setActiveSessionId(s.id); setMessages([]); setIsSessionLoading(true);
     try {
       const res = await fetch(`/api/chat/sessions/${s.id}`, { headers: { 'x-user-id': email } });
       if (res.ok) { const msgs: any[] = await res.json(); setMessages(msgs.map(m => ({ role: m.role, content: m.content }))); }
     } catch { /* ignore */ }
+    finally { setIsSessionLoading(false); }
   };
 
   const deleteSession = async (id: number, e: React.MouseEvent) => {
@@ -548,18 +550,18 @@ export default function AskAIPage() {
       apiPrompt += attachmentContext;
     }
 
-    if (basePrompt.includes('@KnowledgeBase')) {
-      try {
-        const url = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/folder-context?email=${encodeURIComponent(email)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        
-        if (data.success && data.content) {
-          apiPrompt += `\n\n[User is querying their synced Knowledge Base (Google Drive Folder). Use the following synced documents to accurately answer their question. If the answer is not in these documents, say so.]\n\n${data.content}`;
-        } else {
-          apiPrompt += `\n\n[System Note: The Knowledge Base is empty or not properly synced.]`;
-        }
-      } catch {
+    try {
+      const url = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/folder-context?email=${encodeURIComponent(email)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.success && data.content) {
+        apiPrompt += `\n\n[User is querying their synced Knowledge Base (Google Drive Folder). Use the following synced documents to accurately answer their question. If the answer is not in these documents, say so.]\n\n${data.content}`;
+      } else if (basePrompt.includes('@KnowledgeBase')) {
+        apiPrompt += `\n\n[System Note: The Knowledge Base is empty or not properly synced.]`;
+      }
+    } catch {
+      if (basePrompt.includes('@KnowledgeBase')) {
         apiPrompt += `\n\n[System Note: Failed to fetch Knowledge Base context.]`;
       }
     }
@@ -569,12 +571,17 @@ export default function AskAIPage() {
       return;
     }
 
+    // Force AI to cite sources if files were attached or pulled from Knowledge Base
+    if (apiPrompt.includes('--- File:') || apiPrompt.includes('--- KnowledgeBase Document:')) {
+      apiPrompt += `\n\n[SYSTEM DIRECTIVE: You have been provided with documents/files as context. At the very end of your response, you MUST add a "**Sources:**" section that lists the exact file names you used to formulate your answer. Format it nicely.]`;
+    }
+
     const updatedAPI: Message[] = [...messages, { role: 'user', content: apiPrompt }];
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
-        body: JSON.stringify({ prompt: apiPrompt, sessionId: activeSessionId, userRole: 'CORPORATE', messages: updatedAPI.slice(-8) }),
+        body: JSON.stringify({ prompt: apiPrompt, displayPrompt: uiPrompt, sessionId: activeSessionId, userRole: 'CORPORATE', messages: updatedAPI.slice(-8) }),
       });
       const data = await res.json();
       const reply = data.reply || 'Sorry, I could not process that.';
@@ -846,7 +853,12 @@ export default function AskAIPage() {
           <div className="flex flex-col flex-1 overflow-hidden">
             {/* Messages scrollable area */}
             <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {messages.length === 0 ? (
+              {isSessionLoading ? (
+                <div className="flex flex-col items-center justify-center min-h-full px-4 py-12 gap-3">
+                  <span className="w-8 h-8 border-2 border-[#19c37d]/30 border-t-[#19c37d] rounded-full animate-spin" />
+                  <p className="text-[13px] text-[#6b7280]">Loading conversation...</p>
+                </div>
+              ) : messages.length === 0 ? (
                 /* Empty state */
                 <div className="flex flex-col items-center justify-center min-h-full px-4 py-12">
                   <h1 className="text-[28px] font-semibold text-[#111827] dark:text-white mb-2 text-center">
