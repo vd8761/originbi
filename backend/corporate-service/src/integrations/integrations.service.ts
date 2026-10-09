@@ -310,6 +310,7 @@ export class IntegrationsService {
           ...configuredFeatures,
           syncFolderId: googleInt.metadata.syncFolderId,
           syncFolderName: googleInt.metadata.syncFolderName,
+          lastSyncAt: googleInt.metadata.syncedAt,
         };
       }
 
