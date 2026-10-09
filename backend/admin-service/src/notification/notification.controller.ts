@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { NotificationService } from './notification.service';
 
-@Controller('notifications')
+@Controller('alerts')
 export class NotificationController {
   private readonly logger = new Logger(NotificationController.name);
 

@@ -1464,7 +1464,7 @@ export class CorporateDashboardService {
     try {
       await firstValueFrom(
         this.httpService.post(
-          `${adminServiceUrl}/notifications/internal`,
+          `${adminServiceUrl}/alerts/internal`,
           data,
         ),
       );

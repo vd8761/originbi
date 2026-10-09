@@ -4027,7 +4027,7 @@ export class StudentService {
     try {
       await lastValueFrom(
         this.httpService.post(
-          `${adminServiceUrl}/notifications/internal`,
+          `${adminServiceUrl}/alerts/internal`,
           data,
         ),
       );
