@@ -2068,14 +2068,22 @@ RESPONSE RULES:
     const startTime = Date.now();
     this.logger.log(`🧠 UNIFIED HR BRAIN - Corporate #${corporateId}`);
 
-    // 1. Classify intent on clean query
-    const intent = await this.classifyIntent(query);
+    // 1. Strip frontend RAG injections so we don't break GPT's SQL generator
+    let cleanQuery = query;
+    const driveIdx = cleanQuery.indexOf('\n\n[Attached Google Drive Files:');
+    if (driveIdx !== -1) cleanQuery = cleanQuery.substring(0, driveIdx);
+    const sysIdx = cleanQuery.indexOf('\n\n[SYSTEM DIRECTIVE:');
+    if (sysIdx !== -1) cleanQuery = cleanQuery.substring(0, sysIdx);
+    cleanQuery = cleanQuery.trim();
+
+    // 2. Classify intent
+    const intent = await this.classifyIntent(cleanQuery);
     this.logger.log(`🎯 Intent: ${intent}`);
 
-    // 2. Gather DISC + Zenro in parallel
+    // 3. Gather DISC + Zenro in parallel
     const [candidatesResult, zenroResult] = await Promise.allSettled([
       this.fetchCorporateCandidates(corporateId),
-      this.fetchZenroContext(query, corporateId),
+      this.fetchZenroContext(cleanQuery, corporateId),
     ]);
 
     const discCandidates =
@@ -2347,18 +2355,36 @@ QUESTION: "${query.replace(/"/g, "'")}"`,
       });
 
       let sql = sqlRes.choices[0]?.message?.content?.trim() || '';
-      sql = sql
-        .replace(/^```sql\n?/i, '')
-        .replace(/\n?```$/i, '')
-        .trim();
-      if (sql === 'SKIP' || !sql.toLowerCase().startsWith('select'))
+      const sqlMatch = sql.match(/```(?:sql)?\n([\s\S]*?)\n```/i);
+      if (sqlMatch) {
+        sql = sqlMatch[1].trim();
+      } else {
+        sql = sql
+          .replace(/^```sql\n?/i, '')
+          .replace(/\n?```$/i, '')
+          .trim();
+      }
+      
+      this.logger.log(`[DEBUG Zenro Context SQL] Generates: ${sql}`);
+
+      if (sql === 'SKIP' || !sql.toLowerCase().startsWith('select')) {
+        this.logger.warn(`[DEBUG Zenro Context] Skipped because sql was: ${sql}`);
         return null;
+      }
 
       const rows = await this.dataSource.query(sql);
-      if (!rows || rows.length === 0) return null;
+      this.logger.log(`[DEBUG Zenro Context Rows] Length: ${rows?.length}`);
+      
+      if (!rows || rows.length === 0) {
+        this.logger.warn(`[DEBUG Zenro Context] Rows were empty`);
+        return null;
+      }
+      
       // Limit result rows to 20 to prevent token overflow in unified query
       const limitedRows = rows.slice(0, 20);
-      return JSON.stringify(limitedRows, null, 2);
+      const jsonRes = JSON.stringify(limitedRows, null, 2);
+      this.logger.log(`[DEBUG Zenro Context JSON Payload] ${jsonRes}`);
+      return jsonRes;
     } catch (err) {
       this.logger.warn(`Zenro context skipped: ${err?.message}`);
       return null;

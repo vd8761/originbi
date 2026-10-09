@@ -52,7 +52,7 @@ export function useNotifications() {
 
         try {
             const baseUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
-            const response = await fetch(`${baseUrl}/notifications?userId=${user.id}&role=${user.role}&limit=50`, {
+            const response = await fetch(`${baseUrl}/alerts?userId=${user.id}&role=${user.role}&limit=50`, {
                 headers: getAuthHeaders(),
             });
             if (response.ok) {
@@ -92,7 +92,7 @@ export function useNotifications() {
         setLoading(true);
         try {
             const baseUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
-            const response = await fetch(`${baseUrl}/notifications?userId=${user.id}&role=${user.role}&limit=20`, {
+            const response = await fetch(`${baseUrl}/alerts?userId=${user.id}&role=${user.role}&limit=20`, {
                 headers: getAuthHeaders(),
             });
             if (response.ok) {
@@ -113,7 +113,7 @@ export function useNotifications() {
             const wasUnreadNotification = Boolean(notification && !notification.isRead);
             
             const baseUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
-            const response = await fetch(`${baseUrl}/notifications/${id}/read`, {
+            const response = await fetch(`${baseUrl}/alerts/${id}/read`, {
                 method: 'PATCH',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ userId: user.id }),
@@ -141,7 +141,7 @@ export function useNotifications() {
     const markAllAsRead = useCallback(async () => {
         try {
             const baseUrl = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL || 'http://localhost:4001';
-            const response = await fetch(`${baseUrl}/notifications/read-all`, {
+            const response = await fetch(`${baseUrl}/alerts/read-all`, {
                 method: 'PATCH',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ userId: user.id, role: user.role }),
