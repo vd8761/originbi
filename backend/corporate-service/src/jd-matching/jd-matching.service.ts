@@ -2055,7 +2055,8 @@ RESPONSE RULES:
 9. CRITICAL — INVITE FOLLOW-UP: After giving the name list, end with: "Would you like a deeper profile on any of these individuals?"
 10. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response with a DISC profile dump. Begin DIRECTLY addressing the question. Surface behavioral traits only when needed.
 11. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. If there are multiple names in the previous response and the user simply says "Yes" or asks a general follow-up, do NOT ask them "which one?" — you MUST automatically provide the follow-up information for ALL individuals in the list simultaneously. Never ask for clarification on which employee.
-12. CRITICAL — SOURCES FORMAT: If you cite sources (e.g., CSV files, Zenro, Google Drive), you MUST output them as a single plain text line at the very end of your response, exactly like this: "Sources: @file1.csv @zenro_payroll @feedback.csv". Do NOT use bullet points or HTML tags. ONLY list the EXACT files you actually used to formulate your answer. If a file was provided but you did not use its information, DO NOT list it.`;
+12. CRITICAL — SOURCES FORMAT: If you cite sources (e.g., CSV files, Zenro, Google Drive), you MUST output them as a single plain text line at the very end of your response, exactly like this: "Sources: @file1.csv @zenro_payroll @feedback.csv". Do NOT use bullet points or HTML tags. ONLY list the EXACT files you actually used to formulate your answer. If a file was provided but you did not use its information, DO NOT list it.
+13. CRITICAL — MULTIPLE DATA ENTRIES: If the database returns multiple historical entries for a person (e.g., salary or allowances over several months), you MUST label each amount with its corresponding date, month, or reason. Do NOT output a raw list of numbers without explaining what time period each number belongs to. If no dates are provided, clearly state that these are multiple historical entries.`;
 
   // ─── MAIN ROUTING ENTRY POINT ───────────────────────────────────────────────
 
@@ -2354,6 +2355,7 @@ CRITICAL RULES:
 7. If the query contains pronouns (e.g., "this employee", "him", "her") or is a continuation (e.g. "Yes"), use the CONVERSATION HISTORY below to identify the specific employees being discussed. If multiple employees were listed in the previous response, you MUST construct your SQL query to fetch data for ALL of them (e.g., using IN ('Name1', 'Name2') or multiple ILIKE conditions).
 8. If the user asks for a "list of employees" grouped by a category, you MUST select their actual names (e.g., "emp_name"). Do NOT just return a COUNT() unless the user explicitly asks for "how many" or "the count".
 9. For "active" employees, you MUST filter by both "deleted" = 0 AND "emp_status" IN (1, 2, 3). The status mapping is: 1=New Joined, 2=Regular/Provisional, 3=Regular/Confirmed, 4=Suspension, 5=Long Absent, 6=Resigned, 7=Terminated.
+10. If querying historical data (like salaries, allowances, or attendance) without a specific date, you MUST include the relevant date/month columns in the SELECT clause so the results have context. If the user specifically asks for the "current" value, ORDER BY the date DESC and LIMIT 1.
 
 SCHEMA:
 ${schemaStr}
