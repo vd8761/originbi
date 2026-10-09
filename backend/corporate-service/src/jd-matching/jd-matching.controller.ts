@@ -70,6 +70,10 @@ export class ChatJDMatchRequestDto {
   @IsOptional()
   @IsArray()
   transcripts?: { name: string; transcript: string }[];
+
+  @IsOptional()
+  @IsString()
+  knowledgeBaseContext?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -155,6 +159,7 @@ export class JDMatchingController {
         corporateId,
         dto.message,
         dto.history || [],
+        dto.knowledgeBaseContext,
       );
 
       return {

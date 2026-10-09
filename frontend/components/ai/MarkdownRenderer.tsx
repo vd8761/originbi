@@ -19,7 +19,42 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, hid
           h2: ({node, ...props}) => <h2 className="text-[17px] font-semibold mt-5 mb-2 text-[#111827] dark:text-[#f9fafb]" {...props} />,
           h3: ({node, ...props}) => <h3 className="text-[15px] font-semibold mt-4 mb-1.5 text-[#111827] dark:text-[#f9fafb]" {...props} />,
           h4: ({node, ...props}) => <h4 className="text-[14px] font-semibold mt-3 mb-1 text-[#111827] dark:text-[#f9fafb]" {...props} />,
-          p: ({node, ...props}) => <p className="my-2" {...props} />,
+          p: ({node, children, ...props}) => {
+            const extractText = (nodes: any): string => {
+              if (typeof nodes === 'string') return nodes;
+              if (Array.isArray(nodes)) return nodes.map(extractText).join('');
+              if (nodes?.props?.children) return extractText(nodes.props.children);
+              return '';
+            };
+            const textContent = extractText(children);
+
+            if (textContent.trim().startsWith('Sources:')) {
+              const sourcesStr = textContent.replace('Sources:', '').replace(/\*\*/g, '').trim();
+              
+              let sourceItems: string[] = [];
+              if (sourcesStr.includes('@')) {
+                // If it contains @, split by @ to handle filenames with spaces correctly
+                sourceItems = sourcesStr.split('@').map(s => s.trim().replace(/,$/, '')).filter(s => s !== '');
+              } else {
+                // Otherwise fallback to comma splitting
+                sourceItems = sourcesStr.split(',').map(s => s.trim()).filter(s => s !== '');
+              }
+              
+              return (
+                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-[#2d2d2d] flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Sources</span>
+                  <div className="flex flex-wrap gap-2 text-[12px] font-medium">
+                    {sourceItems.map((src, i) => (
+                      <span key={i} className="bg-[#19c37d]/10 px-2 py-0.5 rounded text-[#19c37d]">
+                        @{src}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return <p className="my-2" {...props}>{children}</p>;
+          },
           ul: ({node, children, ...props}) => {
             // Count real li children (ignore whitespace text nodes)
             if (hideSingleBullet) {

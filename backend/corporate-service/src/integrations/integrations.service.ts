@@ -5,12 +5,56 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TenantAppConfig, CorporateAccount } from '@originbi/shared-entities';
+import { TenantAppConfig, CorporateAccount, MasterApp } from '@originbi/shared-entities';
 import { CorporateIntegration } from '../entities/corporate-integration.entity';
 import { google } from 'googleapis';
 import * as xlsx from 'xlsx';
 const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
+import * as crypto from 'crypto';
+
+function getEncryptionKey(): string {
+  let key = process.env.ENCRYPTION_KEY || process.env.INTEGRATION_ENCRYPTION_KEY;
+  if (key) {
+    key = key.replace(/^"|"$/g, '').trim(); // Remove surrounding quotes just in case
+  }
+  if (!key || key.length !== 32) {
+    console.error(`[FATAL] ENCRYPTION_KEY invalid. Length is ${key?.length || 0}. Expected 32.`);
+    throw new Error('ENCRYPTION_KEY must be set and exactly 32 characters long in your .env file.');
+  }
+  return key;
+}
+
+const IV_LENGTH = 16;
+
+function encrypt(text: string): string {
+  if (!text) return text;
+  try {
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(getEncryptionKey()), iv);
+    let encrypted = cipher.update(text);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+  } catch (err) {
+    return text;
+  }
+}
+
+function decrypt(text: string): string {
+  if (!text || !text.includes(':')) return text;
+  try {
+    const textParts = text.split(':');
+    const iv = Buffer.from(textParts.shift()!, 'hex');
+    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(getEncryptionKey()), iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+  } catch (err) {
+    return text;
+  }
+}
+
 @Injectable()
 export class IntegrationsService {
   constructor(
@@ -20,6 +64,8 @@ export class IntegrationsService {
     private readonly corporateAccountRepo: Repository<CorporateAccount>,
     @InjectRepository(CorporateIntegration)
     private readonly corporateIntegrationRepo: Repository<CorporateIntegration>,
+    @InjectRepository(MasterApp)
+    private readonly masterAppRepo: Repository<MasterApp>,
   ) {}
 
   // ─────────────────────────────────────────────────────────
@@ -229,34 +275,42 @@ export class IntegrationsService {
       where: { corporateAccount: { id: account.id }, provider: 'google_drive' }
     });
 
-    // Return only globally active apps
-    return configs
-      .filter((c) => c.app?.is_globally_active)
-      .map((c) => {
-        let configuredFeatures = c.configured_features || {};
-        const appNameLower = c.app.name?.toLowerCase() || '';
-        const isGoogle = appNameLower.includes('google') || appNameLower.includes('drive');
-        if (isGoogle && googleInt?.metadata) {
-          configuredFeatures = {
-            ...configuredFeatures,
-            syncFolderId: googleInt.metadata.syncFolderId,
-            syncFolderName: googleInt.metadata.syncFolderName,
-          };
-        }
-        return {
-          id: c.app_id,
-          name: c.app.name,
-          display_name: c.app.display_name,
-          status: c.status,
-          features: c.app.features,
-          configured_features: configuredFeatures,
-          // Surface connected account info safely (no tokens)
-          connectedAccount: configuredFeatures.connectedAccount || null,
-          connectedName: configuredFeatures.connectedName || null,
-          connectedPicture: configuredFeatures.connectedPicture || null,
-          connectedAt: configuredFeatures.connectedAt || null,
+    const activeMasterApps = await this.masterAppRepo.find({
+      where: { is_globally_active: true },
+    });
+
+    // Return all globally active apps, checking their local tenant connection status
+    return activeMasterApps.map((masterApp) => {
+      const config = configs.find((c) => c.app_id === masterApp.id);
+      let configuredFeatures = config?.configured_features ? { ...config.configured_features } : {};
+      const appNameLower = masterApp.name?.toLowerCase() || '';
+      const isGoogle = appNameLower.includes('google') || appNameLower.includes('drive');
+      if (isGoogle && googleInt?.metadata) {
+        configuredFeatures = {
+          ...configuredFeatures,
+          syncFolderId: googleInt.metadata.syncFolderId,
+          syncFolderName: googleInt.metadata.syncFolderName,
         };
-      });
+      }
+      
+      // Mask password so it doesn't get sent to frontend
+      if (configuredFeatures.db_pass) {
+        configuredFeatures.db_pass = '********';
+      }
+
+      return {
+        id: masterApp.id,
+        name: masterApp.name,
+        display_name: masterApp.display_name,
+        status: config?.status || 'disconnected',
+        features: masterApp.features,
+        configured_features: configuredFeatures,
+        connectedAccount: configuredFeatures.connectedAccount || null,
+        connectedName: configuredFeatures.connectedName || null,
+        connectedPicture: configuredFeatures.connectedPicture || null,
+        connectedAt: configuredFeatures.connectedAt || null,
+      };
+    });
   }
 
   // ─────────────────────────────────────────────────────────
@@ -562,17 +616,56 @@ export class IntegrationsService {
     });
     if (!account) throw new NotFoundException('Corporate account not found');
 
-    const config = await this.tenantAppConfigRepo.findOne({
+    let config = await this.tenantAppConfigRepo.findOne({
       where: { tenant_id: account.id as any, app_id: appId },
     });
-    if (!config)
-      throw new NotFoundException('Integration not assigned to tenant');
+    
+    if (!config) {
+      // Create it if it doesn't exist yet
+      config = this.tenantAppConfigRepo.create({
+        tenant_id: account.id as any,
+        app_id: appId,
+        status: payload.status || 'connected',
+        configured_features: {},
+      });
+    }
+
+    let featuresToMerge = payload.configured_features ? { ...payload.configured_features } : { ...payload };
+    delete featuresToMerge.status; // ensure status doesn't pollute JSON features
+
+    // Verify DB Connection if provided
+    if (featuresToMerge.db_host && featuresToMerge.db_user) {
+      featuresToMerge.connectedAccount = `${featuresToMerge.db_user}@${featuresToMerge.db_host}`;
+      try {
+        const mysql = require('mysql2/promise');
+        const connection = await mysql.createConnection({
+          host: featuresToMerge.db_host,
+          port: parseInt(featuresToMerge.db_port || '3306'),
+          user: featuresToMerge.db_user,
+          password: featuresToMerge.db_pass,
+          database: featuresToMerge.db_name,
+        });
+        await connection.ping();
+        await connection.end();
+      } catch (err: any) {
+        throw new BadRequestException('Database connection failed: ' + err.message);
+      }
+    }
+
+    // Encrypt password before saving
+    if (featuresToMerge.db_pass) {
+      featuresToMerge.db_pass = encrypt(featuresToMerge.db_pass);
+    }
 
     config.configured_features = {
       ...(config.configured_features || {}),
-      ...payload,
+      ...featuresToMerge,
     };
-    config.status = 'connected';
+    if (payload.status) {
+      config.status = payload.status;
+    } else if (!config.status) {
+      config.status = 'connected';
+    }
 
     await this.tenantAppConfigRepo.save(config);
     return { success: true, status: config.status };

@@ -42,6 +42,7 @@ function getCurrentUserEmail(): string {
 }
 
 function getAppIconUrl(name: string): string {
+  if (name === "zenro_payroll") return "/logos/zenrofavicon.png?v=2";
   if (name === "google_drive")
     return "https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg";
   const map: Record<string, string> = {
@@ -88,6 +89,13 @@ export default function CorporateIntegrationsConfig() {
 
   // Disconnect confirm
   const [disconnectTarget, setDisconnectTarget] = useState<TenantApp | null>(null);
+
+  // Zenro Payroll DB Config
+  const [dbHost, setDbHost] = useState("");
+  const [dbPort, setDbPort] = useState("3306");
+  const [dbName, setDbName] = useState("");
+  const [dbUser, setDbUser] = useState("");
+  const [dbPass, setDbPass] = useState("");
 
   const fetchApps = useCallback(async () => {
     try {
@@ -326,21 +334,36 @@ export default function CorporateIntegrationsConfig() {
 
                   {/* Connected account or subtext */}
                   {isConnected && app.connectedAccount ? (
-                    <div className="mt-2 flex items-center gap-2">
-                      {app.connectedPicture ? (
-                        <img src={app.connectedPicture} className="w-5 h-5 rounded-full ring-1 ring-brand-green/30" alt="" />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full bg-brand-green text-white text-[9px] font-black flex items-center justify-center">
-                          {app.connectedAccount[0].toUpperCase()}
-                        </div>
-                      )}
-                      <p className="text-[12px] text-gray-600 dark:text-gray-400 truncate font-semibold">
-                        {app.connectedAccount}
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        {app.connectedPicture ? (
+                          <img src={app.connectedPicture} className="w-5 h-5 rounded-full ring-1 ring-brand-green/30" alt="" />
+                        ) : (
+                          <div className="w-5 h-5 rounded-full bg-brand-green text-white text-[9px] font-black flex items-center justify-center">
+                            {app.connectedAccount[0].toUpperCase()}
+                          </div>
+                        )}
+                        <p className="text-[12px] text-gray-600 dark:text-gray-400 truncate font-semibold">
+                          {app.connectedAccount}
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        {app.configured_features?.lastSyncAt 
+                          ? `Sync: Successful at ${new Date(app.configured_features.lastSyncAt).toLocaleString(undefined, {
+                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                            })}`
+                          : "Sync: Pending first scheduled sync..."}
                       </p>
                     </div>
                   ) : (
                     <p className="mt-1.5 text-[13px] text-gray-400 dark:text-gray-500 leading-snug">
-                      {isConnected ? "Syncing data actively" : "Click to authorize access"}
+                      {!isConnected 
+                        ? "Click to authorize access" 
+                        : app.configured_features?.lastSyncAt 
+                          ? `Sync: Successful at ${new Date(app.configured_features.lastSyncAt).toLocaleString(undefined, {
+                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                            })}`
+                          : "Sync: Pending first scheduled sync..."}
                     </p>
                   )}
 
@@ -368,10 +391,10 @@ export default function CorporateIntegrationsConfig() {
 
       {/* ─── Connection Modal ─── */}
       {isModalOpen && selectedApp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-[#19211C] w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/10">
+        <div className="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-sm overflow-y-auto p-4 flex justify-center items-start">
+          <div className="bg-white dark:bg-[#19211C] w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-white/10 mt-10 mb-10 shrink-0">
             {/* Header */}
-            <div className="px-8 py-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between">
+            <div className="px-8 py-6 border-b border-gray-100 dark:border-white/5 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-white shadow-sm ring-1 ring-gray-100 dark:ring-white/10 p-2 flex items-center justify-center shrink-0">
                   <img src={getAppIconUrl(selectedApp.name)} alt={selectedApp.display_name} className="w-full h-full object-contain" />
@@ -382,14 +405,16 @@ export default function CorporateIntegrationsConfig() {
                   </h3>
                   <p className="text-sm text-gray-500">
                     {selectedApp.status === "connected"
-                      ? `Connected as ${selectedApp.connectedAccount}`
+                      ? (selectedApp.name === 'zenro_payroll'
+                          ? `Connected to ${selectedApp.configured_features?.db_host || 'Database'}`
+                          : `Connected as ${selectedApp.connectedAccount}`)
                       : "Authorize OriginBI to access your account"}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => { setIsModalOpen(false); setOauthStep("initial"); }}
-                className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/5 transition-colors shrink-0"
               >
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -406,18 +431,31 @@ export default function CorporateIntegrationsConfig() {
                     {selectedApp.connectedPicture ? (
                       <img src={selectedApp.connectedPicture} className="w-12 h-12 rounded-full ring-2 ring-brand-green/30" alt="" />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-brand-green/20 text-brand-green text-xl font-bold flex items-center justify-center">
-                        {selectedApp.connectedAccount?.[0]?.toUpperCase()}
+                      <div className="w-12 h-12 rounded-full bg-white ring-2 ring-brand-green/30 flex items-center justify-center p-2 shadow-sm">
+                        <img src={getAppIconUrl(selectedApp.name)} alt={selectedApp.display_name} className="w-full h-full object-contain" />
                       </div>
                     )}
                     <div>
-                      <p className="font-bold text-gray-900 dark:text-white">{selectedApp.connectedName || "Connected Account"}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{selectedApp.connectedAccount}</p>
+                      <p className="font-bold text-gray-900 dark:text-white">
+                        {selectedApp.name === 'zenro_payroll' ? 'Connected Database' : (selectedApp.connectedName || "Connected Account")}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {selectedApp.name === 'zenro_payroll' 
+                          ? `${selectedApp.configured_features?.db_user}@${selectedApp.configured_features?.db_host}:${selectedApp.configured_features?.db_port}` 
+                          : selectedApp.connectedAccount}
+                      </p>
                       {selectedApp.connectedAt && (
                         <p className="text-xs text-gray-400 mt-0.5">
                           Connected {new Date(selectedApp.connectedAt).toLocaleDateString()}
                         </p>
                       )}
+                      <p className="text-xs text-brand-green/80 font-medium mt-1">
+                        {selectedApp.configured_features?.lastSyncAt 
+                          ? `Data Sync: Fully synced at ${new Date(selectedApp.configured_features.lastSyncAt).toLocaleString(undefined, {
+                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                            })}`
+                          : "Data Sync: Pending..."}
+                      </p>
                     </div>
                     <div className="ml-auto">
                       <span className="w-7 h-7 bg-brand-green rounded-full flex items-center justify-center">
@@ -431,14 +469,29 @@ export default function CorporateIntegrationsConfig() {
                   <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                     <p className="font-semibold text-gray-800 dark:text-gray-200">Active permissions:</p>
                     <ul className="space-y-1.5">
-                      <li className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                        Read and manage specific Drive files
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                        Connect to external web services
-                      </li>
+                      {selectedApp.name === 'zenro_payroll' ? (
+                        <>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            Read and write access to Zenro Payroll database
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            Sync employee and payroll data securely
+                          </li>
+                        </>
+                      ) : (
+                        <>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            Read and manage specific Drive files
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            Connect to external web services
+                          </li>
+                        </>
+                      )}
                     </ul>
                   </div>
 
@@ -568,54 +621,156 @@ export default function CorporateIntegrationsConfig() {
                 </div>
               ) : oauthStep === "initial" ? (
                 /* ─── Initial State ─── */
-                <div className="flex flex-col items-center text-center">
-                  <div className="flex items-center justify-center gap-6 mb-8">
-                    <div className="w-16 h-16 rounded-2xl bg-white shadow-md p-3 flex items-center justify-center ring-1 ring-gray-100">
-                      <img src="/Origin-BI-Logo-01.png" alt="OriginBI" className="w-full h-full object-contain" />
+                selectedApp.name === "zenro_payroll" ? (
+                  /* ─── Zenro Payroll DB Form ─── */
+                  <div className="flex flex-col text-left px-4">
+                    <div className="flex items-center justify-center mb-4">
+                      <div className="w-16 h-16 rounded-2xl bg-white shadow-md p-3 flex items-center justify-center ring-1 ring-gray-100">
+                        <img src={getAppIconUrl(selectedApp.name)} alt={selectedApp.display_name} className="w-full h-full object-contain" />
+                      </div>
                     </div>
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 rounded-full bg-brand-green/30 animate-pulse" />
-                      <div className="w-2 h-2 rounded-full bg-brand-green/60 animate-pulse delay-75" />
-                      <div className="w-2 h-2 rounded-full bg-brand-green animate-pulse delay-150" />
+                    <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2 text-center">
+                      Connect to Zenro Payroll
+                    </h4>
+                    <p className="text-sm text-gray-500 mb-6 text-center">
+                      Enter your MySQL database credentials to sync directly with OriginBI.
+                    </p>
+                    
+                    <div className="space-y-4">
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Host / IP Address</label>
+                          <input type="text" value={dbHost} onChange={e => setDbHost(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:border-brand-green" placeholder="e.g. 192.168.1.100" />
+                        </div>
+                        <div className="w-24">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Port</label>
+                          <input type="text" value={dbPort} onChange={e => setDbPort(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:border-brand-green" placeholder="3306" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Database Name</label>
+                        <input type="text" value={dbName} onChange={e => setDbName(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:border-brand-green" placeholder="zenro_db" />
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                          <input type="text" value={dbUser} onChange={e => setDbUser(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:border-brand-green" placeholder="db_user" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                          <input type="password" value={dbPass} onChange={e => setDbPass(e.target.value)} className="w-full px-3 py-2 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:border-brand-green" placeholder="••••••••" />
+                        </div>
+                      </div>
                     </div>
-                    <div className="w-16 h-16 rounded-2xl bg-white shadow-md p-3 flex items-center justify-center ring-1 ring-gray-100">
-                      <img src={getAppIconUrl(selectedApp.name)} alt={selectedApp.display_name} className="w-full h-full object-contain" />
+
+                    <div className="mt-8 flex justify-center">
+                      <button
+                        onClick={async () => {
+                          if (!dbHost || !dbName || !dbUser || !dbPass) return alert("Please fill in all database fields.");
+                          setIsSaving(true);
+                          try {
+                            const email = getCurrentUserEmail();
+                            await fetch(`${CORPORATE_API}/corporate/integrations/${selectedApp.id}?email=${encodeURIComponent(email)}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                              body: JSON.stringify({ 
+                                status: 'connected',
+                                configured_features: {
+                                  db_host: dbHost,
+                                  db_port: dbPort,
+                                  db_name: dbName,
+                                  db_user: dbUser,
+                                  db_pass: dbPass
+                                }
+                              }),
+                            });
+                            await fetchApps();
+                            setIsModalOpen(false);
+                            setOauthStep("initial");
+                          } catch (e) {
+                            alert('Failed to connect to database');
+                          } finally {
+                            setIsSaving(false);
+                          }
+                        }}
+                        disabled={isSaving}
+                        className="w-full py-3.5 rounded-xl text-sm font-bold text-white bg-brand-green hover:bg-brand-green/90 shadow-lg shadow-green-900/20 transition-all disabled:opacity-50"
+                      >
+                        {isSaving ? "Connecting..." : "Connect Database"}
+                      </button>
                     </div>
                   </div>
+                ) : (
+                  /* ─── Default Generic OAuth ─── */
+                  <div className="flex flex-col items-center text-center">
+                    <div className="flex items-center justify-center gap-6 mb-8">
+                      <div className="w-16 h-16 rounded-2xl bg-white shadow-md p-3 flex items-center justify-center ring-1 ring-gray-100">
+                        <img src="/Origin-BI-Logo-01.png" alt="OriginBI" className="w-full h-full object-contain" />
+                      </div>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 rounded-full bg-brand-green/30 animate-pulse" />
+                        <div className="w-2 h-2 rounded-full bg-brand-green/60 animate-pulse delay-75" />
+                        <div className="w-2 h-2 rounded-full bg-brand-green animate-pulse delay-150" />
+                      </div>
+                      <div className="w-16 h-16 rounded-2xl bg-white shadow-md p-3 flex items-center justify-center ring-1 ring-gray-100">
+                        <img src={getAppIconUrl(selectedApp.name)} alt={selectedApp.display_name} className="w-full h-full object-contain" />
+                      </div>
+                    </div>
 
-                  <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                    OriginBI would like to connect to {selectedApp.display_name}
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-3 max-w-sm">
-                    This integration allows OriginBI to securely sync candidate data, assessment results, and workflow actions with your {selectedApp.display_name} workspace.
-                  </p>
+                    <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                      OriginBI would like to connect to {selectedApp.display_name}
+                    </h4>
+                    <p className="text-sm text-gray-500 mb-3 max-w-sm">
+                      This integration allows OriginBI to securely sync candidate data, assessment results, and workflow actions with your {selectedApp.display_name} workspace.
+                    </p>
 
-                  <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl px-4 py-3 mb-8 text-left w-full">
-                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-                      🔐 You will be redirected to {selectedApp.display_name} to sign in and grant permission. OriginBI never stores your password.
+                    <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl px-4 py-3 mb-8 text-left w-full">
+                      <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                        🔐 You will be redirected to {selectedApp.display_name} to sign in and grant permission. OriginBI never stores your password.
+                      </p>
+                    </div>
+
+                    {isGoogleApp(selectedApp.name) ? (
+                      <button
+                        onClick={() => launchGoogleOAuth(selectedApp)}
+                        className="w-full max-w-xs py-3.5 rounded-full text-sm font-bold text-white bg-brand-green hover:bg-brand-green/90 shadow-lg shadow-green-900/20 transition-all"
+                      >
+                        Continue to {selectedApp.display_name}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          setIsSaving(true);
+                          try {
+                            const email = getCurrentUserEmail();
+                            await fetch(`${CORPORATE_API}/corporate/integrations/${selectedApp.id}?email=${encodeURIComponent(email)}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                              body: JSON.stringify({ status: 'connected' }),
+                            });
+                            await fetchApps();
+                            setIsModalOpen(false);
+                            setOauthStep("initial");
+                          } catch (e) {
+                            alert('Failed to connect to ' + selectedApp.display_name);
+                          } finally {
+                            setIsSaving(false);
+                          }
+                        }}
+                        className="w-full max-w-xs py-3.5 rounded-full text-sm font-bold text-white bg-brand-green hover:bg-brand-green/90 shadow-lg shadow-green-900/20 transition-all"
+                      >
+                        Continue to {selectedApp.display_name}
+                      </button>
+                    )}
+
+                    <p className="text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      End-to-end encrypted · OAuth 2.0 standard
                     </p>
                   </div>
-
-                  {isGoogleApp(selectedApp.name) ? (
-                    <button
-                      onClick={() => launchGoogleOAuth(selectedApp)}
-                      className="w-full max-w-xs py-3.5 rounded-full text-sm font-bold text-white bg-brand-green hover:bg-brand-green/90 shadow-lg shadow-green-900/20 transition-all"
-                    >
-                      Continue to {selectedApp.display_name}
-                    </button>
-                  ) : (
-                    <button className="w-full max-w-xs py-3.5 rounded-full text-sm font-bold text-white bg-brand-green hover:bg-brand-green/90 shadow-lg shadow-green-900/20 transition-all">
-                      Continue to {selectedApp.display_name}
-                    </button>
-                  )}
-
-                  <p className="text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    End-to-end encrypted · OAuth 2.0 standard
-                  </p>
-                </div>
+                )
               ) : (
                 /* ─── Connecting/Waiting ─── */
                 <div className="flex flex-col items-center text-center py-8">

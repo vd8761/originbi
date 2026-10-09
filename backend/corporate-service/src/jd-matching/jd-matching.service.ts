@@ -1917,6 +1917,13 @@ Output ONLY a JSON array:
    * Uses a lightweight GPT call to avoid hardcoded regex fragility.
    */
   private async classifyIntent(query: string): Promise<string> {
+    // Strip frontend RAG injections so the classifier doesn't hallucinate
+    let cleanQuery = query;
+    const driveIdx = cleanQuery.indexOf('\n\n[Attached Google Drive Files:');
+    if (driveIdx !== -1) cleanQuery = cleanQuery.substring(0, driveIdx);
+    const sysIdx = cleanQuery.indexOf('\n\n[SYSTEM DIRECTIVE:');
+    if (sysIdx !== -1) cleanQuery = cleanQuery.substring(0, sysIdx);
+    cleanQuery = cleanQuery.trim();
     const classificationPrompt = `You are an intent classifier for a People Intelligence platform. Classify the user's question into EXACTLY ONE of these intent keys. Respond with ONLY the key, no explanation.
 
 INTENT KEYS:
@@ -1933,7 +1940,8 @@ INTENT KEYS:
 - recruitment_intel     → What to look for when hiring, what traits our top performers share
 - people_strategy       → HR policy, communication frameworks, org-wide people practices
 - jd_filter             → Filter or list candidates/students matching a job description, criteria, department, or name list
-- general               → Anything else workforce-related that doesn't fit above categories
+- zenro_data            — Questions about numbers, payroll, attendance, leave, salaries, counts, or Zenro integration
+  - general               — Anything else workforce-related that doesn't fit above categories
 
 USER QUERY: "${query.replace(/"/g, "'")}"`;
 
@@ -2046,7 +2054,8 @@ RESPONSE RULES:
 8. CRITICAL — NAME-FIRST FORMAT: When answering "who" questions (who collaborates best, who is a good leader, who fits this role, etc.), ALWAYS lead with a concise bulleted name list first. Then briefly state why for each name in 1 sentence. Do NOT write long paragraphs before revealing names. The leader wants names immediately.
 9. CRITICAL — INVITE FOLLOW-UP: After giving the name list, end with: "Would you like a deeper profile on any of these individuals?"
 10. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response with a DISC profile dump. Begin DIRECTLY addressing the question. Surface behavioral traits only when needed.
-11. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. Never ask "which employee?" for a follow-up.`;
+11. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. Never ask "which employee?" for a follow-up.
+12. CRITICAL — SOURCES FORMAT: If you cite sources (e.g., CSV files, Zenro, Google Drive), you MUST output them as a single plain text line at the very end of your response, exactly like this: "Sources: @file1.csv @zenro_payroll @feedback.csv". Do NOT use bullet points or HTML tags. ONLY list the EXACT files you actually used to formulate your answer. If a file was provided but you did not use its information, DO NOT list it.`;
 
   // ─── MAIN ROUTING ENTRY POINT ───────────────────────────────────────────────
 
@@ -2054,134 +2063,246 @@ RESPONSE RULES:
     corporateId: number,
     query: string,
     history: { role: 'user' | 'assistant'; content: string }[] = [],
+    knowledgeBaseContext?: string,
   ): Promise<string> {
     const startTime = Date.now();
-    this.logger.log(`🧠 CORPORATE HR BRAIN v2 - Corporate #${corporateId}`);
+    this.logger.log(`🧠 UNIFIED HR BRAIN - Corporate #${corporateId}`);
 
-    const candidates = await this.fetchCorporateCandidates(corporateId);
-    if (candidates.length === 0) {
-      return 'You currently have no employees registered in the system. I need employee behavioral data to answer your question.';
-    }
-
+    // 1. Classify intent on clean query
     const intent = await this.classifyIntent(query);
-    const employeeData = this.buildEmployeeDataStr(candidates);
+    this.logger.log(`🎯 Intent: ${intent}`);
 
-    this.logger.log(
-      `🎯 Routing to handler: ${intent} | ${candidates.length} employees | history: ${history.length} msgs`,
-    );
+    // 2. Gather DISC + Zenro in parallel
+    const [candidatesResult, zenroResult] = await Promise.allSettled([
+      this.fetchCorporateCandidates(corporateId),
+      this.fetchZenroContext(query, corporateId),
+    ]);
 
-    let answer: string;
-    switch (intent) {
-      case 'individual_profile':
-        answer = await this.handleIndividualProfile(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'role_fitment':
-        answer = await this.handleRoleFitment(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'team_formation':
-      case 'project_team':
-        answer = await this.handleTeamFormation(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'manager_guidance':
-        answer = await this.handleManagerGuidance(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'team_dynamics':
-        answer = await this.handleTeamDynamics(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'succession_planning':
-        answer = await this.handleSuccessionPlanning(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'capability_mapping':
-        answer = await this.handleCapabilityMapping(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'learning_dev':
-        answer = await this.handleLearningDev(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'workforce_planning':
-        answer = await this.handleWorkforcePlanning(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'recruitment_intel':
-        answer = await this.handleRecruitmentIntel(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'people_strategy':
-        answer = await this.handlePeopleStrategy(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      case 'jd_filter':
-        answer = await this.handleJDFilter(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
-        break;
-      default:
-        answer = await this.handleGeneralHRQuery(
-          query,
-          candidates,
-          employeeData,
-          history,
-        );
+    const discCandidates = candidatesResult.status === 'fulfilled' ? candidatesResult.value : [];
+    const zenroData = zenroResult.status === 'fulfilled' ? zenroResult.value : null;
+    const hasDisc = discCandidates.length > 0;
+    const hasZenro = !!(zenroData && zenroData.trim().length > 0);
+    const hasKB = !!(knowledgeBaseContext && knowledgeBaseContext.trim().length > 0);
+
+    this.logger.log(`📦 Context: DISC=${hasDisc}(${discCandidates.length}), Zenro=${hasZenro}, KB=${hasKB}`);
+
+    // 3. Pure DISC intents with no extra context -> use specialized behavioral handlers (highest quality)
+    const discOnlyIntents = [
+      'individual_profile', 'role_fitment', 'team_formation', 'project_team',
+      'manager_guidance', 'team_dynamics', 'succession_planning', 'capability_mapping',
+      'learning_dev', 'workforce_planning', 'recruitment_intel', 'people_strategy', 'jd_filter',
+    ];
+
+    if (discOnlyIntents.includes(intent) && hasDisc && !hasZenro && !hasKB) {
+      const employeeData = this.buildEmployeeDataStr(discCandidates);
+      this.logger.log(`🔀 Specialized DISC handler: ${intent}`);
+      let answer: string;
+      switch (intent) {
+        case 'individual_profile':   answer = await this.handleIndividualProfile(query, discCandidates, employeeData, history); break;
+        case 'role_fitment':         answer = await this.handleRoleFitment(query, discCandidates, employeeData, history); break;
+        case 'team_formation':
+        case 'project_team':         answer = await this.handleTeamFormation(query, discCandidates, employeeData, history); break;
+        case 'manager_guidance':     answer = await this.handleManagerGuidance(query, discCandidates, employeeData, history); break;
+        case 'team_dynamics':        answer = await this.handleTeamDynamics(query, discCandidates, employeeData, history); break;
+        case 'succession_planning':  answer = await this.handleSuccessionPlanning(query, discCandidates, employeeData, history); break;
+        case 'capability_mapping':   answer = await this.handleCapabilityMapping(query, discCandidates, employeeData, history); break;
+        case 'learning_dev':         answer = await this.handleLearningDev(query, discCandidates, employeeData, history); break;
+        case 'workforce_planning':   answer = await this.handleWorkforcePlanning(query, discCandidates, employeeData, history); break;
+        case 'recruitment_intel':    answer = await this.handleRecruitmentIntel(query, discCandidates, employeeData, history); break;
+        case 'people_strategy':      answer = await this.handlePeopleStrategy(query, discCandidates, employeeData, history); break;
+        case 'jd_filter':            answer = await this.handleJDFilter(query, discCandidates, employeeData, history); break;
+        default:                     answer = await this.handleGeneralHRQuery(query, discCandidates, employeeData, history);
+      }
+      this.logger.log(`✅ DISC processed in ${Date.now() - startTime}ms`);
+      return answer;
     }
 
-    this.logger.log(
-      `✅ HR Query [${intent}] processed in ${Date.now() - startTime}ms`,
-    );
+    // 4. Unified synthesis — all available sources combined
+    this.logger.log(`🔗 Unified synthesis (DISC+Zenro+KB)`);
+    const answer = await this.handleUnifiedQuery(query, { discCandidates, zenroData, knowledgeBaseContext: knowledgeBaseContext || null, intent, history });
+    this.logger.log(`✅ Unified processed in ${Date.now() - startTime}ms`);
     return answer;
+  }
+
+  /**
+   * Silently fetch Zenro quantitative data relevant to the query.
+   * Returns null if no Zenro integration or query is not HR-data-related.
+   */
+  private async fetchZenroContext(query: string, corporateId: number): Promise<string | null> {
+    try {
+      const configs = await this.dataSource.query(
+        `SELECT tac.tenant_id FROM tenant_app_configs tac
+         JOIN master_apps ma ON tac.app_id = ma.id
+         WHERE tac.tenant_id = $1 AND ma.name = 'zenro_payroll' AND tac.status = 'connected'`,
+        [corporateId],
+      );
+      if (!configs || configs.length === 0) return null;
+
+      const schemaName = `zenro_tenant_${configs[0].tenant_id}`;
+      // Only query the exact tables specified by the tenant admin
+      const RELEVANT_TABLES = [
+        'gs_api_log',
+        'gs_app_version',
+        'gs_basic_settings',
+        'gs_branch_location',
+        'gs_category',
+        'gs_client',
+        'gs_contact_admin_mail_log',
+        'gs_content',
+        'gs_country',
+        'gs_daily_actual_attendance',
+        'gs_daily_actual_attendance_log',
+        'gs_daily_attendance_history',
+        'gs_daily_break_time',
+        'gs_daily_late_attendance_log',
+        'gs_department',
+        'gs_designation',
+        'gs_designation_payroll_components',
+        'gs_documenttype',
+        'gs_employee',
+        'gs_employee_advance_payment',
+        'gs_employee_attendance_location',
+        'gs_employee_documents',
+        'gs_employee_earned_leave_credits_log',
+        'gs_employee_hourly_leave_permission_credits',
+        'gs_employee_hourly_leave_permission_debits',
+        'gs_employee_late_r_permission_duration_details',
+        'gs_employee_leave_availability',
+        'gs_employee_leave_credits',
+        'gs_employee_leave_debits',
+        'gs_employee_loan',
+        'gs_employee_loan_instalment',
+        'gs_employee_loan_transaction',
+        'gs_employee_payroll_component_details',
+        'gs_emp_device_log',
+        'gs_faq',
+        'gs_generalsettings',
+        'gs_holiday',
+        'gs_late_configuration_settings',
+        'gs_license_history',
+        'gs_memo',
+        'gs_mobile_api_log',
+        'gs_payroll_component_settings',
+        'gs_payslip_actual',
+        'gs_payslip_actual_log',
+        'gs_shift_details',
+        'gs_shift_schedule',
+        'gs_state',
+        'gs_unit',
+      ];
+      const schemaCols = await this.dataSource.query(
+        `SELECT table_name, column_name, data_type FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = ANY($2) ORDER BY table_name, ordinal_position`,
+        [schemaName, RELEVANT_TABLES],
+      );
+      if (!schemaCols || schemaCols.length === 0) return null;
+
+      let currentTable = '', schemaStr = '';
+      for (const row of schemaCols) {
+        if (row.table_name !== currentTable) {
+          if (currentTable) schemaStr += '\n';
+          currentTable = row.table_name;
+          schemaStr += `TABLE ${currentTable}: `;
+        }
+        schemaStr += `${row.column_name}(${row.data_type}), `;
+      }
+
+      const sqlRes = await this.getOpenAIClient().chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: `You are a PostgreSQL expert. Write a read-only SELECT query for the Zenro HR database.
+Schema: "${schemaName}". Always prefix tables: ${schemaName}.tablename
+Return ONLY raw SQL. If the question has NO relation to HR numbers/payroll/attendance/leave/salary, return: SKIP
+
+CRITICAL RULES:
+1. When searching for employee names, ALWAYS use case-insensitive fuzzy matching: ILIKE '%Name%' (do NOT use =).
+2. If asking for "last month", calculate it dynamically relative to CURRENT_DATE.
+
+SCHEMA:
+${schemaStr}
+
+QUESTION: "${query.replace(/"/g, "'")}"`,
+        }],
+        temperature: 0,
+        max_tokens: 350,
+      });
+
+      let sql = (sqlRes.choices[0]?.message?.content?.trim() || '');
+      sql = sql.replace(/^```sql\n?/i, '').replace(/\n?```$/i, '').trim();
+      if (sql === 'SKIP' || !sql.toLowerCase().startsWith('select')) return null;
+
+      const rows = await this.dataSource.query(sql);
+      if (!rows || rows.length === 0) return null;
+      // Limit result rows to 20 to prevent token overflow in unified query
+      const limitedRows = rows.slice(0, 20);
+      return JSON.stringify(limitedRows, null, 2);
+    } catch (err) {
+      this.logger.warn(`Zenro context skipped: ${err?.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Synthesize a single answer from DISC + Zenro + Knowledge Base.
+   */
+  private async handleUnifiedQuery(
+    query: string,
+    ctx: {
+      discCandidates: any[];
+      zenroData: string | null;
+      knowledgeBaseContext: string | null;
+      intent: string;
+      history: { role: 'user' | 'assistant'; content: string }[];
+    },
+  ): Promise<string> {
+    const sections: string[] = [];
+    const isZenroQuery = ctx.intent === 'zenro_data';
+
+    // When asking about numbers/payroll/attendance, skip DISC to save tokens
+    if (ctx.discCandidates.length > 0 && !isZenroQuery) {
+      const discSlice = ctx.discCandidates.slice(0, 20);
+      sections.push(`## 📊 DISC Behavioral Intelligence (${discSlice.length} of ${ctx.discCandidates.length} employees)\n${this.buildEmployeeDataStr(discSlice)}`);
+    }
+    if (ctx.zenroData) {
+      sections.push(`## 📋 Zenro HR Database (Live Data)\n${ctx.zenroData}`);
+    }
+    if (ctx.knowledgeBaseContext) {
+      // Truncate KB context to prevent token overflow
+      const kbTruncated = ctx.knowledgeBaseContext.substring(0, 3000);
+      sections.push(`## 📁 Knowledge Base (Google Drive Documents)\n${kbTruncated}`);
+    }
+    if (sections.length === 0) {
+      return 'No data sources are currently available. Please ensure employees have completed their DISC assessment and/or Zenro is connected.';
+    }
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+You are a comprehensive HR Intelligence AI with access to multiple integrated data sources. Answer the user's question by synthesizing ALL available data.
+
+RULES:
+- For payroll/attendance/leave/salary numbers → primarily use Zenro HR Database
+- For personality/behavioral/team fit insights → primarily use DISC data
+- For policy/documents → use Knowledge Base
+- Combine insights naturally when multiple sources are relevant
+- Be specific, reference real names and real numbers from the data
+- CRITICAL: NEVER invent, guess, or hallucinate data (names, salaries, dates). If the exact numbers or names are not provided in the sections below, you MUST explicitly state that the data is missing or not available.
+- End with: "**Sources:** [list which sources you used]"
+
+---
+${sections.join('\n\n---\n\n')}`;
+
+    const res = await this.getOpenAIClient().chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...ctx.history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        { role: 'user', content: query },
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+    return res.choices[0]?.message?.content || 'I could not process your request at this time.';
   }
 
   // ─── UC1: INDIVIDUAL EMPLOYEE INTELLIGENCE ──────────────────────────────────
@@ -2829,7 +2950,166 @@ RULES:
 
   // ─── SHARED GPT CALLER ───────────────────────────────────────────────────────
 
-  private async callGPT(
+  
+  // ─── UC16: ZENRO TEXT-TO-SQL AI AGENT ────────────────────────────────────────────────────────
+
+  private async handleZenroData(
+    query: string,
+    corporateId: number,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
+  ): Promise<string> {
+    this.logger.log(`Executing Zenro Text-to-SQL for Corporate #${corporateId}`);
+    try {
+      const configs = await this.dataSource.query(
+        `SELECT tac.tenant_id 
+         FROM tenant_app_configs tac
+         JOIN master_apps ma ON tac.app_id = ma.id
+         WHERE tac.tenant_id = $1 AND ma.name = 'zenro_payroll' AND tac.status = 'connected'`,
+        [corporateId]
+      );
+
+      if (!configs || configs.length === 0) {
+        return "Zenro integration is not connected. Please reconnect it in Settings → App Integrations to access payroll and attendance data.";
+      }
+
+      const tenantId = configs[0].tenant_id;
+      const schemaName = `zenro_tenant_${tenantId}`;
+
+      const RELEVANT_TABLES = [
+        'gs_api_log',
+        'gs_app_version',
+        'gs_basic_settings',
+        'gs_branch_location',
+        'gs_category',
+        'gs_client',
+        'gs_contact_admin_mail_log',
+        'gs_content',
+        'gs_country',
+        'gs_daily_actual_attendance',
+        'gs_daily_actual_attendance_log',
+        'gs_daily_attendance_history',
+        'gs_daily_break_time',
+        'gs_daily_late_attendance_log',
+        'gs_department',
+        'gs_designation',
+        'gs_designation_payroll_components',
+        'gs_documenttype',
+        'gs_employee',
+        'gs_employee_advance_payment',
+        'gs_employee_attendance_location',
+        'gs_employee_documents',
+        'gs_employee_earned_leave_credits_log',
+        'gs_employee_hourly_leave_permission_credits',
+        'gs_employee_hourly_leave_permission_debits',
+        'gs_employee_late_r_permission_duration_details',
+        'gs_employee_leave_availability',
+        'gs_employee_leave_credits',
+        'gs_employee_leave_debits',
+        'gs_employee_loan',
+        'gs_employee_loan_instalment',
+        'gs_employee_loan_transaction',
+        'gs_employee_payroll_component_details',
+        'gs_emp_device_log',
+        'gs_faq',
+        'gs_generalsettings',
+        'gs_holiday',
+        'gs_late_configuration_settings',
+        'gs_license_history',
+        'gs_memo',
+        'gs_mobile_api_log',
+        'gs_payroll_component_settings',
+        'gs_payslip_actual',
+        'gs_payslip_actual_log',
+        'gs_shift_details',
+        'gs_shift_schedule',
+        'gs_state',
+        'gs_unit',
+      ];
+      
+      const schemaCols = await this.dataSource.query(
+        `SELECT table_name, column_name, data_type 
+         FROM information_schema.columns 
+         WHERE table_schema = $1 AND table_name = ANY($2)
+         ORDER BY table_name, ordinal_position`,
+        [schemaName, RELEVANT_TABLES]
+      );
+
+      if (!schemaCols || schemaCols.length === 0) {
+        return "Your Zenro data is currently empty or still syncing. Please check the Integrations dashboard for sync status.";
+      }
+
+      let currentTable = '';
+      let schemaStr = '';
+      for (const row of schemaCols) {
+        if (row.table_name !== currentTable) {
+          if (currentTable !== '') schemaStr += '\n';
+          currentTable = row.table_name;
+          schemaStr += `TABLE ${currentTable}: `;
+        }
+        schemaStr += `${row.column_name}(${row.data_type}), `;
+      }
+
+      const sqlPrompt = `You are a PostgreSQL expert AI for a Corporate HR system.
+Your task is to generate a read-only PostgreSQL query to answer the user's question based on the Zenro database schema.
+The data is stored in a schema named "${schemaName}".
+
+IMPORTANT RULES:
+1. ONLY return the raw SQL query. Do not use markdown blocks like \`\`\`sql. No explanations.
+2. ALWAYS prepend the schema name to the table. Example: SELECT * FROM ${schemaName}.table_name;
+3. Use simple, safe, read-only SELECT queries. 
+4. The user's query might refer to 'employees', 'attendance', 'leaves', 'payroll', 'salary'. Choose the tables that best match.
+
+SCHEMA DETAILS:
+${schemaStr}
+
+USER QUESTION: "${query}"`;
+
+      const sqlRes = await this.getOpenAIClient().chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: sqlPrompt }],
+        temperature: 0,
+      });
+
+      let rawSql = sqlRes.choices[0]?.message?.content?.trim() || '';
+      rawSql = rawSql.replace(/^\s*\`\`\`[a-zA-Z]*\n?/g, '').replace(/\n?\`\`\`\s*$/g, '').trim();
+
+      this.logger.log(`Generated SQL for Zenro: ${rawSql}`);
+
+      if (!rawSql.toLowerCase().startsWith('select')) {
+        return "I'm sorry, I couldn't formulate a safe query to answer that question.";
+      }
+
+      const queryResults = await this.dataSource.query(rawSql);
+
+      const answerPrompt = `You are an HR AI assistant. Answer the user's question directly and professionally using the raw database query results provided below.
+Provide a clear, natural language answer. You can use markdown to bold key numbers.
+If the results are empty or the answer isn't clear, politely explain that based on the Zenro data available.
+
+USER QUESTION: "${query}"
+
+DATABASE RESULTS (JSON):
+${JSON.stringify(queryResults, null, 2)}
+
+(End with: "Sources: @zenro_db")`;
+
+      const finalRes = await this.getOpenAIClient().chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          ...history,
+          { role: 'user', content: answerPrompt }
+        ],
+        temperature: 0.2,
+      });
+
+      return finalRes.choices[0]?.message?.content || 'I could not process the Zenro data at this time.';
+
+    } catch (err) {
+      this.logger.error('Zenro Text-to-SQL Error:', err);
+      return 'An error occurred while querying the Zenro database. Please ensure the integration is active and try again.';
+    }
+  }
+
+private async callGPT(
     systemPrompt: string,
     userQuery: string,
     maxTokens = 1500,

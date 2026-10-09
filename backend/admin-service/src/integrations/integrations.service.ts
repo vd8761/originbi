@@ -53,6 +53,7 @@ export class IntegrationsService {
       { name: 'deel', display_name: 'Deel', is_globally_active: false, features: { scopes: ['contracts:read'] } },
       { name: 'adp', display_name: 'ADP', is_globally_active: false, features: { scopes: ['hr.workerInformation.read'] } },
       { name: 'rippling', display_name: 'Rippling', is_globally_active: false, features: { scopes: ['employees:read'] } },
+      { name: 'zenro_payroll', display_name: 'Zenro Payroll', is_globally_active: false, features: { scopes: ['mysql:read'] } },
     ];
 
     for (const app of apps) {
