@@ -2047,14 +2047,14 @@ RESPONSE RULES:
 1. NEVER reveal raw scores, numbers, or DISC codes — speak in behavioral language only.
 2. Maintain formal, boardroom-level tone. No casual phrasing.
 3. Reference actual names from the data below.
-4. ALWAYS close with a "Strategic Recommendation" the leader can act on.
+4. ALWAYS close with a "Strategic Recommendation" the leader can act on (UNLESS the answer is simply that a value is zero or an event did not happen, in which case omit the recommendation).
 5. Use bold headers and bullet points. Keep it executive-brief-style.
 6. You CAN answer questions about education history, department, year of study, role, and designation — this data is available.
 7. You CAN filter and list candidates by any criteria — JD match, department, name list, group, year, etc.
 8. CRITICAL — NAME-FIRST FORMAT: When answering "who" questions (who collaborates best, who is a good leader, who fits this role, etc.), ALWAYS lead with a concise bulleted name list first. Then briefly state why for each name in 1 sentence. Do NOT write long paragraphs before revealing names. The leader wants names immediately.
 9. CRITICAL — INVITE FOLLOW-UP: After giving the name list, end with: "Would you like a deeper profile on any of these individuals?"
 10. CRITICAL — CONVERSATIONAL INTELLIGENCE: Do NOT open every response with a DISC profile dump. Begin DIRECTLY addressing the question. Surface behavioral traits only when needed.
-11. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. Never ask "which employee?" for a follow-up.
+11. CRITICAL — CONVERSATION MEMORY: Resolve pronouns ("he", "her", "they", "this person") to the last explicitly named person in conversation history. If there are multiple names in the previous response and the user simply says "Yes" or asks a general follow-up, do NOT ask them "which one?" — you MUST automatically provide the follow-up information for ALL individuals in the list simultaneously. Never ask for clarification on which employee.
 12. CRITICAL — SOURCES FORMAT: If you cite sources (e.g., CSV files, Zenro, Google Drive), you MUST output them as a single plain text line at the very end of your response, exactly like this: "Sources: @file1.csv @zenro_payroll @feedback.csv". Do NOT use bullet points or HTML tags. ONLY list the EXACT files you actually used to formulate your answer. If a file was provided but you did not use its information, DO NOT list it.`;
 
   // ─── MAIN ROUTING ENTRY POINT ───────────────────────────────────────────────
@@ -2080,10 +2080,9 @@ RESPONSE RULES:
     const intent = await this.classifyIntent(cleanQuery);
     this.logger.log(`🎯 Intent: ${intent}`);
 
-    // 3. Gather DISC + Zenro in parallel
     const [candidatesResult, zenroResult] = await Promise.allSettled([
       this.fetchCorporateCandidates(corporateId),
-      this.fetchZenroContext(cleanQuery, corporateId),
+      this.fetchZenroContext(cleanQuery, corporateId, history),
     ]);
 
     const discCandidates =
@@ -2251,6 +2250,7 @@ RESPONSE RULES:
   private async fetchZenroContext(
     query: string,
     corporateId: number,
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string | null> {
     try {
       const configs = await this.dataSource.query(
@@ -2331,6 +2331,10 @@ RESPONSE RULES:
         schemaStr += `"${row.column_name}"(${row.data_type}), `;
       }
 
+      const historyContext = history.length > 0 
+        ? `\nCONVERSATION HISTORY:\n${history.map(h => `${h.role}: ${h.content}`).join('\n')}\n` 
+        : '';
+
       const sqlRes = await this.getOpenAIClient().chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
@@ -2338,17 +2342,23 @@ RESPONSE RULES:
             role: 'user',
             content: `You are a PostgreSQL expert. Write a read-only SELECT query for the Zenro HR database.
 Schema: "${schemaName}". Always prefix tables: "${schemaName}"."tablename"
-Return ONLY raw SQL. If the question has NO relation to HR numbers/payroll/attendance/leave/salary, return: SKIP
+Return ONLY raw SQL. If the query is completely unrelated to HR, payroll, attendance, leave, or employees, return: SKIP
 
 CRITICAL RULES:
 1. When searching for employee names, ALWAYS use case-insensitive fuzzy matching: ILIKE '%Name%' (do NOT use =).
-2. If asking for "last month", calculate it dynamically relative to CURRENT_DATE.
+2. If asking for a specific month (e.g. "September") without a year, default to the current year (CURRENT_DATE) in the SQL. Do not ask for clarification. If asking for "last month", calculate it dynamically relative to CURRENT_DATE.
 3. ALWAYS double-quote column and table names exactly as provided in the schema to avoid case-sensitivity errors (e.g. "employee_ID").
+4. ONLY use the tables and columns explicitly listed in the SCHEMA below. NEVER invent table names.
+5. Treat keyword phrases (e.g. "Ariyappan Payroll details") as valid requests for data. Do NOT return SKIP for them.
+6. To search for data by an employee's name, you MUST JOIN the target table with "${schemaName}"."gs_employee". EVERY single table in the FROM or JOIN clauses MUST be prefixed with "${schemaName}".
+7. If the query contains pronouns (e.g., "this employee", "him", "her") or is a continuation (e.g. "Yes"), use the CONVERSATION HISTORY below to identify the specific employees being discussed. If multiple employees were listed in the previous response, you MUST construct your SQL query to fetch data for ALL of them (e.g., using IN ('Name1', 'Name2') or multiple ILIKE conditions).
+8. If the user asks for a "list of employees" grouped by a category, you MUST select their actual names (e.g., "emp_name"). Do NOT just return a COUNT() unless the user explicitly asks for "how many" or "the count".
+9. For "active" employees, you MUST filter by both "deleted" = 0 AND "emp_status" IN (1, 2, 3). The status mapping is: 1=New Joined, 2=Regular/Provisional, 3=Regular/Confirmed, 4=Suspension, 5=Long Absent, 6=Resigned, 7=Terminated.
 
 SCHEMA:
 ${schemaStr}
-
-QUESTION: "${query.replace(/"/g, "'")}"`,
+${historyContext}
+CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
           },
         ],
         temperature: 0,
@@ -2434,12 +2444,15 @@ QUESTION: "${query.replace(/"/g, "'")}"`,
 You are a comprehensive HR Intelligence AI with access to multiple integrated data sources. Answer the user's question by synthesizing ALL available data.
 
 RULES:
-- For payroll/attendance/leave/salary numbers → primarily use Zenro HR Database
-- For personality/behavioral/team fit insights → primarily use DISC data
-- For policy/documents → use Knowledge Base
-- Combine insights naturally when multiple sources are relevant
-- Be specific, reference real names and real numbers from the data
-- CRITICAL: NEVER invent, guess, or hallucinate data (names, salaries, dates). If the exact numbers or names are not provided in the sections below, you MUST explicitly state that the data is missing or not available.
+- When multiple data sources (connectors) are provided, you MUST analyze both the Zenro HR Database and the Knowledge Base independently.
+- Clearly separate and attribute your findings to the respective connector (e.g., "According to the Zenro HR Database..." and "Based on the Knowledge Base...").
+- If one connector has matching data but the other does not, provide the matched data and explicitly mention that the other connector yielded no matching data (e.g., "The Knowledge Base outlines the policy for late check-ins, but the Zenro database shows no actual late records for the IT department last month.").
+- For real-time employee metrics (payroll, attendance numbers, leave balances), rely on Zenro HR Database.
+- For company policies, operating procedures, and guidelines, rely on the Knowledge Base.
+- CRITICAL: Do NOT present mock examples from Knowledge Base policy documents as real live data. Distinguish between a stated policy and actual live employee records.
+- CRITICAL: NEVER invent, guess, or hallucinate data (names, salaries, dates). 
+- CRITICAL: If the Zenro Database returns no data for a specific person or metric (e.g. no loan records, no late check-ins, no break times), DO NOT say "there are no records available" or "the data is missing". You must assume the value is simply ZERO or the event did not happen. Confidently state the answer as a fact (e.g., "Ariyappan did not take any break time yesterday", or "Ariyappan currently has zero pending loan instalments"). DO NOT suggest that the system needs to be fixed or updated.
+- If the user asks about a month (e.g. "September") without specifying a year, and the provided Zenro data contains records spanning multiple different years for that month, provide the data for the most recent year and politely ask the user to clarify if they meant a different year.
 - End with: "**Sources:** [list which sources you used]"`;
 
     const dataContext = `[SYSTEM PROVIDED DATA CONTEXT]
