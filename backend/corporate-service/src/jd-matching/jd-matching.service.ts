@@ -2287,15 +2287,16 @@ RULES:
 - Combine insights naturally when multiple sources are relevant
 - Be specific, reference real names and real numbers from the data
 - CRITICAL: NEVER invent, guess, or hallucinate data (names, salaries, dates). If the exact numbers or names are not provided in the sections below, you MUST explicitly state that the data is missing or not available.
-- End with: "**Sources:** [list which sources you used]"
+- End with: "**Sources:** [list which sources you used]"`;
 
----
+    const dataContext = `[SYSTEM PROVIDED DATA CONTEXT]
 ${sections.join('\n\n---\n\n')}`;
 
     const res = await this.getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
+        { role: 'user', content: dataContext },
         ...ctx.history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         { role: 'user', content: query },
       ],
