@@ -202,7 +202,20 @@ export class ZenroSyncService implements OnModuleInit {
           for (const row of insertBatch) {
             const rowPlaceholders: string[] = [];
             for (const colName of colNames) {
-              values.push(row[colName] ?? null);
+              let val = row[colName];
+              
+              // Handle MySQL zero dates which strictly crash PostgreSQL
+              if (
+                typeof val === 'string' &&
+                (val === '0000-00-00' || val.startsWith('0000-00-00'))
+              ) {
+                val = null;
+              }
+              if (val instanceof Date && isNaN(val.getTime())) {
+                val = null;
+              }
+
+              values.push(val ?? null);
               rowPlaceholders.push(`$${paramIndex++}`);
             }
             placeholders.push(`(${rowPlaceholders.join(',')})`);

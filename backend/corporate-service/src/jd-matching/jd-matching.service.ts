@@ -2326,9 +2326,9 @@ RESPONSE RULES:
         if (row.table_name !== currentTable) {
           if (currentTable) schemaStr += '\n';
           currentTable = row.table_name;
-          schemaStr += `TABLE ${currentTable}: `;
+          schemaStr += `TABLE "${currentTable}": `;
         }
-        schemaStr += `${row.column_name}(${row.data_type}), `;
+        schemaStr += `"${row.column_name}"(${row.data_type}), `;
       }
 
       const sqlRes = await this.getOpenAIClient().chat.completions.create({
@@ -2337,12 +2337,13 @@ RESPONSE RULES:
           {
             role: 'user',
             content: `You are a PostgreSQL expert. Write a read-only SELECT query for the Zenro HR database.
-Schema: "${schemaName}". Always prefix tables: ${schemaName}.tablename
+Schema: "${schemaName}". Always prefix tables: "${schemaName}"."tablename"
 Return ONLY raw SQL. If the question has NO relation to HR numbers/payroll/attendance/leave/salary, return: SKIP
 
 CRITICAL RULES:
 1. When searching for employee names, ALWAYS use case-insensitive fuzzy matching: ILIKE '%Name%' (do NOT use =).
 2. If asking for "last month", calculate it dynamically relative to CURRENT_DATE.
+3. ALWAYS double-quote column and table names exactly as provided in the schema to avoid case-sensitivity errors (e.g. "employee_ID").
 
 SCHEMA:
 ${schemaStr}
