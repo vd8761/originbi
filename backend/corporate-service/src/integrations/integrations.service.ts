@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TenantAppConfig, CorporateAccount, MasterApp } from '@originbi/shared-entities';
+import {
+  TenantAppConfig,
+  CorporateAccount,
+  MasterApp,
+} from '@originbi/shared-entities';
 import { CorporateIntegration } from '../entities/corporate-integration.entity';
 import { google } from 'googleapis';
 import * as xlsx from 'xlsx';
@@ -14,13 +18,18 @@ import * as mammoth from 'mammoth';
 import * as crypto from 'crypto';
 
 function getEncryptionKey(): string {
-  let key = process.env.ENCRYPTION_KEY || process.env.INTEGRATION_ENCRYPTION_KEY;
+  let key =
+    process.env.ENCRYPTION_KEY || process.env.INTEGRATION_ENCRYPTION_KEY;
   if (key) {
     key = key.replace(/^"|"$/g, '').trim(); // Remove surrounding quotes just in case
   }
   if (!key || key.length !== 32) {
-    console.error(`[FATAL] ENCRYPTION_KEY invalid. Length is ${key?.length || 0}. Expected 32.`);
-    throw new Error('ENCRYPTION_KEY must be set and exactly 32 characters long in your .env file.');
+    console.error(
+      `[FATAL] ENCRYPTION_KEY invalid. Length is ${key?.length || 0}. Expected 32.`,
+    );
+    throw new Error(
+      'ENCRYPTION_KEY must be set and exactly 32 characters long in your .env file.',
+    );
   }
   return key;
 }
@@ -31,7 +40,11 @@ function encrypt(text: string): string {
   if (!text) return text;
   try {
     const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(getEncryptionKey()), iv);
+    const cipher = crypto.createCipheriv(
+      'aes-256-cbc',
+      Buffer.from(getEncryptionKey()),
+      iv,
+    );
     let encrypted = cipher.update(text);
     encrypted = Buffer.concat([encrypted, cipher.final()]);
     return iv.toString('hex') + ':' + encrypted.toString('hex');
@@ -44,9 +57,13 @@ function decrypt(text: string): string {
   if (!text || !text.includes(':')) return text;
   try {
     const textParts = text.split(':');
-    const iv = Buffer.from(textParts.shift()!, 'hex');
+    const iv = Buffer.from(textParts.shift(), 'hex');
     const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(getEncryptionKey()), iv);
+    const decipher = crypto.createDecipheriv(
+      'aes-256-cbc',
+      Buffer.from(getEncryptionKey()),
+      iv,
+    );
     let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
@@ -272,7 +289,7 @@ export class IntegrationsService {
     });
 
     const googleInt = await this.corporateIntegrationRepo.findOne({
-      where: { corporateAccount: { id: account.id }, provider: 'google_drive' }
+      where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
     });
 
     const activeMasterApps = await this.masterAppRepo.find({
@@ -282,9 +299,12 @@ export class IntegrationsService {
     // Return all globally active apps, checking their local tenant connection status
     return activeMasterApps.map((masterApp) => {
       const config = configs.find((c) => c.app_id === masterApp.id);
-      let configuredFeatures = config?.configured_features ? { ...config.configured_features } : {};
+      let configuredFeatures = config?.configured_features
+        ? { ...config.configured_features }
+        : {};
       const appNameLower = masterApp.name?.toLowerCase() || '';
-      const isGoogle = appNameLower.includes('google') || appNameLower.includes('drive');
+      const isGoogle =
+        appNameLower.includes('google') || appNameLower.includes('drive');
       if (isGoogle && googleInt?.metadata) {
         configuredFeatures = {
           ...configuredFeatures,
@@ -292,7 +312,7 @@ export class IntegrationsService {
           syncFolderName: googleInt.metadata.syncFolderName,
         };
       }
-      
+
       // Mask password so it doesn't get sent to frontend
       if (configuredFeatures.db_pass) {
         configuredFeatures.db_pass = '********';
@@ -329,7 +349,9 @@ export class IntegrationsService {
     });
 
     if (!integration || !integration.access_token) {
-      throw new BadRequestException('Google Drive is not connected or token is missing');
+      throw new BadRequestException(
+        'Google Drive is not connected or token is missing',
+      );
     }
 
     const oauth2Client = this.getGoogleOAuthClient();
@@ -343,11 +365,16 @@ export class IntegrationsService {
       let q: string;
       if (search === 'folders_only') {
         // Return only top-level (root-parented), non-hidden Google Drive folders
-        q = "mimeType = 'application/vnd.google-apps.folder' and 'root' in parents and trashed = false";
+        q =
+          "mimeType = 'application/vnd.google-apps.folder' and 'root' in parents and trashed = false";
       } else {
-        q = "mimeType != 'application/vnd.google-apps.folder' and trashed = false";
+        q =
+          "mimeType != 'application/vnd.google-apps.folder' and trashed = false";
         if (search && search.trim() !== '') {
-          const safeSearch = search.trim().replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          const safeSearch = search
+            .trim()
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'");
           q += ` and name contains '${safeSearch}'`;
         }
       }
@@ -362,7 +389,7 @@ export class IntegrationsService {
       let files = response.data.files || [];
       // Remove hidden/system folders (those starting with '.')
       if (search === 'folders_only') {
-        files = files.filter(f => f.name && !f.name.startsWith('.'));
+        files = files.filter((f) => f.name && !f.name.startsWith('.'));
       }
 
       return {
@@ -387,7 +414,8 @@ export class IntegrationsService {
     const integration = await this.corporateIntegrationRepo.findOne({
       where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
     });
-    if (!integration) throw new NotFoundException('Google Drive integration not found');
+    if (!integration)
+      throw new NotFoundException('Google Drive integration not found');
 
     // Save the selected folder ID to metadata — only files inside this folder will be indexed
     integration.metadata = {
@@ -412,7 +440,10 @@ export class IntegrationsService {
     if (!account) throw new NotFoundException('Corporate account not found');
 
     const integration = await this.corporateIntegrationRepo.findOne({
-      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
+      where: {
+        corporate_account_id: account.id as any,
+        provider: 'google_drive',
+      },
     });
     if (!integration || !integration.access_token) {
       throw new BadRequestException('Google Drive is not connected');
@@ -457,7 +488,8 @@ export class IntegrationsService {
         );
         content = response.data as any;
       } else if (
-        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        mimeType ===
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
         mimeType === 'text/csv'
       ) {
         const response = await drive.files.get(
@@ -482,7 +514,10 @@ export class IntegrationsService {
         const buffer = Buffer.from(response.data as any);
         const parsed = await pdfParse(buffer);
         content = parsed.text;
-      } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      } else if (
+        mimeType ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ) {
         const response = await drive.files.get(
           { fileId, alt: 'media' },
           { responseType: 'arraybuffer' },
@@ -517,16 +552,21 @@ export class IntegrationsService {
   // ─────────────────────────────────────────────────────────
   //  Get Combined Folder Context for Knowledge Base
   // ─────────────────────────────────────────────────────────
-  async getFolderContext(email: string): Promise<{ success: boolean; content: string }> {
+  async getFolderContext(
+    email: string,
+  ): Promise<{ success: boolean; content: string }> {
     const account = await this.corporateAccountRepo.findOne({
       where: { user: { email } },
     });
     if (!account) throw new NotFoundException('Corporate account not found');
 
     const integration = await this.corporateIntegrationRepo.findOne({
-      where: { corporate_account_id: account.id as any, provider: 'google_drive' },
+      where: {
+        corporate_account_id: account.id as any,
+        provider: 'google_drive',
+      },
     });
-    
+
     if (!integration || !integration.access_token) {
       return { success: false, content: '' };
     }
@@ -543,7 +583,7 @@ export class IntegrationsService {
     });
 
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
-    
+
     try {
       // Find up to 15 latest files inside the synced folder
       const response = await drive.files.list({
@@ -562,32 +602,64 @@ export class IntegrationsService {
         try {
           let text = '';
           const mimeType = file.mimeType;
-          if (mimeType?.includes('application/vnd.google-apps.document') || mimeType?.includes('application/vnd.google-apps.presentation')) {
-            const r = await drive.files.export({ fileId: file.id as string, mimeType: 'text/plain' }, { responseType: 'text' });
+          if (
+            mimeType?.includes('application/vnd.google-apps.document') ||
+            mimeType?.includes('application/vnd.google-apps.presentation')
+          ) {
+            const r = await drive.files.export(
+              { fileId: file.id, mimeType: 'text/plain' },
+              { responseType: 'text' },
+            );
             text = r.data as any;
-          } else if (mimeType?.includes('application/vnd.google-apps.spreadsheet')) {
-            const r = await drive.files.export({ fileId: file.id as string, mimeType: 'text/csv' }, { responseType: 'text' });
+          } else if (
+            mimeType?.includes('application/vnd.google-apps.spreadsheet')
+          ) {
+            const r = await drive.files.export(
+              { fileId: file.id, mimeType: 'text/csv' },
+              { responseType: 'text' },
+            );
             text = r.data as any;
-          } else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || mimeType === 'text/csv') {
-            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'arraybuffer' });
+          } else if (
+            mimeType ===
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+            mimeType === 'text/csv'
+          ) {
+            const r = await drive.files.get(
+              { fileId: file.id, alt: 'media' },
+              { responseType: 'arraybuffer' },
+            );
             const buffer = Buffer.from(r.data as any);
             const workbook = xlsx.read(buffer, { type: 'buffer' });
             workbook.SheetNames.forEach((sheetName) => {
               const sheet = workbook.Sheets[sheetName];
-              text += `\n--- Sheet: ${sheetName} ---\n` + xlsx.utils.sheet_to_csv(sheet);
+              text +=
+                `\n--- Sheet: ${sheetName} ---\n` +
+                xlsx.utils.sheet_to_csv(sheet);
             });
           } else if (mimeType === 'application/pdf') {
-            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'arraybuffer' });
+            const r = await drive.files.get(
+              { fileId: file.id, alt: 'media' },
+              { responseType: 'arraybuffer' },
+            );
             const buffer = Buffer.from(r.data as any);
             const parsed = await pdfParse(buffer);
             text = parsed.text;
-          } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'arraybuffer' });
+          } else if (
+            mimeType ===
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          ) {
+            const r = await drive.files.get(
+              { fileId: file.id, alt: 'media' },
+              { responseType: 'arraybuffer' },
+            );
             const buffer = Buffer.from(r.data as any);
             const result = await mammoth.extractRawText({ buffer });
             text = result.value;
           } else {
-            const r = await drive.files.get({ fileId: file.id as string, alt: 'media' }, { responseType: 'text' });
+            const r = await drive.files.get(
+              { fileId: file.id, alt: 'media' },
+              { responseType: 'text' },
+            );
             text = r.data as any;
           }
           if (typeof text === 'string' && text.length > 20000) {
@@ -619,7 +691,7 @@ export class IntegrationsService {
     let config = await this.tenantAppConfigRepo.findOne({
       where: { tenant_id: account.id as any, app_id: appId },
     });
-    
+
     if (!config) {
       // Create it if it doesn't exist yet
       config = this.tenantAppConfigRepo.create({
@@ -630,7 +702,9 @@ export class IntegrationsService {
       });
     }
 
-    let featuresToMerge = payload.configured_features ? { ...payload.configured_features } : { ...payload };
+    const featuresToMerge = payload.configured_features
+      ? { ...payload.configured_features }
+      : { ...payload };
     delete featuresToMerge.status; // ensure status doesn't pollute JSON features
 
     // Verify DB Connection if provided
@@ -648,7 +722,9 @@ export class IntegrationsService {
         await connection.ping();
         await connection.end();
       } catch (err: any) {
-        throw new BadRequestException('Database connection failed: ' + err.message);
+        throw new BadRequestException(
+          'Database connection failed: ' + err.message,
+        );
       }
     }
 

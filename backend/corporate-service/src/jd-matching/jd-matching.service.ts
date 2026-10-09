@@ -2078,19 +2078,35 @@ RESPONSE RULES:
       this.fetchZenroContext(query, corporateId),
     ]);
 
-    const discCandidates = candidatesResult.status === 'fulfilled' ? candidatesResult.value : [];
-    const zenroData = zenroResult.status === 'fulfilled' ? zenroResult.value : null;
+    const discCandidates =
+      candidatesResult.status === 'fulfilled' ? candidatesResult.value : [];
+    const zenroData =
+      zenroResult.status === 'fulfilled' ? zenroResult.value : null;
     const hasDisc = discCandidates.length > 0;
     const hasZenro = !!(zenroData && zenroData.trim().length > 0);
-    const hasKB = !!(knowledgeBaseContext && knowledgeBaseContext.trim().length > 0);
+    const hasKB = !!(
+      knowledgeBaseContext && knowledgeBaseContext.trim().length > 0
+    );
 
-    this.logger.log(`📦 Context: DISC=${hasDisc}(${discCandidates.length}), Zenro=${hasZenro}, KB=${hasKB}`);
+    this.logger.log(
+      `📦 Context: DISC=${hasDisc}(${discCandidates.length}), Zenro=${hasZenro}, KB=${hasKB}`,
+    );
 
     // 3. Pure DISC intents with no extra context -> use specialized behavioral handlers (highest quality)
     const discOnlyIntents = [
-      'individual_profile', 'role_fitment', 'team_formation', 'project_team',
-      'manager_guidance', 'team_dynamics', 'succession_planning', 'capability_mapping',
-      'learning_dev', 'workforce_planning', 'recruitment_intel', 'people_strategy', 'jd_filter',
+      'individual_profile',
+      'role_fitment',
+      'team_formation',
+      'project_team',
+      'manager_guidance',
+      'team_dynamics',
+      'succession_planning',
+      'capability_mapping',
+      'learning_dev',
+      'workforce_planning',
+      'recruitment_intel',
+      'people_strategy',
+      'jd_filter',
     ];
 
     if (discOnlyIntents.includes(intent) && hasDisc && !hasZenro && !hasKB) {
@@ -2098,20 +2114,110 @@ RESPONSE RULES:
       this.logger.log(`🔀 Specialized DISC handler: ${intent}`);
       let answer: string;
       switch (intent) {
-        case 'individual_profile':   answer = await this.handleIndividualProfile(query, discCandidates, employeeData, history); break;
-        case 'role_fitment':         answer = await this.handleRoleFitment(query, discCandidates, employeeData, history); break;
+        case 'individual_profile':
+          answer = await this.handleIndividualProfile(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'role_fitment':
+          answer = await this.handleRoleFitment(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
         case 'team_formation':
-        case 'project_team':         answer = await this.handleTeamFormation(query, discCandidates, employeeData, history); break;
-        case 'manager_guidance':     answer = await this.handleManagerGuidance(query, discCandidates, employeeData, history); break;
-        case 'team_dynamics':        answer = await this.handleTeamDynamics(query, discCandidates, employeeData, history); break;
-        case 'succession_planning':  answer = await this.handleSuccessionPlanning(query, discCandidates, employeeData, history); break;
-        case 'capability_mapping':   answer = await this.handleCapabilityMapping(query, discCandidates, employeeData, history); break;
-        case 'learning_dev':         answer = await this.handleLearningDev(query, discCandidates, employeeData, history); break;
-        case 'workforce_planning':   answer = await this.handleWorkforcePlanning(query, discCandidates, employeeData, history); break;
-        case 'recruitment_intel':    answer = await this.handleRecruitmentIntel(query, discCandidates, employeeData, history); break;
-        case 'people_strategy':      answer = await this.handlePeopleStrategy(query, discCandidates, employeeData, history); break;
-        case 'jd_filter':            answer = await this.handleJDFilter(query, discCandidates, employeeData, history); break;
-        default:                     answer = await this.handleGeneralHRQuery(query, discCandidates, employeeData, history);
+        case 'project_team':
+          answer = await this.handleTeamFormation(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'manager_guidance':
+          answer = await this.handleManagerGuidance(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'team_dynamics':
+          answer = await this.handleTeamDynamics(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'succession_planning':
+          answer = await this.handleSuccessionPlanning(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'capability_mapping':
+          answer = await this.handleCapabilityMapping(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'learning_dev':
+          answer = await this.handleLearningDev(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'workforce_planning':
+          answer = await this.handleWorkforcePlanning(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'recruitment_intel':
+          answer = await this.handleRecruitmentIntel(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'people_strategy':
+          answer = await this.handlePeopleStrategy(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        case 'jd_filter':
+          answer = await this.handleJDFilter(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
+          break;
+        default:
+          answer = await this.handleGeneralHRQuery(
+            query,
+            discCandidates,
+            employeeData,
+            history,
+          );
       }
       this.logger.log(`✅ DISC processed in ${Date.now() - startTime}ms`);
       return answer;
@@ -2119,7 +2225,13 @@ RESPONSE RULES:
 
     // 4. Unified synthesis — all available sources combined
     this.logger.log(`🔗 Unified synthesis (DISC+Zenro+KB)`);
-    const answer = await this.handleUnifiedQuery(query, { discCandidates, zenroData, knowledgeBaseContext: knowledgeBaseContext || null, intent, history });
+    const answer = await this.handleUnifiedQuery(query, {
+      discCandidates,
+      zenroData,
+      knowledgeBaseContext: knowledgeBaseContext || null,
+      intent,
+      history,
+    });
     this.logger.log(`✅ Unified processed in ${Date.now() - startTime}ms`);
     return answer;
   }
@@ -2128,7 +2240,10 @@ RESPONSE RULES:
    * Silently fetch Zenro quantitative data relevant to the query.
    * Returns null if no Zenro integration or query is not HR-data-related.
    */
-  private async fetchZenroContext(query: string, corporateId: number): Promise<string | null> {
+  private async fetchZenroContext(
+    query: string,
+    corporateId: number,
+  ): Promise<string | null> {
     try {
       const configs = await this.dataSource.query(
         `SELECT tac.tenant_id FROM tenant_app_configs tac
@@ -2197,7 +2312,8 @@ RESPONSE RULES:
       );
       if (!schemaCols || schemaCols.length === 0) return null;
 
-      let currentTable = '', schemaStr = '';
+      let currentTable = '',
+        schemaStr = '';
       for (const row of schemaCols) {
         if (row.table_name !== currentTable) {
           if (currentTable) schemaStr += '\n';
@@ -2209,9 +2325,10 @@ RESPONSE RULES:
 
       const sqlRes = await this.getOpenAIClient().chat.completions.create({
         model: 'gpt-4o-mini',
-        messages: [{
-          role: 'user',
-          content: `You are a PostgreSQL expert. Write a read-only SELECT query for the Zenro HR database.
+        messages: [
+          {
+            role: 'user',
+            content: `You are a PostgreSQL expert. Write a read-only SELECT query for the Zenro HR database.
 Schema: "${schemaName}". Always prefix tables: ${schemaName}.tablename
 Return ONLY raw SQL. If the question has NO relation to HR numbers/payroll/attendance/leave/salary, return: SKIP
 
@@ -2223,14 +2340,19 @@ SCHEMA:
 ${schemaStr}
 
 QUESTION: "${query.replace(/"/g, "'")}"`,
-        }],
+          },
+        ],
         temperature: 0,
         max_tokens: 350,
       });
 
-      let sql = (sqlRes.choices[0]?.message?.content?.trim() || '');
-      sql = sql.replace(/^```sql\n?/i, '').replace(/\n?```$/i, '').trim();
-      if (sql === 'SKIP' || !sql.toLowerCase().startsWith('select')) return null;
+      let sql = sqlRes.choices[0]?.message?.content?.trim() || '';
+      sql = sql
+        .replace(/^```sql\n?/i, '')
+        .replace(/\n?```$/i, '')
+        .trim();
+      if (sql === 'SKIP' || !sql.toLowerCase().startsWith('select'))
+        return null;
 
       const rows = await this.dataSource.query(sql);
       if (!rows || rows.length === 0) return null;
@@ -2262,7 +2384,9 @@ QUESTION: "${query.replace(/"/g, "'")}"`,
     // When asking about numbers/payroll/attendance, skip DISC to save tokens
     if (ctx.discCandidates.length > 0 && !isZenroQuery) {
       const discSlice = ctx.discCandidates.slice(0, 20);
-      sections.push(`## 📊 DISC Behavioral Intelligence (${discSlice.length} of ${ctx.discCandidates.length} employees)\n${this.buildEmployeeDataStr(discSlice)}`);
+      sections.push(
+        `## 📊 DISC Behavioral Intelligence (${discSlice.length} of ${ctx.discCandidates.length} employees)\n${this.buildEmployeeDataStr(discSlice)}`,
+      );
     }
     if (ctx.zenroData) {
       sections.push(`## 📋 Zenro HR Database (Live Data)\n${ctx.zenroData}`);
@@ -2270,7 +2394,9 @@ QUESTION: "${query.replace(/"/g, "'")}"`,
     if (ctx.knowledgeBaseContext) {
       // Truncate KB context to prevent token overflow
       const kbTruncated = ctx.knowledgeBaseContext.substring(0, 3000);
-      sections.push(`## 📁 Knowledge Base (Google Drive Documents)\n${kbTruncated}`);
+      sections.push(
+        `## 📁 Knowledge Base (Google Drive Documents)\n${kbTruncated}`,
+      );
     }
     if (sections.length === 0) {
       return 'No data sources are currently available. Please ensure employees have completed their DISC assessment and/or Zenro is connected.';
@@ -2297,13 +2423,19 @@ ${sections.join('\n\n---\n\n')}`;
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: dataContext },
-        ...ctx.history.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        ...ctx.history.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
         { role: 'user', content: query },
       ],
       temperature: 0.3,
       max_tokens: 2000,
     });
-    return res.choices[0]?.message?.content || 'I could not process your request at this time.';
+    return (
+      res.choices[0]?.message?.content ||
+      'I could not process your request at this time.'
+    );
   }
 
   // ─── UC1: INDIVIDUAL EMPLOYEE INTELLIGENCE ──────────────────────────────────
@@ -2951,7 +3083,6 @@ RULES:
 
   // ─── SHARED GPT CALLER ───────────────────────────────────────────────────────
 
-  
   // ─── UC16: ZENRO TEXT-TO-SQL AI AGENT ────────────────────────────────────────────────────────
 
   private async handleZenroData(
@@ -2959,18 +3090,20 @@ RULES:
     corporateId: number,
     history: { role: 'user' | 'assistant'; content: string }[] = [],
   ): Promise<string> {
-    this.logger.log(`Executing Zenro Text-to-SQL for Corporate #${corporateId}`);
+    this.logger.log(
+      `Executing Zenro Text-to-SQL for Corporate #${corporateId}`,
+    );
     try {
       const configs = await this.dataSource.query(
         `SELECT tac.tenant_id 
          FROM tenant_app_configs tac
          JOIN master_apps ma ON tac.app_id = ma.id
          WHERE tac.tenant_id = $1 AND ma.name = 'zenro_payroll' AND tac.status = 'connected'`,
-        [corporateId]
+        [corporateId],
       );
 
       if (!configs || configs.length === 0) {
-        return "Zenro integration is not connected. Please reconnect it in Settings → App Integrations to access payroll and attendance data.";
+        return 'Zenro integration is not connected. Please reconnect it in Settings → App Integrations to access payroll and attendance data.';
       }
 
       const tenantId = configs[0].tenant_id;
@@ -3026,17 +3159,17 @@ RULES:
         'gs_state',
         'gs_unit',
       ];
-      
+
       const schemaCols = await this.dataSource.query(
         `SELECT table_name, column_name, data_type 
          FROM information_schema.columns 
          WHERE table_schema = $1 AND table_name = ANY($2)
          ORDER BY table_name, ordinal_position`,
-        [schemaName, RELEVANT_TABLES]
+        [schemaName, RELEVANT_TABLES],
       );
 
       if (!schemaCols || schemaCols.length === 0) {
-        return "Your Zenro data is currently empty or still syncing. Please check the Integrations dashboard for sync status.";
+        return 'Your Zenro data is currently empty or still syncing. Please check the Integrations dashboard for sync status.';
       }
 
       let currentTable = '';
@@ -3072,7 +3205,10 @@ USER QUESTION: "${query}"`;
       });
 
       let rawSql = sqlRes.choices[0]?.message?.content?.trim() || '';
-      rawSql = rawSql.replace(/^\s*\`\`\`[a-zA-Z]*\n?/g, '').replace(/\n?\`\`\`\s*$/g, '').trim();
+      rawSql = rawSql
+        .replace(/^\s*```[a-zA-Z]*\n?/g, '')
+        .replace(/\n?```\s*$/g, '')
+        .trim();
 
       this.logger.log(`Generated SQL for Zenro: ${rawSql}`);
 
@@ -3095,22 +3231,21 @@ ${JSON.stringify(queryResults, null, 2)}
 
       const finalRes = await this.getOpenAIClient().chat.completions.create({
         model: 'gpt-4o',
-        messages: [
-          ...history,
-          { role: 'user', content: answerPrompt }
-        ],
+        messages: [...history, { role: 'user', content: answerPrompt }],
         temperature: 0.2,
       });
 
-      return finalRes.choices[0]?.message?.content || 'I could not process the Zenro data at this time.';
-
+      return (
+        finalRes.choices[0]?.message?.content ||
+        'I could not process the Zenro data at this time.'
+      );
     } catch (err) {
       this.logger.error('Zenro Text-to-SQL Error:', err);
       return 'An error occurred while querying the Zenro database. Please ensure the integration is active and try again.';
     }
   }
 
-private async callGPT(
+  private async callGPT(
     systemPrompt: string,
     userQuery: string,
     maxTokens = 1500,

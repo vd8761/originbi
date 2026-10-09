@@ -120,7 +120,11 @@ export class IntegrationsController {
   ) {
     if (!email) throw new BadRequestException('Email is required');
     if (!body.folderId) throw new BadRequestException('Folder ID is required');
-    return this.integrationsService.saveSyncFolder(email, body.folderId, body.folderName);
+    return this.integrationsService.saveSyncFolder(
+      email,
+      body.folderId,
+      body.folderName,
+    );
   }
 
   @Get('google/folder-context')
