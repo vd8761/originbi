@@ -129,11 +129,12 @@ export class ZenroSyncService implements OnModuleInit {
 
     // 3. Discover N Tables automatically
     const [tablesRow] = await remoteDb.query('SHOW TABLES');
-    const tables = (tablesRow as any[]).map(
-      (row) => Object.values(row)[0] as string,
-    );
+    const tables = (tablesRow as any[])
+      .map((row) => Object.values(row)[0] as string)
+      .filter((t) => !t.endsWith('_log') && !t.includes('api_log'));
+
     this.logger.log(
-      `📋 Discovered ${tables.length} tables. Mirroring to PostgreSQL schema: ${tempSchemaName}`,
+      `📋 Discovered ${tables.length} tables (ignored massive logs). Mirroring to PostgreSQL schema: ${tempSchemaName}`,
     );
 
     // 4. Safely map MySQL types to Postgres types
