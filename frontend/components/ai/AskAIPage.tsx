@@ -550,20 +550,17 @@ export default function AskAIPage() {
       apiPrompt += attachmentContext;
     }
 
+    // Always silently fetch Knowledge Base context — backend unified engine decides relevance
+    let knowledgeBaseContext: string | undefined;
     try {
-      const url = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/folder-context?email=${encodeURIComponent(email)}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      
-      if (data.success && data.content) {
-        apiPrompt += `\n\n[User is querying their synced Knowledge Base (Google Drive Folder). Use the following synced documents to accurately answer their question. If the answer is not in these documents, say so.]\n\n${data.content}`;
-      } else if (basePrompt.includes('@KnowledgeBase')) {
-        apiPrompt += `\n\n[System Note: The Knowledge Base is empty or not properly synced.]`;
+      const kbUrl = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/folder-context?email=${encodeURIComponent(email)}`;
+      const kbRes = await fetch(kbUrl);
+      const kbData = await kbRes.json();
+      if (kbData.success && kbData.content && kbData.content.trim().length > 0) {
+        knowledgeBaseContext = kbData.content;
       }
     } catch {
-      if (basePrompt.includes('@KnowledgeBase')) {
-        apiPrompt += `\n\n[System Note: Failed to fetch Knowledge Base context.]`;
-      }
+      // KB fetch failed silently — backend will still use DISC + Zenro
     }
 
     if (!apiPrompt) {
@@ -581,7 +578,7 @@ export default function AskAIPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-user-id': email, 'x-user-role': 'CORPORATE', 'x-auth-token': authToken },
-        body: JSON.stringify({ prompt: apiPrompt, displayPrompt: uiPrompt, sessionId: activeSessionId, userRole: 'CORPORATE', messages: updatedAPI.slice(-8) }),
+        body: JSON.stringify({ prompt: apiPrompt, displayPrompt: uiPrompt, sessionId: activeSessionId, userRole: 'CORPORATE', messages: updatedAPI.slice(-8), knowledgeBaseContext }),
       });
       const data = await res.json();
       const reply = data.reply || 'Sorry, I could not process that.';
@@ -1017,6 +1014,23 @@ export default function AskAIPage() {
                         <div>
                           <p className="text-[13px] font-medium text-[#111827] dark:text-white">Knowledge Base</p>
                           <p className="text-[11px] text-[#6b7280] dark:text-[#9ca3af]">Google Drive Folder Sync</p>
+                        </div>
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const lastAt = input.lastIndexOf('@');
+                          setInput(input.substring(0, lastAt) + '@Zenro_DB ');
+                          setShowMentionMenu(false);
+                          if (inputRef.current) inputRef.current.focus();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-3 hover:bg-[#f3f4f6] dark:hover:bg-[#3d3d3d] transition-colors text-left border-t border-[#e5e7eb] dark:border-[#3d3d3d]"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                          <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2 1.5 3 4 3h8c2.5 0 4-1 4-3V7M4 7c0-2 1.5-3 4-3h8c2.5 0 4 1 4 3M4 7l8 4 8-4M4 12l8 4 8-4" /></svg>
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-medium text-[#111827] dark:text-white">Zenro DB</p>
+                          <p className="text-[11px] text-[#6b7280] dark:text-[#9ca3af]">Text-to-SQL Engine</p>
                         </div>
                       </button>
                     </div>

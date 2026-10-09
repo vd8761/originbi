@@ -9,6 +9,7 @@ import { CorporateIntegration } from '../entities/corporate-integration.entity';
 import { IntegrationsController } from './integrations.controller';
 import { IntegrationsService } from './integrations.service';
 import { GoogleStrategy } from './strategies/google.strategy';
+import { ZenroSyncService } from './zenro-sync.service';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
     ]),
   ],
   controllers: [IntegrationsController],
-  providers: [IntegrationsService, GoogleStrategy],
+  providers: [IntegrationsService, GoogleStrategy, ZenroSyncService],
   exports: [IntegrationsService],
 })
 export class IntegrationsModule {}

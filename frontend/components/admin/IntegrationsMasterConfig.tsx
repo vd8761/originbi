@@ -101,6 +101,7 @@ export default function IntegrationsMasterConfig() {
 
   const getAppIconUrl = (name: string) => {
     // Custom overrides for icons that Google Favicons API fails to fetch correctly
+    if (name === 'zenro_payroll') return '/logos/zenrofavicon.png?v=2';
     if (name === 'google_drive') return 'https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg';
     
     const map: Record<string, string> = {

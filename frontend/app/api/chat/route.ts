@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const userId = req.headers.get('x-user-id') || 'test-user-id';
     const body = await req.json();
-    const { messages, sessionId, prompt, displayPrompt, userRole, interviewMode, jdText, transcripts, noSession } = body;
+    const { messages, sessionId, prompt, displayPrompt, userRole, interviewMode, jdText, transcripts, noSession, knowledgeBaseContext } = body;
     const role = (userRole || req.headers.get('x-user-role') || 'STUDENT') as UserRole;
     const authToken = req.headers.get('x-auth-token') || '';
     const authHeader: Record<string, string> = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
@@ -64,6 +64,9 @@ export async function POST(req: NextRequest) {
           requestBody.transcripts = transcripts;
         } else {
           requestBody.message = prompt;
+          if (knowledgeBaseContext) {
+            requestBody.knowledgeBaseContext = knowledgeBaseContext;
+          }
         }
 
         const res = await fetch(`${corpApiBase}/jd-matching/chat`, {
