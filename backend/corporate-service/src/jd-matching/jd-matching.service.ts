@@ -2373,6 +2373,7 @@ CRITICAL RULES:
 7. If the query contains pronouns (e.g., "this employee", "him", "her") or is a continuation (e.g. "Yes"), use the CONVERSATION HISTORY below to identify the specific employees being discussed. If multiple employees were listed in the previous response, you MUST construct your SQL query to fetch data for ALL of them (e.g., using IN ('Name1', 'Name2') or multiple ILIKE conditions).
 8. If the user asks for a "list of employees" grouped by a category, you MUST select their actual names (e.g., "emp_name"). Do NOT just return a COUNT() unless the user explicitly asks for "how many" or "the count".
 9. For "active" employees, you MUST filter by both "deleted" = 0 AND "emp_status" IN (1, 2, 3). The status mapping is: 1=New Joined, 2=Regular/Provisional, 3=Regular/Confirmed, 4=Suspension, 5=Long Absent, 6=Resigned, 7=Terminated.
+10. IF asking about shifts, working hours, or rosters, you MUST query "gs_shift_details" or "gs_shift_schedule", and JOIN with "gs_employee" if needed. If no daily override exists, look for a default shift_id in "gs_employee" and JOIN it. Make sure to select the actual shift start/end times.
 10. If querying historical data (like salaries, allowances, or attendance) without a specific date, you MUST include the relevant date/month columns in the SELECT clause so the results have context. If the user specifically asks for the "current" value, ORDER BY the date DESC and LIMIT 1.
 
 SCHEMA:
