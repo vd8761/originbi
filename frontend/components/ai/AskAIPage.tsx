@@ -551,17 +551,8 @@ export default function AskAIPage() {
     }
 
     // Always silently fetch Knowledge Base context — backend unified engine decides relevance
+    // Now handled in the backend simultaneously with Zenro to eliminate lag.
     let knowledgeBaseContext: string | undefined;
-    try {
-      const kbUrl = `${process.env.NEXT_PUBLIC_CORPORATE_API_URL || 'http://localhost:4003'}/corporate/integrations/google/folder-context?email=${encodeURIComponent(email)}`;
-      const kbRes = await fetch(kbUrl);
-      const kbData = await kbRes.json();
-      if (kbData.success && kbData.content && kbData.content.trim().length > 0) {
-        knowledgeBaseContext = kbData.content;
-      }
-    } catch {
-      // KB fetch failed silently — backend will still use DISC + Zenro
-    }
 
     if (!apiPrompt) {
       setLoading(false);

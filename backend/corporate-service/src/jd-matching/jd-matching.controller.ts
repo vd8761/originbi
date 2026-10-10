@@ -159,6 +159,7 @@ export class JDMatchingController {
         corporateId,
         dto.message,
         dto.history || [],
+        dto.email,
         dto.knowledgeBaseContext,
       );
 

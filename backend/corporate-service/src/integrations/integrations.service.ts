@@ -586,10 +586,10 @@ export class IntegrationsService {
     const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
     try {
-      // Find up to 15 latest files inside the synced folder
+      // Find up to 100 latest files inside the synced folder
       const response = await drive.files.list({
         q: `'${folderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
-        pageSize: 15,
+        pageSize: 100,
         orderBy: 'modifiedTime desc',
         fields: 'files(id, name, mimeType)',
       });

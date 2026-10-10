@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import OpenAI from 'openai';
+import { IntegrationsService } from '../integrations/integrations.service';
 
 /**
  * ╔═══════════════════════════════════════════════════════════════════════════════╗
@@ -369,7 +369,10 @@ export class CorporateJDMatchingService {
   private readonly logger = new Logger('Corporate-JD-MatchEngine');
   private openaiClient: OpenAI | null = null;
 
-  constructor(private dataSource: DataSource) {
+  constructor(
+    private dataSource: DataSource,
+    private integrationsService: IntegrationsService,
+  ) {
     this.logger.log('🎯 Corporate JD Matching Engine v2.0 initialized');
   }
 
@@ -2064,7 +2067,8 @@ RESPONSE RULES:
     corporateId: number,
     query: string,
     history: { role: 'user' | 'assistant'; content: string }[] = [],
-    knowledgeBaseContext?: string,
+    userEmail?: string,
+    frontendKbContext?: string,
   ): Promise<string> {
     const startTime = Date.now();
     this.logger.log(`🧠 UNIFIED HR BRAIN - Corporate #${corporateId}`);
@@ -2081,15 +2085,28 @@ RESPONSE RULES:
     const intent = await this.classifyIntent(cleanQuery);
     this.logger.log(`🎯 Intent: ${intent}`);
 
-    const [candidatesResult, zenroResult] = await Promise.allSettled([
+    const promises: any[] = [
       this.fetchCorporateCandidates(corporateId),
       this.fetchZenroContext(cleanQuery, corporateId, history),
-    ]);
+    ];
+    if (userEmail) {
+      promises.push(this.integrationsService.getFolderContext(userEmail));
+    } else {
+      promises.push(Promise.resolve(null));
+    }
+
+    const [candidatesResult, zenroResult, kbResult] = await Promise.allSettled(promises);
 
     const discCandidates =
       candidatesResult.status === 'fulfilled' ? candidatesResult.value : [];
     const zenroData =
       zenroResult.status === 'fulfilled' ? zenroResult.value : null;
+    
+    let knowledgeBaseContext = frontendKbContext || '';
+    if (kbResult.status === 'fulfilled' && kbResult.value && kbResult.value.success) {
+      knowledgeBaseContext += (knowledgeBaseContext ? '\n' : '') + kbResult.value.content;
+    }
+
     const hasDisc = discCandidates.length > 0;
     const hasZenro = !!(zenroData && zenroData.trim().length > 0);
     const hasKB = !!(
@@ -2446,8 +2463,9 @@ CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
 You are a comprehensive HR Intelligence AI with access to multiple integrated data sources. Answer the user's question by synthesizing ALL available data.
 
 RULES:
-- When multiple data sources (connectors) are provided, you MUST analyze both the Zenro HR Database and the Knowledge Base independently.
-- Clearly separate and attribute your findings to the respective connector (e.g., "According to the Zenro HR Database..." and "Based on the Knowledge Base...").
+- CRITICAL: You MUST ALWAYS consult BOTH the Zenro HR Database and the Knowledge Base independently.
+- CRITICAL: If both sources contain relevant information, you MUST provide BOTH results clearly separated (e.g., "According to the Zenro HR Database..." and "Based on the Knowledge Base...").
+- CRITICAL: Do NOT skip one source just because the other has an answer. Present BOTH.
 - If one connector has matching data but the other does not, provide the matched data and explicitly mention that the other connector yielded no matching data (e.g., "The Knowledge Base outlines the policy for late check-ins, but the Zenro database shows no actual late records for the IT department last month.").
 - For real-time employee metrics (payroll, attendance numbers, leave balances), rely on Zenro HR Database.
 - For company policies, operating procedures, and guidelines, rely on the Knowledge Base.
