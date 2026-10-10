@@ -558,6 +558,7 @@ export class IntegrationsService {
   ): Promise<{ success: boolean; content: string }> {
     const account = await this.corporateAccountRepo.findOne({
       where: { user: { email } },
+      relations: ['user'],
     });
     if (!account) throw new NotFoundException('Corporate account not found');
 

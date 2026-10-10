@@ -2449,8 +2449,8 @@ CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
       sections.push(`## 📋 Zenro HR Database (Live Data)\n${ctx.zenroData}`);
     }
     if (ctx.knowledgeBaseContext) {
-      // Truncate KB context to prevent token overflow
-      const kbTruncated = ctx.knowledgeBaseContext.substring(0, 3000);
+      // Truncate KB context to prevent token overflow, but allow enough for multiple files
+      const kbTruncated = ctx.knowledgeBaseContext.substring(0, 100000);
       sections.push(
         `## 📁 Knowledge Base (Google Drive Documents)\n${kbTruncated}`,
       );
@@ -2472,7 +2472,7 @@ RULES:
 - For company policies, operating procedures, and guidelines, rely on the Knowledge Base.
 - CRITICAL: Do NOT present mock examples from Knowledge Base policy documents as real live data. Distinguish between a stated policy and actual live employee records.
 - CRITICAL: NEVER invent, guess, or hallucinate data (names, salaries, dates). 
-- CRITICAL: If the Zenro Database returns no data for a specific person or metric (e.g. no loan records, no late check-ins, no break times), DO NOT say "there are no records available" or "the data is missing". You must assume the value is simply ZERO or the event did not happen. Confidently state the answer as a fact (e.g., "Ariyappan did not take any break time yesterday", or "Ariyappan currently has zero pending loan instalments"). DO NOT suggest that the system needs to be fixed or updated.
+- CRITICAL: If the Zenro Database returns no data for a specific person or metric (e.g. no loan records, no late check-ins), assume the value is ZERO or the event did not happen. HOWEVER, if an employee has no check-in/out data for a specific day, actively check if the data indicates it is a Week Off (WW), weekend, or Holiday. Always provide this additional context (e.g., "Mohanraaj did not check in today, but note that today is marked as a Week Off / Holiday").
 - If the user asks about a month (e.g. "September") without specifying a year, and the provided Zenro data contains records spanning multiple different years for that month, provide the data for the most recent year and politely ask the user to clarify if they meant a different year.
 - End with: "**Sources:** [list which sources you used]"`;
 
