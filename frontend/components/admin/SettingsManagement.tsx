@@ -594,7 +594,9 @@ export default function SettingsManagement() {
                 <div className="relative">
                     <input
                         id={item.key}
+                        name={item.key}
                         type={inputType}
+                        autoComplete={isSensitiveTextField ? "new-password" : "off"}
                         disabled={item.isReadonly}
                         value={item.value || ''}
                         onChange={(e) => {
@@ -1046,12 +1048,18 @@ export default function SettingsManagement() {
                             <SearchIcon className="w-4 h-4" />
                         </span>
                         <input
-                            type="text"
+                            type="search"
+                            name="search_settings_query"
+                            id="settings-search-input"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            data-lpignore="true"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search settings"
                             aria-label="Search settings"
-                            className="block w-full rounded-xl border-0 py-2.5 pl-10 pr-9 bg-white/70 dark:bg-white/5 text-sm text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green transition-all"
+                            className="block w-full rounded-xl border-0 py-2.5 pl-10 pr-9 bg-white/70 dark:bg-white/5 text-sm text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-brand-green transition-all [&::-webkit-search-cancel-button]:hidden"
                         />
                         {search && (
                             <button
