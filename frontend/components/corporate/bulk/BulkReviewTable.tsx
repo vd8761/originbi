@@ -212,7 +212,7 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                 </div>
             )}
 
-            <div className="flex justify-end gap-4 pt-4">
+            <div className="flex justify-end gap-4 pt-4 sm:pr-36">
                 <button onClick={onCancel} className="px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5">Back</button>
                 <button
                     onClick={handleRegister}
