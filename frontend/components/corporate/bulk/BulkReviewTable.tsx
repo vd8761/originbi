@@ -61,7 +61,11 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                         <th className="px-4 py-3">Email</th>
                         <th className="px-4 py-3">Mobile</th>
                         <th className="px-4 py-3">Program</th>
+                        <th className="px-4 py-3">Board</th>
+                        <th className="px-4 py-3">School Level</th>
+                        <th className="px-4 py-3">Stream</th>
                         <th className="px-4 py-3">Dept</th>
+                        <th className="px-4 py-3">Degree</th>
                         <th className="px-4 py-3">Year</th>
                         <th className="px-4 py-3">Current Role</th>
                         <th className="px-4 py-3">Role Description</th>
@@ -75,6 +79,10 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                 <tbody className="divide-y divide-gray-200 dark:divide-[#FFFFFF0D]">
                     {rows.map((row, idx) => {
                         const hasError = row.status === 'INVALID' || row.errorMessage;
+                        const programVal = row.rawData['ProgramId'] || row.rawData['program_code'] || '';
+                        const isCollege = String(programVal).toUpperCase().includes('COLLEGE');
+                        const isSchool = String(programVal).toUpperCase().includes('SCHOOL');
+
                         return (
                             <React.Fragment key={idx}>
                                 <tr className={`hover:bg-gray-50 dark:hover:bg-[#FFFFFF05] ${hasError ? 'bg-red-500/5' : ''}`}>
@@ -86,7 +94,21 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                                         {renderCell(row, ['CountryCode', 'country_code'], (val) => String(val).startsWith('+') ? val : '+' + val)} {renderCell(row, ['Mobile', 'mobile', 'mobile_number'])}
                                     </td>
                                     <td className="px-4 py-3">{renderCell(row, ['ProgramId', 'program_code'])}</td>
-                                    <td className="px-4 py-3">{renderCell(row, ['Department', 'department', 'Stream'])}</td>
+                                    <td className="px-4 py-3">
+                                        {isSchool ? renderCell(row, ['StudentBoard', 'student_board', 'board']) : '-'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {isSchool ? renderCell(row, ['SchoolLevel', 'school_level']) : '-'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {isSchool ? renderCell(row, ['SchoolStream', 'school_stream']) : '-'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {isCollege ? renderCell(row, ['Department', 'department', 'Stream', 'DepartmentId']) : '-'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {isCollege ? renderCell(row, ['Degree', 'degree', 'degree_name', 'DegreeId']) : '-'}
+                                    </td>
                                     <td className="px-4 py-3">{renderCell(row, ['CurrentYear', 'current_year', 'Year'])}</td>
                                     <td className="px-4 py-3">
                                         {renderCell(row, ['CurrentRole', 'current_role', 'currentRole', 'Current Role'])}
@@ -106,7 +128,7 @@ export const BulkReviewTable: React.FC<BulkReviewTableProps> = ({ validRows, inv
                                 </tr>
                                 {hasError && (
                                     <tr>
-                                        <td colSpan={15} className="px-4 py-2 bg-red-500/10 border-b border-red-500/20">
+                                        <td colSpan={19} className="px-4 py-2 bg-red-500/10 border-b border-red-500/20">
                                             <div className="flex items-center gap-2 text-red-500 text-sm font-medium">
                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

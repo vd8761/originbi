@@ -10,23 +10,27 @@ import { registrationService, CreateRegistrationDto } from '../../lib/services/r
 import { BulkUploadModal } from '../ui/BulkUploadModal';
 import { Department } from "../../lib/types";
 import { normalizeDepartmentDisplayName } from '../../lib/utils';
+import { getEnabledBoards } from '../../lib/constants';
 import { useEffect } from "react";
 
 interface AddRegistrationFormProps {
   onCancel: () => void;
   onRegister: () => void;
+  onBulkClick?: () => void;
 }
 
-// Hardcoded programs for Corporate
+// Programs for Corporate
 const CORPORATE_PROGRAMS = [
   { label: "Employee", value: "Employee" },
   { label: "CXO General", value: "CXO General" },
   { label: "College Students", value: "College Students" },
+  { label: "School Students", value: "School Students" },
 ];
 
 const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
   onCancel,
   onRegister,
+  onBulkClick,
 }) => {
   // --- State ---
   const [formData, setFormData] = useState<CreateRegistrationDto>({
@@ -55,6 +59,34 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
 
   const isEmployeeProgram =
     String(formData.program_id || "").trim().toUpperCase() === "EMPLOYEE";
+
+  const isSchoolProgram =
+    formData.program_id === "School Students" ||
+    formData.program_id === "School" ||
+    formData.program_id === "SCHOOL_STUDENT";
+
+  // Static Options for School Students
+  const schoolLevels = [
+    { value: "SSLC", label: "SSLC" },
+    { value: "HSC", label: "HSC" },
+    { value: "GCSE", label: "GCSE" },
+  ];
+
+  const filteredSchoolLevels =
+    formData.student_board === "IGCSE"
+      ? schoolLevels.filter((l) => l.value === "GCSE")
+      : schoolLevels.filter((l) => l.value !== "GCSE");
+
+  const schoolStreams = [
+    { value: "PCMB", label: "PCMB (Physics, Chemistry, Maths, Biology)" },
+    { value: "PCB", label: "PCB (Physics, Chemistry, Biology)" },
+    { value: "PCM", label: "PCM (Physics, Chemistry, Mathematics)" },
+    { value: "PCBZ", label: "PCBZ (Physics, Chemistry, Botany, Zoology)" },
+    { value: "COMMERCE", label: "COMMERCE (Commerce Stream)" },
+    { value: "HUMANITIES", label: "HUMANITIES (Humanities / Arts Stream)" },
+  ];
+
+  const boardOptions = getEnabledBoards();
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +164,15 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       if (!formData.current_year) errors.current_year = "Required";
     }
 
+    if (isSchoolProgram) {
+      if (!formData.student_board) errors.student_board = "Required";
+      if (!formData.school_level) errors.school_level = "Required";
+      if (formData.school_level === "HSC") {
+        if (!formData.school_stream) errors.school_stream = "Required";
+        if (!formData.current_year) errors.current_year = "Required";
+      }
+    }
+
     if (isEmployeeProgram) {
       if (!formData.current_role?.trim()) errors.current_role = "Required";
       if (!formData.role_description?.trim())
@@ -186,6 +227,9 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         departmentId: formData.department_id,
         degreeId: formData.degree_id,
         currentYear: formData.current_year,
+        studentBoard: isSchoolProgram ? formData.student_board : undefined,
+        schoolLevel: isSchoolProgram ? formData.school_level : undefined,
+        schoolStream: isSchoolProgram ? formData.school_stream : undefined,
         currentRole: formData.current_role,
         roleDescription: formData.role_description,
         // Only the Employee program uses the difficulty level.
@@ -254,7 +298,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setIsBulkModalOpen(true)}
+            onClick={() => onBulkClick ? onBulkClick() : setIsBulkModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-brand-light-tertiary dark:bg-[#1A3A2C] border border-transparent dark:border-[#1A3A2C] rounded-lg text-sm font-medium text-brand-text-light-primary dark:text-white hover:opacity-90 transition-opacity"
           >
             <span>Bulk Registration</span>
@@ -407,6 +451,12 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                   handleInputChange("current_role", "");
                   handleInputChange("role_description", "");
                   handleInputChange("employee_level", "Entry");
+                  handleInputChange("student_board", "");
+                  handleInputChange("school_level", "");
+                  handleInputChange("school_stream", "");
+                  handleInputChange("department_id", "");
+                  handleInputChange("degree_id", "");
+                  handleInputChange("current_year", "");
                 }}
                 onOpenChange={(isOpen) => handleOpenStatus("program", isOpen)}
                 placeholder="Choose Program Type"
@@ -417,6 +467,116 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
                 </p>
               )}
             </div>
+
+            {/* School Specific Fields */}
+            {isSchoolProgram && (
+              <>
+                {/* Student Board */}
+                <div
+                  className={`relative ${getZIndex("board")}`}
+                  onMouseEnter={() => setActiveField("board")}
+                  onMouseLeave={() => setActiveField(null)}
+                >
+                  <CustomSelect
+                    label="Board"
+                    required
+                    options={boardOptions}
+                    value={formData.student_board || ""}
+                    onChange={(val) => {
+                      handleInputChange("student_board", val);
+                      handleInputChange("school_level", "");
+                      handleInputChange("school_stream", "");
+                      handleInputChange("current_year", "");
+                    }}
+                    onOpenChange={(isOpen) => handleOpenStatus("board", isOpen)}
+                    placeholder="Select Board"
+                  />
+                  {formErrors.student_board && (
+                    <p className="text-xs text-red-500 ml-1 mt-1">
+                      {formErrors.student_board}
+                    </p>
+                  )}
+                </div>
+
+                {/* School Level */}
+                <div
+                  className={`relative ${getZIndex("schoolLevel")}`}
+                  onMouseEnter={() => setActiveField("schoolLevel")}
+                  onMouseLeave={() => setActiveField(null)}
+                >
+                  <CustomSelect
+                    label="School Level"
+                    required
+                    options={filteredSchoolLevels}
+                    value={formData.school_level || ""}
+                    onChange={(val) => {
+                      handleInputChange("school_level", val);
+                      handleInputChange("school_stream", "");
+                      handleInputChange("current_year", "");
+                    }}
+                    onOpenChange={(isOpen) => handleOpenStatus("schoolLevel", isOpen)}
+                    placeholder="Select Level"
+                  />
+                  {formErrors.school_level && (
+                    <p className="text-xs text-red-500 ml-1 mt-1">
+                      {formErrors.school_level}
+                    </p>
+                  )}
+                </div>
+
+                {/* Stream (HSC only) */}
+                {formData.school_level === "HSC" && (
+                  <div
+                    className={`relative ${getZIndex("stream")}`}
+                    onMouseEnter={() => setActiveField("stream")}
+                    onMouseLeave={() => setActiveField(null)}
+                  >
+                    <CustomSelect
+                      label="Stream"
+                      required
+                      options={schoolStreams}
+                      value={formData.school_stream || ""}
+                      onChange={(val) => handleInputChange("school_stream", val)}
+                      onOpenChange={(isOpen) => handleOpenStatus("stream", isOpen)}
+                      placeholder="Select Stream"
+                    />
+                    {formErrors.school_stream && (
+                      <p className="text-xs text-red-500 ml-1 mt-1">
+                        {formErrors.school_stream}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Current Level (HSC only) */}
+                {formData.school_level === "HSC" && (
+                  <div className="space-y-2 animate-fade-in relative z-0">
+                    <label className={baseLabelClasses}>
+                      Current Level <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={2}
+                      value={formData.current_year || ""}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "current_year",
+                          e.target.value.replace(/\D/g, "")
+                        )
+                      }
+                      placeholder="1 or 2"
+                      className={`${baseInputClasses} ${formErrors.current_year ? "border-red-500/50" : ""}`}
+                    />
+                    {formErrors.current_year && (
+                      <p className="text-xs text-red-500 ml-1 mt-1">
+                        {formErrors.current_year}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
 
 
 

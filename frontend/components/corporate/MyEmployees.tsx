@@ -574,6 +574,7 @@ const MyEmployeesContent: React.FC = () => {
                     setView("list");
                     fetchData();
                 }}
+                onBulkClick={() => setView("bulk")}
             />
         );
     }
