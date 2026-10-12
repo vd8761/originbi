@@ -292,6 +292,30 @@ const EmployeePreview: React.FC<EmployeePreviewProps> = ({ registration, onBack,
                                 </div>
                             </>
                         )}
+                        {registration.program_code === 'SCHOOL_STUDENT' && (
+                            <>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Board</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.student_board || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">School Level</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.school_level || 'N/A'}</p>
+                                </div>
+                                {registration.school_stream && (
+                                    <div>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Stream</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.school_stream}</p>
+                                    </div>
+                                )}
+                                {registration.current_year && (
+                                    <div>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Current Level</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{registration.current_year}</p>
+                                    </div>
+                                )}
+                            </>
+                        )}
                         {registration.program_code === 'EMPLOYEE' && (
                             <div>
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Role Type</p>

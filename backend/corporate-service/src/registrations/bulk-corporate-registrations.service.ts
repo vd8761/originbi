@@ -1148,8 +1148,10 @@ export class BulkCorporateRegistrationsService {
       }
     }
 
-    isCollege = pCode && pCode.toUpperCase().includes('COLLEGE');
-    isSchool = pCode && pCode.toUpperCase().includes('SCHOOL');
+    isCollege =
+      isCollege || (!!pCode && pCode.toUpperCase().includes('COLLEGE'));
+    isSchool =
+      isSchool || (!!pCode && pCode.toUpperCase().includes('SCHOOL'));
     const isEmployee = !!pCode && !isCollege && !isSchool;
 
     // Resolve DepartmentDegreeId
@@ -1218,7 +1220,8 @@ export class BulkCorporateRegistrationsService {
 
       departmentId: departmentDegreeId ? String(departmentDegreeId) : undefined, // Corporate frontend dto expects departmentId as string which maps to departmentDegreeId in backend
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
-      currentYear: isCollege ? String(currentYear) : undefined,
+      currentYear:
+        (isCollege || isSchool) && currentYear ? String(currentYear) : undefined,
       currentRole:
         this.getValue(rawData, [
           'CurrentRole',
@@ -1400,8 +1403,8 @@ export class BulkCorporateRegistrationsService {
         ''
       ).toUpperCase();
       if (!level) return 'School Level is required for School Students';
-      if (!['SSLC', 'HSC'].includes(level))
-        return 'School Level valid values are SSLC, HSC';
+      if (!['SSLC', 'HSC', 'GCSE'].includes(level))
+        return 'School Level valid values are SSLC, HSC, GCSE';
 
       if (level === 'HSC') {
         const stream = (

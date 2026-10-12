@@ -237,6 +237,10 @@ export const corporateRegistrationService = {
         currentYear?: string;
         currentRole?: string;
         roleDescription?: string;
+        studentBoard?: string;
+        schoolLevel?: string;
+        schoolStream?: string;
+        employeeLevel?: string;
     }, userId: string): Promise<any> {
         const token = AuthService.getToken();
         const CORP_API = process.env.NEXT_PUBLIC_CORPORATE_API_URL;

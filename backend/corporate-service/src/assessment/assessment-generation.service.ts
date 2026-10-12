@@ -127,19 +127,17 @@ export class AssessmentGenerationService {
   }
 
   /**
-   * Resolves the Employee difficulty level (Entry/Medium/Executive) stored on
-   * the registration. Returns null for non-employee registrations (no board
-   * filtering), so other programs keep their existing behaviour.
+   * Resolves the board/difficulty filter stored on the registration.
+   * - For School students: returns the student's exam board (e.g. CBSE, STATE_BOARD, IGCSE).
+   * - For Employee registrations: returns the Employee difficulty level (Entry/Medium/Executive).
+   * - Other programs: returns null.
    */
-  private async resolveEmployeeLevel(
+  private async resolveBoardFilter(
     manager: EntityManager,
     attempt: AssessmentAttempt,
   ): Promise<string | null> {
     if (!attempt.registrationId) return null;
 
-    // Only the Employee program uses the board column for difficulty level.
-    // Other programs (College/CXO/...) must ignore employeeLevel even if it was
-    // sent on the registration, otherwise the board filter finds no questions.
     const program = await manager.findOne(Program, {
       where: { id: attempt.programId },
     });
@@ -148,13 +146,31 @@ export class AssessmentGenerationService {
       String(program?.name || '')
         .trim()
         .toUpperCase() === 'EMPLOYEE';
-    if (!isEmployee) return null;
+    const isSchool =
+      program?.code === 'SCHOOL_STUDENT' ||
+      String(program?.name || '')
+        .trim()
+        .toUpperCase()
+        .includes('SCHOOL');
 
     const registration = await manager.findOne(Registration, {
       where: { id: attempt.registrationId },
     });
-    const level = registration?.metadata?.employeeLevel;
-    return level ? String(level).trim() : null;
+
+    if (isSchool) {
+      const board =
+        registration?.studentBoard ||
+        registration?.metadata?.studentBoard ||
+        null;
+      return board ? String(board).trim() : null;
+    }
+
+    if (isEmployee) {
+      const level = registration?.metadata?.employeeLevel;
+      return level ? String(level).trim() : null;
+    }
+
+    return null;
   }
 
   /**
@@ -200,18 +216,19 @@ export class AssessmentGenerationService {
   /**
    * Selects the main (DISC) questions for an attempt, applying:
    *  - the Program + Level filter (always),
-   *  - the Employee difficulty level filter via the `board` column (when set),
+   *  - the Board filter (School board or Employee difficulty level, when set),
    *  - the admin-configured per-program generation mode.
    */
   private async selectMainQuestions(
     manager: EntityManager,
     attempt: AssessmentAttempt,
   ): Promise<AssessmentQuestion[]> {
-    const boardLevel = await this.resolveEmployeeLevel(manager, attempt);
+    let boardLevel = await this.resolveBoardFilter(manager, attempt);
     const config = await this.getGenerationConfig(manager, attempt.programId);
 
     const applyBaseFilters = (
       qb: SelectQueryBuilder<AssessmentQuestion>,
+      filterBoard: string | null = boardLevel,
     ): SelectQueryBuilder<AssessmentQuestion> => {
       qb.where('q.program_id = :programId', { programId: attempt.programId })
         .andWhere('q.assessment_level_id = :levelId', {
@@ -219,30 +236,58 @@ export class AssessmentGenerationService {
         })
         .andWhere('q.is_active = true')
         .andWhere('q.is_deleted = false');
-      if (boardLevel) {
-        qb.andWhere('q.board = :board', { board: boardLevel });
+      if (filterBoard) {
+        qb.andWhere('q.board = :board', { board: filterBoard });
       }
       return qb;
     };
 
     // random_all_sets: ignore set boundaries entirely.
     if (config.mode === 'random_all_sets') {
-      const rows = await applyBaseFilters(
+      let rows = await applyBaseFilters(
         manager.createQueryBuilder(AssessmentQuestion, 'q'),
       )
         .orderBy('RANDOM()')
         .limit(config.count)
         .getMany();
+
+      if ((!rows || rows.length === 0) && boardLevel) {
+        this.logger.warn(
+          `No questions found with board=${boardLevel}, falling back without board filter.`,
+        );
+        boardLevel = null;
+        rows = await applyBaseFilters(
+          manager.createQueryBuilder(AssessmentQuestion, 'q'),
+          null,
+        )
+          .orderBy('RANDOM()')
+          .limit(config.count)
+          .getMany();
+      }
+
       this.ensureQuestionsFound(rows, attempt, boardLevel, null);
       return rows;
     }
 
     // set-based modes: find the available sets first, then pick one at random.
-    const setsResult = await applyBaseFilters(
+    let setsResult = await applyBaseFilters(
       manager
         .createQueryBuilder(AssessmentQuestion, 'q')
         .select('DISTINCT q.set_number', 'setNumber'),
     ).getRawMany<{ setNumber: number }>();
+
+    if ((!setsResult || setsResult.length === 0) && boardLevel) {
+      this.logger.warn(
+        `No sets found with board=${boardLevel}, falling back to any available sets.`,
+      );
+      boardLevel = null;
+      setsResult = await applyBaseFilters(
+        manager
+          .createQueryBuilder(AssessmentQuestion, 'q')
+          .select('DISTINCT q.set_number', 'setNumber'),
+        null,
+      ).getRawMany<{ setNumber: number }>();
+    }
 
     if (!setsResult || setsResult.length === 0) {
       this.ensureQuestionsFound([], attempt, boardLevel, null);

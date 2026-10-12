@@ -327,6 +327,9 @@ export class CorporateRegistrationsService {
           departmentDegreeId: dto.departmentId
             ? Number(dto.departmentId)
             : null,
+          schoolLevel: dto.schoolLevel || null,
+          schoolStream: dto.schoolStream || null,
+          studentBoard: dto.studentBoard || null,
           metadata: {
             programType: dto.programType,
             groupName: dto.groupName,
@@ -335,6 +338,9 @@ export class CorporateRegistrationsService {
             currentRole,
             roleDescription,
             employeeLevel: dto.employeeLevel,
+            schoolLevel: dto.schoolLevel || null,
+            schoolStream: dto.schoolStream || null,
+            studentBoard: dto.studentBoard || null,
           },
         });
         await manager.save(registration);
@@ -602,6 +608,9 @@ export class CorporateRegistrationsService {
           departmentDegreeId: dto.departmentId
             ? Number(dto.departmentId)
             : null,
+          schoolLevel: dto.schoolLevel || null,
+          schoolStream: dto.schoolStream || null,
+          studentBoard: dto.studentBoard || null,
           metadata: {
             programType: dto.programType,
             groupName: dto.groupName,
@@ -610,6 +619,9 @@ export class CorporateRegistrationsService {
             currentRole,
             roleDescription,
             employeeLevel: dto.employeeLevel,
+            schoolLevel: dto.schoolLevel || null,
+            schoolStream: dto.schoolStream || null,
+            studentBoard: dto.studentBoard || null,
           },
         });
         await manager.save(registration);
@@ -947,6 +959,16 @@ export class CorporateRegistrationsService {
     } else if (normInput === 'collegestudents') {
       program = allPrograms.find(
         (p) => this.normalizeString(p.name) === 'collegestudent',
+      );
+    } else if (
+      normInput === 'school' ||
+      normInput === 'schoolstudent' ||
+      normInput === 'schoolstudents'
+    ) {
+      program = allPrograms.find(
+        (p) =>
+          this.normalizeString(p.name).includes('school') ||
+          (p.code && this.normalizeString(p.code).includes('school')),
       );
     }
 

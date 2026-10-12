@@ -248,7 +248,7 @@ export default function SettingsManagement() {
     const [departmentDegreeOptions, setDepartmentDegreeOptions] = useState<SelectOption[]>([]);
     const [iatModuleOptions, setIatModuleOptions] = useState<SelectOption[]>([]);
     const [iatOptionsLoading, setIatOptionsLoading] = useState(false);
-    
+
     // Track modifications to only save what changed
     const [modifiedSettings, setModifiedSettings] = useState<Record<string, any>>({});
     const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -327,15 +327,15 @@ export default function SettingsManagement() {
         try {
             if (showLoading) setLoading(true);
             const { data } = await api.get('/settings');
-            
+
             // "2 way option" implementation for Affiliate Email configuration
             if (!data['affiliate']) data['affiliate'] = [];
             const affiliateEmailSetting = data['email']?.find((s: SettingItem) => s.key === 'send_affiliate_email');
-            
+
             if (affiliateEmailSetting) {
                 // Ensure the exact original category is retained to save correctly to backend
                 data['affiliate'].push({ ...affiliateEmailSetting, originalCategory: 'email' });
-                
+
                 // If there's an override config modal button, copy it too
                 const overrideKey = toggleToConfigMap['send_affiliate_email'];
                 const overrideSetting = overrideKey ? data['email']?.find((s: SettingItem) => s.key === overrideKey) : null;
@@ -364,12 +364,12 @@ export default function SettingsManagement() {
             if (manualReportConfig) {
                 data['report'].push({ ...manualReportConfig, originalCategory: 'email' });
             }
-            
+
             // Ensure integrations tab is present even if DB doesn't have it
             if (!data['integrations']) data['integrations'] = [];
 
             setSettingsGrouped(data);
-            
+
             // Set first category as active by default
             if (Object.keys(data).length > 0 && !activeCategory) {
                 setActiveCategory(Object.keys(data)[0]);
@@ -430,9 +430,9 @@ export default function SettingsManagement() {
             (window as any).hasUnsavedAdminChanges = hasModifications;
         }
         return () => {
-             if (typeof window !== 'undefined') {
-                 (window as any).hasUnsavedAdminChanges = false;
-             }
+            if (typeof window !== 'undefined') {
+                (window as any).hasUnsavedAdminChanges = false;
+            }
         }
     }, [hasModifications]);
 
@@ -451,12 +451,12 @@ export default function SettingsManagement() {
         try {
             setSaving(true);
             setSaveStatus('idle');
-            
+
             await api.patch('/settings/bulk', { updates });
-            
+
             setSaveStatus('success');
             setTimeout(() => setSaveStatus('idle'), 3000);
-            
+
             // Re-fetch to sync exact DB states and reset modifications without flashing UI
             await fetchSettings(false);
         } catch (error: any) {
@@ -478,13 +478,13 @@ export default function SettingsManagement() {
         }
 
         const compoundKey = `${saveCategory}::${key}`;
-        
+
         // Update local modified state
         setModifiedSettings(prev => ({
             ...prev,
             [compoundKey]: newValue
         }));
-        
+
         // Update displayed grouped state for real-time UI reflection across any tabs it exists in
         setSettingsGrouped(prev => {
             const newGrouped = { ...prev };
@@ -504,25 +504,22 @@ export default function SettingsManagement() {
             return (
                 <div className="flex items-center gap-3">
                     <span
-                        className={`text-xs font-semibold uppercase tracking-wide ${
-                            item.value
+                        className={`text-xs font-semibold uppercase tracking-wide ${item.value
                                 ? 'text-brand-green'
                                 : 'text-gray-400 dark:text-gray-500'
-                        }`}
+                            }`}
                     >
                         {item.value ? 'Enabled' : 'Disabled'}
                     </span>
                     <button
                         disabled={item.isReadonly}
                         onClick={() => handleValueChange(item.category, item.key, !item.value)}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 ${
-                            item.value ? 'bg-brand-green' : 'bg-gray-200 dark:bg-gray-700'
-                        } ${item.isReadonly ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 ${item.value ? 'bg-brand-green' : 'bg-gray-200 dark:bg-gray-700'
+                            } ${item.isReadonly ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                         <span
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                item.value ? 'translate-x-5' : 'translate-x-0'
-                            }`}
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.value ? 'translate-x-5' : 'translate-x-0'
+                                }`}
                         />
                     </button>
                 </div>
@@ -756,13 +753,12 @@ export default function SettingsManagement() {
             if (item.key.endsWith('_config')) {
                 const isLocal = item.value && typeof item.value === 'object' && item.value.mode === 'local';
                 return (
-                    <button 
+                    <button
                         onClick={() => setActiveOverrideKey(item.key)}
-                        className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-white dark:bg-white/5 border rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-green/50 ${
-                            isLocal 
-                                ? 'text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-500/30' 
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium bg-white dark:bg-white/5 border rounded-xl hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-green/50 ${isLocal
+                                ? 'text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-500/30'
                                 : 'text-gray-700 dark:text-gray-200 border-gray-200 dark:border-white/10'
-                        }`}
+                            }`}
                     >
                         <SettingsIcon className={`w-4 h-4 ${isLocal ? 'text-yellow-500 dark:text-yellow-400' : 'text-brand-green'}`} />
                         Configure Overrides
@@ -772,10 +768,10 @@ export default function SettingsManagement() {
 
             // For JSON arrays (like cc_addresses)
             const isArray = Array.isArray(item.value);
-            
+
             // Simple Array-Chip editor approach
             return (
-                <ArrayChipInput 
+                <ArrayChipInput
                     values={isArray ? item.value : []}
                     isReadonly={item.isReadonly}
                     onChange={(newArr) => handleValueChange(item.category, item.key, newArr)}
@@ -834,11 +830,10 @@ export default function SettingsManagement() {
                         {overrideItem && (
                             <button
                                 onClick={() => setActiveOverrideKey(overrideKey)}
-                                className={`ml-3 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors ${
-                                    overrideItem.value && typeof overrideItem.value === 'object' && overrideItem.value.mode === 'local'
+                                className={`ml-3 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-white/10 transition-colors ${overrideItem.value && typeof overrideItem.value === 'object' && overrideItem.value.mode === 'local'
                                         ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300'
                                         : 'text-gray-400 hover:text-brand-green'
-                                }`}
+                                    }`}
                                 title="Configure specific email overrides"
                             >
                                 <SettingsIcon className="w-4 h-4" />
@@ -997,7 +992,7 @@ export default function SettingsManagement() {
                         Manage central platform configurations dynamically. Settings prefixed with a lock are read-only and automatically managed by the system.
                     </p>
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Status Feedback */}
                     {saveStatus === 'success' && (
@@ -1025,11 +1020,10 @@ export default function SettingsManagement() {
                     <button
                         onClick={handleSave}
                         disabled={!hasModifications || saving}
-                        className={`inline-flex items-center justify-center rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-green ${
-                            hasModifications && !saving 
-                                ? 'bg-brand-green hover:bg-emerald-500 hover:shadow-lg hover:shadow-brand-green/30 hover:-translate-y-0.5' 
+                        className={`inline-flex items-center justify-center rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-green ${hasModifications && !saving
+                                ? 'bg-brand-green hover:bg-emerald-500 hover:shadow-lg hover:shadow-brand-green/30 hover:-translate-y-0.5'
                                 : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-80'
-                        }`}
+                            }`}
                     >
                         {saving ? (
                             <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
@@ -1109,11 +1103,10 @@ export default function SettingsManagement() {
                                             <button
                                                 key={category}
                                                 onClick={() => switchCategory(category)}
-                                                className={`group flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
-                                                    isActive
+                                                className={`group flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${isActive
                                                         ? 'bg-white dark:bg-white/10 text-brand-green dark:text-white shadow-sm ring-1 ring-gray-200 dark:ring-white/10'
                                                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'
-                                                }`}
+                                                    }`}
                                             >
                                                 <span className={`transition-colors ${isActive ? 'text-brand-green' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300'}`}>
                                                     <Icon className="w-5 h-5 flex-shrink-0" />
@@ -1122,11 +1115,10 @@ export default function SettingsManagement() {
                                                     {meta.label}
                                                 </span>
                                                 {category !== 'integrations' && (
-                                                    <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${
-                                                        isActive
+                                                    <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${isActive
                                                             ? 'bg-brand-green/10 text-brand-green'
                                                             : 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400'
-                                                    }`}>
+                                                        }`}>
                                                         {count}
                                                     </span>
                                                 )}
@@ -1353,9 +1345,8 @@ function ImportExportModal({
                         <button
                             key={t}
                             onClick={() => setTab(t)}
-                            className={`relative rounded-t-lg px-4 py-2.5 text-sm font-semibold capitalize transition-colors ${
-                                tab === t ? 'text-brand-green' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
-                            }`}
+                            className={`relative rounded-t-lg px-4 py-2.5 text-sm font-semibold capitalize transition-colors ${tab === t ? 'text-brand-green' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'
+                                }`}
                         >
                             {t}
                             {tab === t && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-green" />}
@@ -1531,7 +1522,7 @@ function ImportReportView({ report, onClose }: { report: any; onClose: () => voi
 
 function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
     if (!isOpen || !configItem) return null;
-    
+
     // Default safe parsing
     const defaultVal = { mode: 'global', from_address: '', from_name: '', cc_addresses: [], bcc_addresses: [], reply_to_address: '' };
     const value = typeof configItem.value === 'object' && configItem.value ? { ...defaultVal, ...configItem.value } : defaultVal;
@@ -1557,7 +1548,7 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                         </svg>
                     </button>
                 </div>
-                
+
                 <div className="p-6 space-y-6 overflow-y-auto flex-1">
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/5">
                         <div>
@@ -1566,9 +1557,8 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                         </div>
                         <button
                             onClick={() => updateField('mode', isLocal ? 'global' : 'local')}
-                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                isLocal ? 'bg-brand-green' : 'bg-gray-200 dark:bg-gray-700'
-                            }`}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isLocal ? 'bg-brand-green' : 'bg-gray-200 dark:bg-gray-700'
+                                }`}
                         >
                             <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isLocal ? 'translate-x-5' : 'translate-x-0'}`} />
                         </button>
@@ -1577,9 +1567,9 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                     <div className={`space-y-4 transition-opacity duration-200 ${!isLocal ? 'opacity-40 pointer-events-none' : ''}`}>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">From Address</label>
-                            <input 
+                            <input
                                 type="text"
-                                placeholder="Leave blank to fallback to global" 
+                                placeholder="Leave blank to fallback to global"
                                 value={value.from_address || ''}
                                 onChange={(e) => updateField('from_address', e.target.value)}
                                 className="block w-full rounded-xl border-0 py-2 px-3 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-brand-green"
@@ -1587,9 +1577,9 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">From Display Name</label>
-                            <input 
+                            <input
                                 type="text"
-                                placeholder="Leave blank to fallback to global" 
+                                placeholder="Leave blank to fallback to global"
                                 value={value.from_name || ''}
                                 onChange={(e) => updateField('from_name', e.target.value)}
                                 className="block w-full rounded-xl border-0 py-2 px-3 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-brand-green"
@@ -1598,27 +1588,27 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">CC Addresses</label>
                             <p className="text-xs text-gray-500 mb-2">Leave blank to send to 0 CCs. Will entirely overwrite global CCs.</p>
-                            <ArrayChipInput 
-                                values={Array.isArray(value.cc_addresses) ? value.cc_addresses : []} 
-                                isReadonly={!isLocal} 
-                                onChange={(arr) => updateField('cc_addresses', arr)} 
+                            <ArrayChipInput
+                                values={Array.isArray(value.cc_addresses) ? value.cc_addresses : []}
+                                isReadonly={!isLocal}
+                                onChange={(arr) => updateField('cc_addresses', arr)}
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">BCC Addresses</label>
                             <p className="text-xs text-gray-500 mb-2">Hidden recipients. Leave blank for no BCCs. Will entirely overwrite global BCCs.</p>
-                            <ArrayChipInput 
-                                values={Array.isArray(value.bcc_addresses) ? value.bcc_addresses : []} 
-                                isReadonly={!isLocal} 
-                                onChange={(arr) => updateField('bcc_addresses', arr)} 
+                            <ArrayChipInput
+                                values={Array.isArray(value.bcc_addresses) ? value.bcc_addresses : []}
+                                isReadonly={!isLocal}
+                                onChange={(arr) => updateField('bcc_addresses', arr)}
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Reply-To Address</label>
                             <p className="text-xs text-gray-500 mb-2">Replies will go to this address instead of the From address. Leave blank to use From address.</p>
-                            <input 
+                            <input
                                 type="text"
-                                placeholder="Leave blank to fallback to global" 
+                                placeholder="Leave blank to fallback to global"
                                 value={value.reply_to_address || ''}
                                 onChange={(e) => updateField('reply_to_address', e.target.value)}
                                 className="block w-full rounded-xl border-0 py-2 px-3 text-sm bg-white dark:bg-white/5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-200 dark:ring-white/10 focus:ring-2 focus:ring-brand-green"
@@ -1626,9 +1616,9 @@ function EmailOverrideModal({ isOpen, onClose, configItem, onChange }: any) {
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="px-6 py-4 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-black/20 flex justify-end">
-                    <button 
+                    <button
                         onClick={onClose}
                         className="rounded-lg px-5 py-2 text-sm font-medium text-white bg-brand-green hover:bg-emerald-500 transition-colors shadow-sm"
                     >
@@ -1831,18 +1821,16 @@ function SettingsSelect({
                                     key={option.value}
                                     type="button"
                                     onClick={() => choose(option.value)}
-                                    className={`flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
-                                        value === option.value
+                                    className={`flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm transition-colors ${value === option.value
                                             ? 'bg-brand-green text-white'
                                             : 'text-gray-800 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-white/10'
-                                    }`}
+                                        }`}
                                 >
                                     <span className="min-w-0">
                                         <span className="block truncate font-medium">{option.label}</span>
                                         {option.description && (
-                                            <span className={`mt-0.5 block line-clamp-2 text-xs ${
-                                                value === option.value ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
-                                            }`}>
+                                            <span className={`mt-0.5 block line-clamp-2 text-xs ${value === option.value ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+                                                }`}>
                                                 {option.description}
                                             </span>
                                         )}
@@ -2307,11 +2295,10 @@ function MarkdownSkillModal({
                                     key={mode}
                                     type="button"
                                     onClick={() => setTab(mode)}
-                                    className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                                        tab === mode
+                                    className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${tab === mode
                                             ? 'bg-white text-gray-900 shadow-sm dark:bg-[#273127] dark:text-white'
                                             : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
-                                    }`}
+                                        }`}
                                 >
                                     {mode}
                                 </button>

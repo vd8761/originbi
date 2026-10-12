@@ -63,6 +63,18 @@ export class CreateCandidateDto {
   @IsOptional()
   roleDescription?: string;
 
+  @IsString()
+  @IsOptional()
+  studentBoard?: string;
+
+  @IsString()
+  @IsOptional()
+  schoolLevel?: string;
+
+  @IsString()
+  @IsOptional()
+  schoolStream?: string;
+
   // Employee program difficulty level: Entry | Medium | Executive.
   // Stored in registration.metadata.employeeLevel and used to filter the
   // assessment question sets (via the assessment_questions.board column).
