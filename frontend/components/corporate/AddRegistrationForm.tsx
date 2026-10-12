@@ -262,7 +262,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
     "text-gray-600 hover:text-black dark:text-gray-300 dark:hover:text-white";
 
   return (
-    <div className="w-full font-sans animate-fade-in pb-12 p-4 sm:p-6 lg:p-8">
+    <div className="w-full font-sans animate-fade-in pb-32 sm:pb-36 p-4 sm:p-6 lg:p-8">
       <BulkUploadModal
         isOpen={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
@@ -775,7 +775,7 @@ const AddRegistrationForm: React.FC<AddRegistrationFormProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="flex flex-col-reverse sm:flex-row justify-end gap-4 mt-8">
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-4 mt-8 sm:pr-36">
         <button
           onClick={onCancel}
           disabled={isLoading}
