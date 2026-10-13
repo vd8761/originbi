@@ -1943,9 +1943,9 @@ INTENT KEYS:
 - workforce_planning    → Can we launch X, do we have enough capability, strategic people planning
 - recruitment_intel     → What to look for when hiring, what traits our top performers share
 - people_strategy       → HR policy, communication frameworks, org-wide people practices
-- jd_filter             → Filter or list candidates/students matching a job description, criteria, department, or name list
-- zenro_data            — Questions about numbers, payroll, attendance, leave, salaries, counts, or Zenro integration
-  - general               — Anything else workforce-related that doesn't fit above categories
+- zenro_data            → Questions about numbers, payroll, attendance, leave, salaries, counts, or Zenro integration
+- clickup_tasks         → Questions about tasks, projects, ClickUp, work assignments, deadlines, progress, to-do items, or workload
+- general               → Anything else workforce-related that doesn't fit above categories
 
 USER QUERY: "${query.replace(/"/g, "'")}"`;
 
@@ -2092,11 +2092,13 @@ RESPONSE RULES:
     ];
     if (userEmail) {
       promises.push(this.integrationsService.getFolderContext(userEmail));
+      promises.push(this.integrationsService.getClickUpContext(userEmail));
     } else {
+      promises.push(Promise.resolve(null));
       promises.push(Promise.resolve(null));
     }
 
-    const [candidatesResult, zenroResult, kbResult] =
+    const [candidatesResult, zenroResult, kbResult, clickupResult] =
       await Promise.allSettled(promises);
 
     const discCandidates =
@@ -2114,15 +2116,43 @@ RESPONSE RULES:
         (knowledgeBaseContext ? '\n' : '') + kbResult.value.content;
     }
 
+    const clickupData =
+      clickupResult.status === 'fulfilled' && clickupResult.value
+        ? (clickupResult.value as string)
+        : null;
+
     const hasDisc = discCandidates.length > 0;
     const hasZenro = !!(zenroData && zenroData.trim().length > 0);
     const hasKB = !!(
       knowledgeBaseContext && knowledgeBaseContext.trim().length > 0
     );
+    const hasClickUp = !!(clickupData && clickupData.trim().length > 0);
 
     this.logger.log(
-      `📦 Context: DISC=${hasDisc}(${discCandidates.length}), Zenro=${hasZenro}, KB=${hasKB}`,
+      `📦 Context: DISC=${hasDisc}(${discCandidates.length}), Zenro=${hasZenro}, KB=${hasKB}, ClickUp=${hasClickUp}`,
     );
+
+    const lowerQuery = cleanQuery.toLowerCase();
+    const isClickUpQuery =
+      intent === 'clickup_tasks' ||
+      lowerQuery.includes('clickup') ||
+      lowerQuery.includes('task') ||
+      lowerQuery.includes('project') ||
+      lowerQuery.includes('assignment') ||
+      lowerQuery.includes('to do') ||
+      lowerQuery.includes('todo') ||
+      lowerQuery.includes('workload') ||
+      lowerQuery.includes('working on') ||
+      lowerQuery.includes('doing') ||
+      lowerQuery.includes('deliverable') ||
+      lowerQuery.includes('progress') ||
+      lowerQuery.includes('sprint') ||
+      lowerQuery.includes('backlog') ||
+      (lowerQuery.includes('employee') &&
+        (lowerQuery.includes('wise') ||
+          lowerQuery.includes('detail') ||
+          lowerQuery.includes('status') ||
+          lowerQuery.includes('all')));
 
     // 3. Pure DISC intents with no extra context -> use specialized behavioral handlers (highest quality)
     const discOnlyIntents = [
@@ -2141,7 +2171,13 @@ RESPONSE RULES:
       'jd_filter',
     ];
 
-    if (discOnlyIntents.includes(intent) && hasDisc && !hasZenro && !hasKB) {
+    if (
+      discOnlyIntents.includes(intent) &&
+      hasDisc &&
+      !hasZenro &&
+      !hasKB &&
+      !isClickUpQuery
+    ) {
       const employeeData = this.buildEmployeeDataStr(discCandidates);
       this.logger.log(`🔀 Specialized DISC handler: ${intent}`);
       let answer: string;
@@ -2256,11 +2292,12 @@ RESPONSE RULES:
     }
 
     // 4. Unified synthesis — all available sources combined
-    this.logger.log(`🔗 Unified synthesis (DISC+Zenro+KB)`);
+    this.logger.log(`🔗 Unified synthesis (DISC+Zenro+KB+ClickUp)`);
     const answer = await this.handleUnifiedQuery(query, {
       discCandidates,
       zenroData,
       knowledgeBaseContext: knowledgeBaseContext || null,
+      clickupData: clickupData || null,
       intent,
       history,
     });
@@ -2433,7 +2470,7 @@ CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
   }
 
   /**
-   * Synthesize a single answer from DISC + Zenro + Knowledge Base.
+   * Synthesize a single answer from DISC + Zenro + Knowledge Base + ClickUp.
    */
   private async handleUnifiedQuery(
     query: string,
@@ -2441,6 +2478,7 @@ CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
       discCandidates: any[];
       zenroData: string | null;
       knowledgeBaseContext: string | null;
+      clickupData?: string | null;
       intent: string;
       history: { role: 'user' | 'assistant'; content: string }[];
     },
@@ -2465,26 +2503,39 @@ CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
         `## 📁 Knowledge Base (Google Drive Documents)\n${kbTruncated}`,
       );
     }
+    if (ctx.clickupData) {
+      sections.push(
+        `## 🎯 ClickUp Workspace Tasks & Employee Assignments (Live Synced Data)\n${ctx.clickupData}`,
+      );
+    }
     if (sections.length === 0) {
-      return 'No data sources are currently available. Please ensure employees have completed their DISC assessment and/or Zenro is connected.';
+      return 'No data sources are currently available. Please ensure employees have completed their DISC assessment and/or Zenro / ClickUp is connected.';
     }
 
     const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
 
-You are a comprehensive HR Intelligence AI with access to multiple integrated data sources. Answer the user's question by synthesizing ALL available data.
+You are a comprehensive HR and Workforce Intelligence AI with access to multiple integrated corporate data sources:
+1. 📊 DISC Behavioral Intelligence: Employee personality styles, cognitive traits, communication habits, and collaboration dynamics.
+2. 📋 Zenro HR Database: Live attendance records, leave balances, payroll, departments, and designations.
+3. 🎯 ClickUp Workspace Tasks: Live task assignments, current projects/lists, task statuses (Open, In Progress, In Review, Complete, etc.), priorities, deadlines, and employee workloads.
+4. 📁 Knowledge Base: Company policies, handbooks, SOPs, and documentation from Google Drive.
 
-RULES:
-- CRITICAL: You MUST ALWAYS consult BOTH the Zenro HR Database and the Knowledge Base independently.
-- CRITICAL: If both sources contain relevant information, you MUST provide BOTH results clearly separated (e.g., "According to the Zenro HR Database..." and "Based on the Knowledge Base...").
-- CRITICAL: Do NOT skip one source just because the other has an answer. Present BOTH.
-- If one connector has matching data but the other does not, provide the matched data and explicitly mention that the other connector yielded no matching data (e.g., "The Knowledge Base outlines the policy for late check-ins, but the Zenro database shows no actual late records for the IT department last month.").
-- For real-time employee metrics (payroll, attendance numbers, leave balances), rely on Zenro HR Database.
-- For company policies, operating procedures, and guidelines, rely on the Knowledge Base.
-- CRITICAL: Do NOT present mock examples from Knowledge Base policy documents as real live data. Distinguish between a stated policy and actual live employee records.
-- CRITICAL: NEVER invent, guess, or hallucinate data (names, salaries, dates). 
-- CRITICAL: If the Zenro Database returns no data for a specific person or metric (e.g. no loan records, no late check-ins), assume the value is ZERO or the event did not happen. HOWEVER, if an employee has no check-in/out data for a specific day, actively check if the data indicates it is a Week Off (WW), weekend, or Holiday. Always provide this additional context (e.g., "Mohanraaj did not check in today, but note that today is marked as a Week Off / Holiday").
-- If the user asks about a month (e.g. "September") without specifying a year, and the provided Zenro data contains records spanning multiple different years for that month, provide the data for the most recent year and politely ask the user to clarify if they meant a different year.
-- End with: "**Sources:** [list which sources you used]"`;
+RULES FOR SYNTHESIS & EMPLOYEE-WISE QUERIES:
+- EMPLOYEE-WISE QUESTIONS: When asked about a specific employee (e.g., "What is Ariyappan working on?", "Tell me about Ariyappan", "Show tasks for [Name]", or "Give me employee wise details"):
+  * Look up the employee across ALL available sources:
+    - ClickUp: Detail their assigned tasks, statuses, lists/folders, priorities, and due dates.
+    - DISC: Summarize their behavioral profile, natural working style, and communication preferences if available.
+    - Zenro: Mention their designation, department, and attendance/leaves if relevant.
+  * Structure your answer cleanly with distinct sections or bullet points for readability.
+- CLICKUP TASKS & PROJECTS: When asked about tasks, projects, deliverables, deadlines, or workload:
+  * Rely directly on the ClickUp Workspace Tasks section.
+  * Provide accurate task names, statuses, assignees, lists/folders, and due dates.
+  * When asked for an employee-wise overview, break it down clearly person-by-person.
+- If an employee has no tasks assigned in ClickUp, explicitly state that they have no active tasks assigned in the synced ClickUp workspace.
+- REAL-TIME METRICS: For attendance numbers, payroll, and leave balances, rely on Zenro HR Database.
+- POLICIES & GUIDELINES: For company policies, rely on the Knowledge Base.
+- CRITICAL: NEVER invent, guess, or hallucinate task names, dates, salaries, or employee records. Only report what is present in the provided context.
+- End with: "**Sources:** [list which sources you used: e.g. ClickUp, DISC, Zenro HR, Knowledge Base]"`;
 
     const dataContext = `[SYSTEM PROVIDED DATA CONTEXT]
 ${sections.join('\n\n---\n\n')}`;

@@ -143,6 +143,157 @@ export class IntegrationsController {
     return this.integrationsService.getGoogleDriveFileContent(email, fileId);
   }
 
+  // ─── OAuth: Start ClickUp Authorization ───
+  @Get('oauth/clickup/start')
+  startClickUpOAuth(
+    @Query('email') email: string,
+    @Query('appId') appId: string,
+    @Res() res: Response,
+  ) {
+    if (!email || !appId)
+      throw new BadRequestException('Email and appId are required');
+    const url = this.integrationsService.generateClickUpOAuthUrl(email, appId);
+    return res.redirect(url);
+  }
+
+  // ─── OAuth: ClickUp Callback ───
+  @Get('oauth/clickup/callback')
+  async handleClickUpCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.integrationsService.handleClickUpCallback(
+        code,
+        state,
+      );
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>ClickUp Connected</title></head>
+        <body>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage(
+              { type: 'OAUTH_SUCCESS', provider: 'clickup', connectedAccount: '${result.connectedAccount}' },
+              '${process.env.FRONTEND_URL || 'http://localhost:3000'}'
+            );
+          }
+          window.close();
+        </script>
+        <p>ClickUp authorization successful! You can close this window.</p>
+        </body>
+        </html>
+      `);
+    } catch (err: any) {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <body>
+        <script>
+          if (window.opener) {
+            window.opener.postMessage(
+              { type: 'OAUTH_ERROR', error: '${err.message}' },
+              '${process.env.FRONTEND_URL || 'http://localhost:3000'}'
+            );
+          }
+          window.close();
+        </script>
+        <p>ClickUp authorization failed: ${err.message}</p>
+        </body>
+        </html>
+      `);
+    }
+  }
+
+  // ─── ClickUp API routes ───
+  @Get('clickup/workspaces')
+  async getClickUpWorkspaces(@Query('email') email: string) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.integrationsService.getClickUpWorkspaces(email);
+  }
+
+  @Get('clickup/spaces')
+  async getClickUpSpaces(
+    @Query('email') email: string,
+    @Query('teamId') teamId: string,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!teamId) throw new BadRequestException('Team ID is required');
+    return this.integrationsService.getClickUpSpaces(email, teamId);
+  }
+
+  @Get('clickup/lists')
+  async getClickUpLists(
+    @Query('email') email: string,
+    @Query('spaceId') spaceId: string,
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!spaceId) throw new BadRequestException('Space ID is required');
+    return this.integrationsService.getClickUpLists(email, spaceId);
+  }
+
+  @Post('clickup/sync-list')
+  async saveClickUpSyncList(
+    @Query('email') email: string,
+    @Body() body: { listId: string; listName: string; spaceName?: string },
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!body.listId) throw new BadRequestException('List ID is required');
+    return this.integrationsService.saveClickUpSyncList(
+      email,
+      body.listId,
+      body.listName,
+      body.spaceName,
+    );
+  }
+
+  @Post('clickup/test-task')
+  async createClickUpTestTask(
+    @Query('email') email: string,
+    @Body() body?: { listId?: string },
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.integrationsService.createClickUpTask(email, {
+      name: `OriginBI Test Task - Connected Successfully (${new Date().toLocaleTimeString()})`,
+      description:
+        'This test task was created by OriginBI to verify that your ClickUp integration is working smoothly.\n\nStatus: Connected\nIntegration: OriginBI Candidate Sync',
+      listId: body?.listId,
+    });
+  }
+
+  @Post('clickup/sync')
+  async syncClickUp(@Query('email') email: string) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.integrationsService.syncClickUpData(email);
+  }
+
+  @Get('clickup/context')
+  async getClickUpContext(@Query('email') email: string) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.integrationsService.getClickUpContext(email);
+  }
+
+  @Post('clickup/tasks')
+  async createClickUpTask(
+    @Query('email') email: string,
+    @Body()
+    body: {
+      name: string;
+      description?: string;
+      listId?: string;
+      priority?: number;
+      dueDate?: number;
+    },
+  ) {
+    if (!email) throw new BadRequestException('Email is required');
+    if (!body.name) throw new BadRequestException('Task name is required');
+    return this.integrationsService.createClickUpTask(email, body);
+  }
+
+
+
   @Put(':appId')
   async updateIntegration(
     @Query('email') email: string,
