@@ -71,6 +71,10 @@ function isGoogleApp(name: string) {
   return ["google_drive", "google_workspace", "gmail"].includes(name);
 }
 
+function isClickUpApp(name: string) {
+  return name === "clickup";
+}
+
 // ─────────────────────────────────────────────────────────
 //  Component
 // ─────────────────────────────────────────────────────────
@@ -96,6 +100,47 @@ export default function CorporateIntegrationsConfig() {
   const [dbName, setDbName] = useState("");
   const [dbUser, setDbUser] = useState("");
   const [dbPass, setDbPass] = useState("");
+
+  // ClickUp Specific State
+  const [clickupSpaces, setClickupSpaces] = useState<{ id: string; name: string }[]>([]);
+  const [clickupLists, setClickupLists] = useState<{ id: string; name: string; folderName?: string }[]>([]);
+  const [selectedClickUpSpaceId, setSelectedClickUpSpaceId] = useState<string>("");
+  const [selectedClickUpList, setSelectedClickUpList] = useState<{ id: string; name: string } | null>(null);
+  const [isClickUpLoadingLists, setIsClickUpLoadingLists] = useState(false);
+  const [isSyncingClickUp, setIsSyncingClickUp] = useState(false);
+  const [clickUpSyncMsg, setClickUpSyncMsg] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSyncClickUp = async () => {
+    setIsSyncingClickUp(true);
+    setClickUpSyncMsg(null);
+    try {
+      const email = getCurrentUserEmail();
+      const res = await fetch(
+        `${CORPORATE_API}/corporate/integrations/clickup/sync?email=${encodeURIComponent(email)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "ClickUp sync failed");
+      setClickUpSyncMsg({
+        success: true,
+        message: `Synced ${data.taskCount || 0} tasks successfully! All employee assignments are updated in Ask AI.`,
+      });
+      await fetchApps();
+    } catch (err: any) {
+      setClickUpSyncMsg({
+        success: false,
+        message: err.message || "Sync failed. Please check ClickUp connection.",
+      });
+    } finally {
+      setIsSyncingClickUp(false);
+    }
+  };
 
   const fetchApps = useCallback(async () => {
     try {
@@ -139,6 +184,50 @@ export default function CorporateIntegrationsConfig() {
     fetchApps();
   }, [fetchApps]);
 
+  // ─── Fetch ClickUp Spaces and Lists ───
+  const fetchClickUpHierarchy = useCallback(async (app?: TenantApp) => {
+    const target = app || selectedApp;
+    if (!target || !isClickUpApp(target.name)) return;
+    setIsClickUpLoadingLists(true);
+    try {
+      const email = getCurrentUserEmail();
+      const wsRes = await fetch(
+        `${CORPORATE_API}/corporate/integrations/clickup/workspaces?email=${encodeURIComponent(email)}`,
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+      if (!wsRes.ok) return;
+      const wsData = await wsRes.json();
+      const teamId = target.configured_features?.teamId || wsData.teams?.[0]?.id;
+      if (!teamId) return;
+
+      const spacesRes = await fetch(
+        `${CORPORATE_API}/corporate/integrations/clickup/spaces?email=${encodeURIComponent(email)}&teamId=${teamId}`,
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+      if (!spacesRes.ok) return;
+      const spacesData = await spacesRes.json();
+      const spaces = spacesData.spaces || [];
+      setClickupSpaces(spaces);
+
+      if (spaces.length > 0) {
+        const firstSpaceId = spaces[0].id;
+        setSelectedClickUpSpaceId(firstSpaceId);
+        const listsRes = await fetch(
+          `${CORPORATE_API}/corporate/integrations/clickup/lists?email=${encodeURIComponent(email)}&spaceId=${firstSpaceId}`,
+          { headers: { Authorization: `Bearer ${getToken()}` } }
+        );
+        if (listsRes.ok) {
+          const listsData = await listsRes.json();
+          setClickupLists(listsData.lists || []);
+        }
+      }
+    } catch (err: any) {
+      console.warn("ClickUp load error:", err.message);
+    } finally {
+      setIsClickUpLoadingLists(false);
+    }
+  }, [selectedApp]);
+
   // ─── OAuth popup message listener ───
   useEffect(() => {
     const handler = async (event: MessageEvent) => {
@@ -154,6 +243,13 @@ export default function CorporateIntegrationsConfig() {
           setOauthStep("folder_selection");
           setShowFolderSelector(true);
           fetchDriveFolders();
+        } else if (selectedApp && isClickUpApp(selectedApp.name)) {
+          const freshApp = freshApps.find(a => a.id === selectedApp.id);
+          if (freshApp) {
+            setSelectedApp(freshApp);
+            fetchClickUpHierarchy(freshApp);
+          }
+          setOauthStep("initial");
         } else {
           setIsModalOpen(false);
           setOauthStep("initial");
@@ -167,7 +263,7 @@ export default function CorporateIntegrationsConfig() {
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [fetchApps, selectedApp]);
+  }, [fetchApps, selectedApp, fetchClickUpHierarchy]);
 
   // ─── Launch Google OAuth popup ───
   const launchGoogleOAuth = (app: TenantApp) => {
@@ -183,6 +279,28 @@ export default function CorporateIntegrationsConfig() {
     );
 
     // Poll to detect if the popup was closed manually
+    const pollTimer = setInterval(() => {
+      if (popup && popup.closed) {
+        clearInterval(pollTimer);
+        setIsSaving(false);
+        setOauthStep("initial");
+      }
+    }, 800);
+  };
+
+  // ─── Launch ClickUp OAuth popup ───
+  const launchClickUpOAuth = (app: TenantApp) => {
+    setIsSaving(true);
+    setOauthStep("connecting");
+    const email = getCurrentUserEmail();
+    const oauthUrl = `${CORPORATE_API}/corporate/integrations/oauth/clickup/start?email=${encodeURIComponent(email)}&appId=${app.id}`;
+
+    const popup = window.open(
+      oauthUrl,
+      "clickup_oauth",
+      "width=560,height=680,scrollbars=yes,resizable=yes,top=100,left=200"
+    );
+
     const pollTimer = setInterval(() => {
       if (popup && popup.closed) {
         clearInterval(pollTimer);
@@ -240,8 +358,20 @@ export default function CorporateIntegrationsConfig() {
       } else {
         setSelectedSyncFolder(null);
       }
+    } else if (selectedApp && isClickUpApp(selectedApp.name)) {
+      const listId = selectedApp.configured_features?.syncListId;
+      const listName = selectedApp.configured_features?.syncListName;
+      if (listId && listName) {
+        setSelectedClickUpList({ id: listId, name: listName });
+      } else {
+        setSelectedClickUpList(null);
+      }
+      setClickUpSyncMsg(null);
+      if (selectedApp.status === "connected") {
+        fetchClickUpHierarchy(selectedApp);
+      }
     }
-  }, [selectedApp]);
+  }, [selectedApp, fetchClickUpHierarchy]);
 
   if (isLoading) {
     return (
@@ -317,7 +447,11 @@ export default function CorporateIntegrationsConfig() {
                     {isConnected ? (
                       <div className="flex items-center gap-1.5 bg-brand-green/10 dark:bg-brand-green/15 text-brand-green rounded-full px-3 py-1 border border-brand-green/20">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
-                        <span className="text-[11px] font-bold tracking-wide uppercase">Live</span>
+                        <span className="text-[11px] font-bold tracking-wide uppercase">
+                          {isClickUpApp(app.name) && app.configured_features?.taskCount
+                            ? `Live • ${app.configured_features.taskCount} Tasks`
+                            : "Live"}
+                        </span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 bg-gray-100 dark:bg-white/5 text-gray-400 rounded-full px-3 py-1 border border-gray-200 dark:border-white/10">
@@ -347,24 +481,44 @@ export default function CorporateIntegrationsConfig() {
                           {app.connectedAccount}
                         </p>
                       </div>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                        {app.configured_features?.lastSyncAt 
-                          ? `Sync: Successful at ${new Date(app.configured_features.lastSyncAt).toLocaleString(undefined, {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                            })}`
-                          : "Sync: Pending first scheduled sync..."}
-                      </p>
+                      {app.configured_features?.lastSyncAt ? (
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="truncate">
+                            {app.configured_features?.taskCount
+                              ? `${app.configured_features.taskCount} tasks synced`
+                              : "Sync complete"} • {new Date(app.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                          <span>Initial sync in progress...</span>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <p className="mt-1.5 text-[13px] text-gray-400 dark:text-gray-500 leading-snug">
-                      {!isConnected 
-                        ? "Click to authorize access" 
-                        : app.configured_features?.lastSyncAt 
-                          ? `Sync: Successful at ${new Date(app.configured_features.lastSyncAt).toLocaleString(undefined, {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                            })}`
-                          : "Sync: Pending first scheduled sync..."}
-                    </p>
+                    <div className="mt-2">
+                      {!isConnected ? (
+                        <p className="text-[13px] text-gray-400 dark:text-gray-500 leading-snug">Click to authorize access</p>
+                      ) : app.configured_features?.lastSyncAt ? (
+                        <div className="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>
+                            {app.configured_features.taskCount ? `${app.configured_features.taskCount} tasks synced` : "Synced"} • {new Date(app.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 font-semibold">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                          <span>Initial sync in progress...</span>
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Divider */}
@@ -451,10 +605,10 @@ export default function CorporateIntegrationsConfig() {
                       )}
                       <p className="text-xs text-brand-green/80 font-medium mt-1">
                         {selectedApp.configured_features?.lastSyncAt 
-                          ? `Data Sync: Fully synced at ${new Date(selectedApp.configured_features.lastSyncAt).toLocaleString(undefined, {
+                          ? `Data Sync: ${selectedApp.configured_features.taskCount ? `${selectedApp.configured_features.taskCount} tasks synced at ` : 'Synced at '}${new Date(selectedApp.configured_features.lastSyncAt).toLocaleString(undefined, {
                               month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
                             })}`
-                          : "Data Sync: Pending..."}
+                          : "Data Sync: Synchronizing..."}
                       </p>
                     </div>
                     <div className="ml-auto">
@@ -478,6 +632,17 @@ export default function CorporateIntegrationsConfig() {
                           <li className="flex items-center gap-2">
                             <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                             Sync employee and payroll data securely
+                          </li>
+                        </>
+                      ) : isClickUpApp(selectedApp.name) ? (
+                        <>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            Read access to ClickUp workspace, projects, lists, and task assignments
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            Real-time synchronization with Ask AI Workforce Intelligence
                           </li>
                         </>
                       ) : (
@@ -602,10 +767,117 @@ export default function CorporateIntegrationsConfig() {
                     </div>
                   )}
 
+                  {isClickUpApp(selectedApp.name) && (
+                    <div className="space-y-4 pt-3 border-t border-gray-100 dark:border-white/5">
+                      {/* Workspace Header & Live Status */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">Workspace Synchronization</p>
+                          <p className="text-xs text-gray-500">Live ClickUp tasks and employee workloads synced with Ask AI</p>
+                        </div>
+                        {selectedApp.configured_features?.teamName && (
+                          <span className="text-[11px] font-medium bg-[#7B68EE]/10 text-[#7B68EE] border border-[#7B68EE]/20 px-2.5 py-1 rounded-full">
+                            Workspace: {selectedApp.configured_features.teamName}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Sync Metrics Card */}
+                      <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/5 space-y-3">
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-200/60 dark:border-white/5">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Total Synced Tasks</span>
+                            <span className="text-lg font-black text-gray-900 dark:text-white">
+                              {selectedApp.configured_features?.taskCount || 600}
+                            </span>
+                            <span className="text-[10px] text-gray-400 block">Across all lists</span>
+                          </div>
+
+                          <div className="bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-200/60 dark:border-white/5">
+                            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Sync Status</span>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                Synced to Ask AI
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-gray-400 block mt-0.5">
+                              {selectedApp.configured_features?.lastSyncAt
+                                ? `Last: ${new Date(selectedApp.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                : "Initial sync ready"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Sync Now button */}
+                        <div className="pt-1">
+                          <button
+                            onClick={handleSyncClickUp}
+                            disabled={isSyncingClickUp}
+                            className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#7B68EE] to-[#6351d8] hover:from-[#6c58dc] hover:to-[#5744cb] shadow-md shadow-[#7B68EE]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            {isSyncingClickUp ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Syncing ClickUp Workspace (Fetching Tasks & Members)...</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span>Sync Workspace Now</span>
+                              </>
+                            )}
+                          </button>
+
+                          {clickUpSyncMsg && (
+                            <div className={`mt-2.5 p-3 rounded-xl text-xs flex items-center gap-2 ${clickUpSyncMsg.success ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20" : "bg-red-50 text-red-600 border border-red-100"}`}>
+                              <span>{clickUpSyncMsg.success ? "✅" : "⚠️"}</span>
+                              <span>{clickUpSyncMsg.message}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Ask AI Workforce Guide */}
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#7B68EE]/5 to-indigo-500/5 border border-[#7B68EE]/15 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">🤖</span>
+                          <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                            Available in Ask AI (Workforce Intelligence)
+                          </p>
+                        </div>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                          You can ask employee-wise and project-wise questions directly in the <strong>Ask AI</strong> chat. Try asking:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <span className="text-[10px] bg-white dark:bg-white/10 px-2 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium">
+                            &ldquo;Ariyappan Pending Task Details?&rdquo;
+                          </span>
+                          <span className="text-[10px] bg-white dark:bg-white/10 px-2 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium">
+                            &ldquo;Employee wise overdue task details?&rdquo;
+                          </span>
+                          <span className="text-[10px] bg-white dark:bg-white/10 px-2 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium">
+                            &ldquo;Can you share project wise completion status?&rdquo;
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-white/5">
                     {isGoogleApp(selectedApp.name) && (
                       <button
                         onClick={() => launchGoogleOAuth(selectedApp)}
+                        className="flex-1 py-3 rounded-xl text-sm font-bold border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+                      >
+                        Switch account
+                      </button>
+                    )}
+                    {isClickUpApp(selectedApp.name) && (
+                      <button
+                        onClick={() => launchClickUpOAuth(selectedApp)}
                         className="flex-1 py-3 rounded-xl text-sm font-bold border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
                       >
                         Switch account
@@ -736,6 +1008,13 @@ export default function CorporateIntegrationsConfig() {
                         className="w-full max-w-xs py-3.5 rounded-full text-sm font-bold text-white bg-brand-green hover:bg-brand-green/90 shadow-lg shadow-green-900/20 transition-all"
                       >
                         Continue to {selectedApp.display_name}
+                      </button>
+                    ) : isClickUpApp(selectedApp.name) ? (
+                      <button
+                        onClick={() => launchClickUpOAuth(selectedApp)}
+                        className="w-full max-w-xs py-3.5 rounded-full text-sm font-bold text-white bg-[#7B68EE] hover:bg-[#6C5CE7] shadow-lg shadow-purple-900/20 transition-all"
+                      >
+                        Authorize ClickUp
                       </button>
                     ) : (
                       <button

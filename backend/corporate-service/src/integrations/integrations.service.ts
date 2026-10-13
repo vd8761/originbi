@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -16,6 +17,7 @@ import * as xlsx from 'xlsx';
 const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import * as crypto from 'crypto';
+import axios from 'axios';
 
 function getEncryptionKey(): string {
   let key =
@@ -292,6 +294,10 @@ export class IntegrationsService {
       where: { corporateAccount: { id: account.id }, provider: 'google_drive' },
     });
 
+    const clickupInt = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+
     const activeMasterApps = await this.masterAppRepo.find({
       where: { is_globally_active: true },
     });
@@ -305,12 +311,70 @@ export class IntegrationsService {
       const appNameLower = masterApp.name?.toLowerCase() || '';
       const isGoogle =
         appNameLower.includes('google') || appNameLower.includes('drive');
+      let appStatus = config?.status || 'disconnected';
+
       if (isGoogle && googleInt?.metadata) {
+        if (googleInt.status === 'active') {
+          appStatus = 'connected';
+        }
         configuredFeatures = {
           ...configuredFeatures,
+          connectedAccount:
+            googleInt.metadata.connectedAccount ||
+            configuredFeatures.connectedAccount,
+          connectedName:
+            googleInt.metadata.connectedName ||
+            configuredFeatures.connectedName,
+          connectedPicture:
+            googleInt.metadata.connectedPicture ||
+            configuredFeatures.connectedPicture,
+          connectedAt:
+            googleInt.metadata.connectedAt || configuredFeatures.connectedAt,
           syncFolderId: googleInt.metadata.syncFolderId,
           syncFolderName: googleInt.metadata.syncFolderName,
           lastSyncAt: googleInt.metadata.syncedAt,
+        };
+      }
+
+      const isClickUp = appNameLower.includes('clickup');
+      if (isClickUp && clickupInt?.metadata) {
+        if (clickupInt.status === 'active') {
+          appStatus = 'connected';
+        }
+        configuredFeatures = {
+          ...configuredFeatures,
+          connectedAccount:
+            clickupInt.metadata.connectedAccount ||
+            clickupInt.metadata.email ||
+            configuredFeatures.connectedAccount,
+          connectedName:
+            clickupInt.metadata.connectedName ||
+            clickupInt.metadata.username ||
+            configuredFeatures.connectedName,
+          connectedPicture:
+            clickupInt.metadata.connectedPicture ||
+            configuredFeatures.connectedPicture,
+          connectedAt:
+            clickupInt.metadata.connectedAt || configuredFeatures.connectedAt,
+          teamName:
+            clickupInt.metadata.defaultTeamName ||
+            clickupInt.metadata.teamName ||
+            configuredFeatures.teamName,
+          teamId:
+            clickupInt.metadata.defaultTeamId ||
+            clickupInt.metadata.teamId ||
+            configuredFeatures.teamId,
+          syncListId:
+            clickupInt.metadata.syncListId || configuredFeatures.syncListId,
+          syncListName:
+            clickupInt.metadata.syncListName || configuredFeatures.syncListName,
+          syncSpaceName:
+            clickupInt.metadata.syncSpaceName ||
+            configuredFeatures.syncSpaceName,
+          lastSyncAt:
+            clickupInt.metadata.lastSyncAt || configuredFeatures.lastSyncAt,
+          taskCount:
+            clickupInt.metadata.taskCount || configuredFeatures.taskCount || 0,
         };
       }
 
@@ -323,7 +387,7 @@ export class IntegrationsService {
         id: masterApp.id,
         name: masterApp.name,
         display_name: masterApp.display_name,
-        status: config?.status || 'disconnected',
+        status: appStatus,
         features: masterApp.features,
         configured_features: configuredFeatures,
         connectedAccount: configuredFeatures.connectedAccount || null,
@@ -750,6 +814,893 @@ export class IntegrationsService {
   }
 
   // ─────────────────────────────────────────────────────────
+  //  ClickUp: Credentials loader (reads process.env or .env.local dynamically)
+  // ─────────────────────────────────────────────────────────
+  private getClickUpCredentials(): {
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+  } {
+    let clientId = process.env.CLICKUP_CLIENT_ID || '';
+    let clientSecret = process.env.CLICKUP_CLIENT_SECRET || '';
+    let redirectUri = process.env.CLICKUP_REDIRECT_URI || '';
+
+    // If empty in active process.env, dynamically re-read from .env.local
+    if (!clientId.trim() || !clientSecret.trim()) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const dotenv = require('dotenv');
+        const envPath = path.resolve(process.cwd(), '.env.local');
+        if (fs.existsSync(envPath)) {
+          const parsed = dotenv.parse(fs.readFileSync(envPath));
+          if (parsed.CLICKUP_CLIENT_ID) {
+            clientId = parsed.CLICKUP_CLIENT_ID;
+            process.env.CLICKUP_CLIENT_ID = parsed.CLICKUP_CLIENT_ID;
+          }
+          if (parsed.CLICKUP_CLIENT_SECRET) {
+            clientSecret = parsed.CLICKUP_CLIENT_SECRET;
+            process.env.CLICKUP_CLIENT_SECRET = parsed.CLICKUP_CLIENT_SECRET;
+          }
+          if (parsed.CLICKUP_REDIRECT_URI) {
+            redirectUri = parsed.CLICKUP_REDIRECT_URI;
+            process.env.CLICKUP_REDIRECT_URI = parsed.CLICKUP_REDIRECT_URI;
+          }
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    if (!redirectUri) {
+      redirectUri = `${process.env.API_URL || 'http://localhost:4003'}/corporate/integrations/oauth/clickup/callback`;
+    }
+
+    return {
+      clientId: clientId.trim(),
+      clientSecret: clientSecret.trim(),
+      redirectUri: redirectUri.trim(),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp Step 1: Generate OAuth URL
+  // ─────────────────────────────────────────────────────────
+  generateClickUpOAuthUrl(email: string, appId: string): string {
+    const { clientId, redirectUri } = this.getClickUpCredentials();
+    if (!clientId) {
+      throw new BadRequestException(
+        'CLICKUP_CLIENT_ID is not configured in environment variables (.env.local)',
+      );
+    }
+
+    const state = Buffer.from(JSON.stringify({ email, appId })).toString(
+      'base64url',
+    );
+
+    return `https://app.clickup.com/api?client_id=${encodeURIComponent(
+      clientId,
+    )}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(
+      state,
+    )}`;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp Step 2: Handle OAuth Callback
+  // ─────────────────────────────────────────────────────────
+  async handleClickUpCallback(
+    code: string,
+    state: string,
+  ): Promise<{ email: string; connectedAccount: string; teamName?: string }> {
+    if (!code || !state) {
+      throw new BadRequestException('Missing ClickUp OAuth code or state');
+    }
+
+    let tenantEmail: string;
+    let appId: string;
+    try {
+      const decoded = JSON.parse(Buffer.from(state, 'base64url').toString());
+      tenantEmail = decoded.email;
+      appId = decoded.appId;
+    } catch {
+      throw new BadRequestException('Invalid OAuth state');
+    }
+
+    const { clientId, clientSecret } = this.getClickUpCredentials();
+    if (!clientId || !clientSecret) {
+      throw new BadRequestException(
+        'ClickUp client credentials are not configured in environment',
+      );
+    }
+
+    // Exchange code for token
+    let accessToken: string;
+    try {
+      const tokenRes = await axios.post(
+        'https://api.clickup.com/api/v2/oauth/token',
+        {
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+        },
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+      accessToken = tokenRes.data.access_token;
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.err || err.response?.data?.error || err.message;
+      throw new BadRequestException(`ClickUp token exchange failed: ${msg}`);
+    }
+
+    if (!accessToken) {
+      throw new BadRequestException(
+        'Did not receive access token from ClickUp',
+      );
+    }
+
+    // Fetch ClickUp user profile
+    let clickupUser: any = {};
+    try {
+      const userRes = await axios.get('https://api.clickup.com/api/v2/user', {
+        headers: { Authorization: accessToken },
+      });
+      clickupUser = userRes.data.user || {};
+    } catch (err: any) {
+      console.warn('Could not fetch ClickUp user profile:', err.message);
+    }
+
+    // Fetch ClickUp teams (workspaces)
+    let teams: any[] = [];
+    try {
+      const teamRes = await axios.get('https://api.clickup.com/api/v2/team', {
+        headers: { Authorization: accessToken },
+      });
+      teams = teamRes.data.teams || [];
+    } catch (err: any) {
+      console.warn('Could not fetch ClickUp teams:', err.message);
+    }
+
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email: tenantEmail } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    // Pick workspace with the most members (e.g. corporate workspace with 13 members vs personal/empty workspace)
+    const sortedTeams = [...teams].sort(
+      (a, b) => (b.members?.length || 0) - (a.members?.length || 0),
+    );
+    const defaultTeam = sortedTeams[0] || teams[0] || {};
+    const connectedAccount =
+      clickupUser.email || clickupUser.username || 'ClickUp User';
+    const connectedName = clickupUser.username || connectedAccount;
+    const connectedPicture = clickupUser.profilePicture || null;
+
+    // Save to CorporateIntegration
+    let integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+
+    if (!integration) {
+      integration = this.corporateIntegrationRepo.create({
+        corporateAccount: account,
+        provider: 'clickup',
+      });
+    }
+
+    integration.access_token = accessToken;
+    integration.status = 'active';
+    integration.metadata = {
+      clickupUserId: clickupUser.id,
+      username: connectedName,
+      email: clickupUser.email,
+      teams: teams.map((t) => ({ id: t.id, name: t.name })),
+      defaultTeamId: defaultTeam.id,
+      defaultTeamName: defaultTeam.name,
+      connectedAccount,
+      connectedName,
+      connectedPicture,
+      connectedAt: new Date().toISOString(),
+      ...(integration.metadata || {}),
+    };
+
+    await this.corporateIntegrationRepo.save(integration);
+
+    // Save to TenantAppConfig
+    let config = await this.tenantAppConfigRepo.findOne({
+      where: { tenant_id: account.id as any, app_id: appId },
+    });
+    if (!config) {
+      config = this.tenantAppConfigRepo.create({
+        tenant_id: account.id as any,
+        app_id: appId,
+        status: 'connected',
+        configured_features: {},
+      });
+    }
+    config.configured_features = {
+      ...(config.configured_features || {}),
+      connectedAccount,
+      connectedName,
+      connectedPicture,
+      teamId: defaultTeam.id,
+      teamName: defaultTeam.name,
+      connectedAt: new Date().toISOString(),
+    };
+    config.status = 'connected';
+    await this.tenantAppConfigRepo.save(config);
+
+    // Immediately trigger initial sync in background so user doesn't wait
+    this.syncClickUpData(tenantEmail).catch((err) => {
+      console.warn('Initial ClickUp background sync error:', err.message);
+    });
+
+    return {
+      email: tenantEmail,
+      connectedAccount,
+      teamName: defaultTeam.name,
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Get Workspaces (Teams)
+  // ─────────────────────────────────────────────────────────
+  async getClickUpWorkspaces(email: string) {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+    if (!integration?.access_token) {
+      throw new BadRequestException(
+        'ClickUp is not connected or token is missing',
+      );
+    }
+
+    try {
+      const res = await axios.get('https://api.clickup.com/api/v2/team', {
+        headers: { Authorization: integration.access_token },
+      });
+      return { success: true, teams: res.data.teams || [] };
+    } catch (err: any) {
+      throw new BadRequestException(
+        `Failed to fetch ClickUp teams: ${err.response?.data?.err || err.message}`,
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp Security & SSRF Protection
+  // ─────────────────────────────────────────────────────────
+  private sanitizeClickUpId(id: unknown, fieldName = 'id'): string {
+    if (!id || typeof id !== 'string') {
+      throw new BadRequestException(
+        `Invalid ${fieldName}: must be a non-empty string`,
+      );
+    }
+    const clean = id.trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(clean)) {
+      throw new BadRequestException(
+        `Invalid ${fieldName}: must be alphanumeric`,
+      );
+    }
+    return encodeURIComponent(clean);
+  }
+
+  private buildClickUpUrl(
+    path: string,
+    params?: Record<string, string>,
+  ): string {
+    const baseUrl = 'https://api.clickup.com/api/v2/';
+    const cleanPath = path.replace(/^\/+/, '');
+    const url = new URL(cleanPath, baseUrl);
+    const ALLOWED_HOSTS = ['api.clickup.com'];
+    if (!ALLOWED_HOSTS.includes(url.hostname) || url.protocol !== 'https:') {
+      throw new BadRequestException('Untrusted target API host');
+    }
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null) {
+          url.searchParams.set(k, String(v));
+        }
+      }
+    }
+    return url.toString();
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Get Spaces in a Team
+  // ─────────────────────────────────────────────────────────
+  async getClickUpSpaces(email: string, teamId: string) {
+    if (
+      !teamId ||
+      typeof teamId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(teamId.trim())
+    ) {
+      throw new BadRequestException('Invalid teamId: must be alphanumeric');
+    }
+
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+    if (!integration?.access_token) {
+      throw new BadRequestException('ClickUp is not connected');
+    }
+
+    try {
+      const safeTeamId = this.sanitizeClickUpId(teamId, 'teamId');
+      const targetUrl = this.buildClickUpUrl(`team/${safeTeamId}/space`);
+      const parsedUrl = new URL(targetUrl);
+      if (parsedUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
+      const res = await axios.get(parsedUrl.toString(), {
+        headers: { Authorization: integration.access_token },
+      });
+      return { success: true, spaces: res.data.spaces || [] };
+    } catch (err: any) {
+      throw new BadRequestException(
+        `Failed to fetch ClickUp spaces: ${err.response?.data?.err || err.message}`,
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Get Lists in a Space
+  // ─────────────────────────────────────────────────────────
+  async getClickUpLists(email: string, spaceId: string) {
+    if (
+      !spaceId ||
+      typeof spaceId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(spaceId.trim())
+    ) {
+      throw new BadRequestException('Invalid spaceId: must be alphanumeric');
+    }
+
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+    if (!integration?.access_token) {
+      throw new BadRequestException('ClickUp is not connected');
+    }
+
+    try {
+      const safeSpaceId = this.sanitizeClickUpId(spaceId, 'spaceId');
+
+      // 1. Folderless lists directly in space
+      const listUrl = this.buildClickUpUrl(`space/${safeSpaceId}/list`);
+      const parsedListUrl = new URL(listUrl);
+      if (parsedListUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
+      const listsRes = await axios.get(parsedListUrl.toString(), {
+        headers: { Authorization: integration.access_token },
+      });
+      const folderlessLists = (listsRes.data.lists || []).map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        folderName: null,
+      }));
+
+      // 2. Lists inside folders
+      const folderUrl = this.buildClickUpUrl(`space/${safeSpaceId}/folder`);
+      const parsedFolderUrl = new URL(folderUrl);
+      if (parsedFolderUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
+      const foldersRes = await axios.get(parsedFolderUrl.toString(), {
+        headers: { Authorization: integration.access_token },
+      });
+      const folderLists: any[] = [];
+      for (const folder of foldersRes.data.folders || []) {
+        for (const l of folder.lists || []) {
+          folderLists.push({
+            id: l.id,
+            name: l.name,
+            folderName: folder.name,
+          });
+        }
+      }
+
+      return { success: true, lists: [...folderlessLists, ...folderLists] };
+    } catch (err: any) {
+      throw new BadRequestException(
+        `Failed to fetch ClickUp lists: ${err.response?.data?.err || err.message}`,
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Save Sync List Destination
+  // ─────────────────────────────────────────────────────────
+  async saveClickUpSyncList(
+    email: string,
+    listId: string,
+    listName: string,
+    spaceName?: string,
+  ) {
+    if (
+      !listId ||
+      typeof listId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(listId.trim())
+    ) {
+      throw new BadRequestException('Invalid listId: must be alphanumeric');
+    }
+    const safeListId = this.sanitizeClickUpId(listId, 'listId');
+
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+    if (!integration)
+      throw new NotFoundException('ClickUp integration not found');
+
+    integration.metadata = {
+      ...(integration.metadata || {}),
+      syncListId: safeListId,
+      syncListName: listName,
+      syncSpaceName: spaceName,
+      lastSyncAt: new Date().toISOString(),
+    };
+    await this.corporateIntegrationRepo.save(integration);
+
+    // Also update TenantAppConfig
+    const masterApp = await this.masterAppRepo.findOne({
+      where: { name: 'clickup' },
+    });
+    if (masterApp) {
+      let config = await this.tenantAppConfigRepo.findOne({
+        where: { tenant_id: account.id as any, app_id: masterApp.id },
+      });
+      if (!config) {
+        config = this.tenantAppConfigRepo.create({
+          tenant_id: account.id as any,
+          app_id: masterApp.id,
+          status: 'connected',
+          configured_features: {},
+        });
+      }
+      config.configured_features = {
+        ...(config.configured_features || {}),
+        syncListId: safeListId,
+        syncListName: listName,
+        syncSpaceName: spaceName,
+        lastSyncAt: new Date().toISOString(),
+      };
+      config.status = 'connected';
+      await this.tenantAppConfigRepo.save(config);
+    }
+
+    return { success: true, syncListId: safeListId, syncListName: listName };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Create Test Task or Assessment Task
+  // ─────────────────────────────────────────────────────────
+  async createClickUpTask(
+    email: string,
+    taskData: {
+      name: string;
+      description?: string;
+      listId?: string;
+      priority?: number;
+      dueDate?: number;
+    },
+  ) {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+    if (!integration?.access_token) {
+      throw new BadRequestException(
+        'ClickUp is not connected or token is missing',
+      );
+    }
+
+    const rawListId = taskData.listId || integration.metadata?.syncListId;
+    if (!rawListId) {
+      throw new BadRequestException(
+        'No ClickUp List selected. Please select a destination list in ClickUp settings.',
+      );
+    }
+    const listId = String(rawListId).trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(listId)) {
+      throw new BadRequestException('Invalid listId: must be alphanumeric');
+    }
+
+    try {
+      const safeListId = this.sanitizeClickUpId(listId, 'listId');
+      const targetUrl = this.buildClickUpUrl(`list/${safeListId}/task`);
+      const parsedTaskUrl = new URL(targetUrl);
+      if (parsedTaskUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
+
+      const res = await axios.post(
+        parsedTaskUrl.toString(),
+        {
+          name: taskData.name,
+          description: taskData.description || 'Created by OriginBI',
+          status: 'to do',
+          priority: taskData.priority || 3,
+          due_date: taskData.dueDate,
+        },
+        {
+          headers: {
+            Authorization: integration.access_token,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      // Update lastSyncAt
+      integration.metadata = {
+        ...(integration.metadata || {}),
+        lastSyncAt: new Date().toISOString(),
+      };
+      await this.corporateIntegrationRepo.save(integration);
+
+      return {
+        success: true,
+        task: {
+          id: res.data.id,
+          name: res.data.name,
+          url: res.data.url,
+          status: res.data.status?.status,
+        },
+      };
+    } catch (err: any) {
+      throw new BadRequestException(
+        `Failed to create ClickUp task: ${err.response?.data?.err || err.message}`,
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Full Workspace Sync (Tasks & Employee Assignments)
+  // ─────────────────────────────────────────────────────────
+  async syncClickUpData(email: string) {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+    if (!integration?.access_token) {
+      throw new BadRequestException(
+        'ClickUp is not connected or token is missing',
+      );
+    }
+
+    const rawTeamId =
+      integration.metadata?.defaultTeamId ||
+      integration.metadata?.teams?.[0]?.id;
+    if (!rawTeamId) {
+      throw new BadRequestException('ClickUp workspace ID not found');
+    }
+    const teamId = String(rawTeamId).trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(teamId)) {
+      throw new BadRequestException(
+        'Invalid workspace ID: must be alphanumeric',
+      );
+    }
+
+    try {
+      const safeTeamId = this.sanitizeClickUpId(teamId, 'teamId');
+      let rawTasks: any[] = [];
+      let page = 0;
+      while (page < 6) {
+        try {
+          const syncUrl = this.buildClickUpUrl(`team/${safeTeamId}/task`, {
+            page: String(page),
+            include_closed: 'true',
+            subtasks: 'true',
+          });
+          const parsedSyncUrl = new URL(syncUrl);
+          if (parsedSyncUrl.hostname !== 'api.clickup.com') {
+            throw new BadRequestException('Untrusted host');
+          }
+          const res = await axios.get(parsedSyncUrl.toString(), {
+            headers: { Authorization: integration.access_token },
+          });
+          const pageTasks = res.data.tasks || [];
+          rawTasks = rawTasks.concat(pageTasks);
+          if (pageTasks.length < 100) break;
+          page++;
+        } catch (pageErr: any) {
+          console.warn(
+            `ClickUp task page ${page} fetch failed:`,
+            pageErr.message,
+          );
+          break;
+        }
+      }
+
+      const normalizedTasks = rawTasks.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        status: t.status?.status || 'open',
+        priority: t.priority?.priority || 'none',
+        dueDate: t.due_date
+          ? new Date(parseInt(t.due_date)).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })
+          : null,
+        dueTimestamp: t.due_date ? parseInt(t.due_date) : null,
+        listName: t.list?.name || 'General',
+        spaceName: t.space?.name || '',
+        folderName: t.folder?.name || '',
+        creator: t.creator?.username || t.creator?.email || 'Unknown',
+        assignees: (t.assignees || []).map((a: any) => ({
+          id: a.id,
+          username: a.username,
+          email: a.email,
+        })),
+        url: t.url,
+      }));
+
+      // Group tasks employee-wise and project-wise
+      const employeeMap: Record<string, any[]> = {};
+      const projectMap: Record<string, any[]> = {};
+      const unassigned: any[] = [];
+
+      normalizedTasks.forEach((t: any) => {
+        const listKey = t.listName || 'General';
+        if (!projectMap[listKey]) projectMap[listKey] = [];
+        projectMap[listKey].push(t);
+
+        if (!t.assignees || t.assignees.length === 0) {
+          unassigned.push(t);
+        } else {
+          t.assignees.forEach((a: any) => {
+            const key = a.username || a.email || 'Unknown';
+            if (!employeeMap[key]) employeeMap[key] = [];
+            employeeMap[key].push(t);
+          });
+        }
+      });
+
+      const now = new Date().toISOString();
+      integration.metadata = {
+        ...(integration.metadata || {}),
+        lastSyncAt: now,
+        taskCount: normalizedTasks.length,
+        tasks: normalizedTasks,
+        employeeMap,
+        projectMap,
+        unassignedCount: unassigned.length,
+      };
+      await this.corporateIntegrationRepo.save(integration);
+
+      // Also update TenantAppConfig
+      const masterApp = await this.masterAppRepo.findOne({
+        where: { name: 'clickup' },
+      });
+      if (masterApp) {
+        let config = await this.tenantAppConfigRepo.findOne({
+          where: { tenant_id: account.id as any, app_id: masterApp.id },
+        });
+        if (!config) {
+          config = this.tenantAppConfigRepo.create({
+            tenant_id: account.id as any,
+            app_id: masterApp.id,
+            status: 'connected',
+            configured_features: {},
+          });
+        }
+        config.configured_features = {
+          ...(config.configured_features || {}),
+          teamId,
+          lastSyncAt: now,
+          taskCount: normalizedTasks.length,
+        };
+        await this.tenantAppConfigRepo.save(config);
+      }
+
+      return {
+        success: true,
+        taskCount: normalizedTasks.length,
+        lastSyncAt: now,
+      };
+    } catch (err: any) {
+      throw new BadRequestException(
+        `ClickUp sync failed: ${err.response?.data?.err || err.message}`,
+      );
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Scheduled Hourly Sync
+  // ─────────────────────────────────────────────────────────
+  @Cron(CronExpression.EVERY_HOUR)
+  async handleHourlyClickUpSync() {
+    try {
+      const integrations = await this.corporateIntegrationRepo.find({
+        where: { provider: 'clickup', status: 'active' },
+        relations: ['corporateAccount', 'corporateAccount.user'],
+      });
+      for (const int of integrations) {
+        const email = int.corporateAccount?.user?.email;
+        if (email) {
+          try {
+            await this.syncClickUpData(email);
+          } catch (e: any) {
+            console.warn(`Hourly ClickUp sync failed for ${email}:`, e.message);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('ClickUp hourly cron failed:', err.message);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  ClickUp: Get Formatted Context for Ask AI
+  // ─────────────────────────────────────────────────────────
+  async getClickUpContext(email: string): Promise<string> {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) return '';
+
+    const integration = await this.corporateIntegrationRepo.findOne({
+      where: { corporateAccount: { id: account.id }, provider: 'clickup' },
+    });
+    if (!integration?.access_token || integration.status !== 'active') {
+      return '';
+    }
+
+    const lastSyncTime = integration.metadata?.lastSyncAt
+      ? new Date(integration.metadata.lastSyncAt).getTime()
+      : 0;
+    const isStale = Date.now() - lastSyncTime > 15 * 60 * 1000; // 15 mins
+
+    // Auto-sync if no tasks cached yet OR cache is stale (>15 mins)
+    if (
+      !integration.metadata?.tasks ||
+      integration.metadata.tasks.length === 0 ||
+      isStale
+    ) {
+      try {
+        await this.syncClickUpData(email);
+        const refreshed = await this.corporateIntegrationRepo.findOne({
+          where: { id: integration.id },
+        });
+        if (refreshed?.metadata) {
+          integration.metadata = refreshed.metadata;
+        }
+      } catch (err: any) {
+        console.warn('ClickUp auto-sync on context fetch failed:', err.message);
+      }
+    }
+
+    const tasks: any[] = integration.metadata?.tasks || [];
+    if (tasks.length === 0) return '';
+
+    const teamName =
+      integration.metadata?.defaultTeamName || 'ClickUp Workspace';
+    const employeeMap: Record<string, any[]> =
+      integration.metadata?.employeeMap || {};
+    const projectMap: Record<string, any[]> =
+      integration.metadata?.projectMap || {};
+
+    const now = Date.now();
+
+    let context = `WORKSPACE: ${teamName} (Total Synced ClickUp Tasks: ${tasks.length})\n\n`;
+
+    // 1. Employee-wise task summary & detailed breakdown
+    context += `### 👥 EMPLOYEE-WISE TASK ASSIGNMENTS & WORKLOAD (${Object.keys(employeeMap).length} active team members):\n`;
+    for (const [employee, empTasks] of Object.entries(employeeMap)) {
+      const openTasks = empTasks.filter(
+        (t) =>
+          !['complete', 'closed', 'resolved', 'done'].includes(
+            t.status.toLowerCase(),
+          ),
+      );
+      const completedTasks = empTasks.filter((t) =>
+        ['complete', 'closed', 'resolved', 'done'].includes(
+          t.status.toLowerCase(),
+        ),
+      );
+      const overdueTasks = openTasks.filter(
+        (t) => t.dueTimestamp && t.dueTimestamp < now,
+      );
+
+      context += `\n👤 Employee: ${employee}\n`;
+      context += `  - Total Assigned: ${empTasks.length} | Pending/Active: ${openTasks.length} | Completed: ${completedTasks.length} | Overdue: ${overdueTasks.length}\n`;
+      context += `  - Active / Pending Tasks:\n`;
+      if (openTasks.length === 0) {
+        context += `    * No pending tasks (all assigned tasks are completed).\n`;
+      } else {
+        openTasks.slice(0, 25).forEach((t: any) => {
+          const isOverdue =
+            t.dueTimestamp && t.dueTimestamp < now ? ' [OVERDUE!]' : '';
+          context += `    * [${t.status.toUpperCase()}] "${t.name}" (List: ${t.listName}${t.folderName ? ` in ${t.folderName}` : ''}, Priority: ${t.priority}, Due: ${t.dueDate || 'No due date'})${isOverdue}\n`;
+        });
+        if (openTasks.length > 25) {
+          context += `    * ...and ${openTasks.length - 25} more pending tasks.\n`;
+        }
+      }
+      if (completedTasks.length > 0) {
+        context += `  - Recent Completed Tasks: ${completedTasks
+          .slice(0, 6)
+          .map((t) => `"${t.name}"`)
+          .join(', ')}\n`;
+      }
+    }
+
+    // 2. Project / List wise breakdown
+    context += `\n### 📁 PROJECT & LIST BREAKDOWN:\n`;
+    for (const [project, pTasks] of Object.entries(projectMap)) {
+      const pOpen = pTasks.filter(
+        (t) =>
+          !['complete', 'closed', 'resolved', 'done'].includes(
+            t.status.toLowerCase(),
+          ),
+      );
+      const pCompleted = pTasks.filter((t) =>
+        ['complete', 'closed', 'resolved', 'done'].includes(
+          t.status.toLowerCase(),
+        ),
+      );
+      context += `- Project/List: "${project}" (Total: ${pTasks.length} tasks | Active: ${pOpen.length} | Completed: ${pCompleted.length})\n`;
+      pOpen.slice(0, 5).forEach((t: any) => {
+        const assignees =
+          t.assignees
+            ?.map((a: any): string => String(a?.username || ''))
+            .filter(Boolean)
+            .join(', ') || 'Unassigned';
+        context += `  * [${t.status.toUpperCase()}] "${t.name}" (Assignees: ${assignees}, Priority: ${t.priority}, Due: ${t.dueDate || 'None'})\n`;
+      });
+    }
+
+    // 3. Unassigned tasks
+    const unassigned = tasks.filter(
+      (t: any) => !t.assignees || t.assignees.length === 0,
+    );
+    if (unassigned.length > 0) {
+      context += `\n### 📋 UNASSIGNED & GENERAL PROJECT TASKS (${unassigned.length} tasks):\n`;
+      unassigned.slice(0, 15).forEach((t: any) => {
+        context += `- [${t.status.toUpperCase()}] "${t.name}" (List: ${t.listName}, Due: ${t.dueDate || 'None'}, Priority: ${t.priority})\n`;
+      });
+    }
+
+    return context;
+  }
+
+  // ─────────────────────────────────────────────────────────
   //  Disconnect an integration
   // ─────────────────────────────────────────────────────────
   async disconnectIntegration(email: string, appId: string) {
@@ -761,12 +1712,26 @@ export class IntegrationsService {
 
     const config = await this.tenantAppConfigRepo.findOne({
       where: { tenant_id: account.id as any, app_id: appId },
+      relations: ['app'],
     });
     if (!config) throw new NotFoundException('Integration not found');
 
     config.status = 'disconnected';
     config.configured_features = null;
     await this.tenantAppConfigRepo.save(config);
+
+    if (config.app?.name === 'google_drive') {
+      await this.corporateIntegrationRepo.delete({
+        corporateAccount: { id: account.id },
+        provider: 'google_drive',
+      });
+    } else if (config.app?.name === 'clickup') {
+      await this.corporateIntegrationRepo.delete({
+        corporateAccount: { id: account.id },
+        provider: 'clickup',
+      });
+    }
+
     return { success: true };
   }
 }
