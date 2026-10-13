@@ -2217,4 +2217,84 @@ export class AssessmentService {
       };
     });
   }
+
+  /**
+   * Move an entire group assessment (and all its member registrations) to a
+   * corporate account.  Updates in a single transaction:
+   *   1. group_assessments.corporate_account_id
+   *   2. groups.corporate_account_id
+   *   3. registrations.corporate_account_id + registration_source = 'CORPORATE'
+   *      for every registration whose group_id matches the group.
+   *
+   * Idempotent - safe to call more than once; existing corporate_account_id on
+   * individual registrations is simply overwritten.
+   */
+  async moveGroupToCorporate(
+    groupAssessmentId: number,
+    corporateAccountId: number,
+  ): Promise<{
+    groupAssessmentId: number;
+    groupId: number;
+    corporateAccountId: number;
+    registrationsUpdated: number;
+  }> {
+    return this.dataSource.transaction(async (manager) => {
+      // 1. Load the group assessment.
+      const ga = await manager
+        .getRepository(GroupAssessment)
+        .findOne({ where: { id: groupAssessmentId as any } });
+      if (!ga) {
+        throw new BadRequestException('Group assessment not found.');
+      }
+
+      // 2. Validate the corporate account exists.
+      const corpExists = await manager.query(
+        `SELECT id FROM corporate_accounts WHERE id = $1 LIMIT 1`,
+        [corporateAccountId],
+      );
+      if (!corpExists?.length) {
+        throw new BadRequestException('Corporate account not found.');
+      }
+
+      const groupId = Number(ga.groupId);
+
+      // 3. Update group_assessments row.
+      ga.corporateAccountId = corporateAccountId;
+      await manager.save(ga);
+
+      // 4. Update the groups row.
+      await manager.query(
+        `UPDATE groups SET corporate_account_id = $1 WHERE id = $2`,
+        [corporateAccountId, groupId],
+      );
+
+      // 5. Update all registrations that belong to this group.
+      const updateResult = await manager.query(
+        `UPDATE registrations
+            SET corporate_account_id  = $1,
+                registration_source   = 'CORPORATE'
+          WHERE group_id = $2
+            AND is_deleted = false`,
+        [corporateAccountId, groupId],
+      );
+
+      // pg returns [{command,rowCount}] via DataSource.query
+      const registrationsUpdated =
+        Array.isArray(updateResult) && updateResult[1] != null
+          ? Number(updateResult[1])
+          : 0;
+
+      this.logger.log(
+        `moveGroupToCorporate: ga=${groupAssessmentId} group=${groupId} ` +
+          `-> corporate=${corporateAccountId}, regs updated=${registrationsUpdated}`,
+      );
+
+      return {
+        groupAssessmentId,
+        groupId,
+        corporateAccountId,
+        registrationsUpdated,
+      };
+    });
+  }
 }
