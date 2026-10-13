@@ -1098,8 +1098,9 @@ export class IntegrationsService {
     const baseUrl = 'https://api.clickup.com/api/v2/';
     const cleanPath = path.replace(/^\/+/, '');
     const url = new URL(cleanPath, baseUrl);
-    if (url.origin !== 'https://api.clickup.com') {
-      throw new BadRequestException('Invalid target API origin');
+    const ALLOWED_HOSTS = ['api.clickup.com'];
+    if (!ALLOWED_HOSTS.includes(url.hostname) || url.protocol !== 'https:') {
+      throw new BadRequestException('Untrusted target API host');
     }
     if (params) {
       for (const [k, v] of Object.entries(params)) {
@@ -1139,7 +1140,11 @@ export class IntegrationsService {
     try {
       const safeTeamId = this.sanitizeClickUpId(teamId, 'teamId');
       const targetUrl = this.buildClickUpUrl(`team/${safeTeamId}/space`);
-      const res = await axios.get(targetUrl, {
+      const parsedUrl = new URL(targetUrl);
+      if (parsedUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
+      const res = await axios.get(parsedUrl.toString(), {
         headers: { Authorization: integration.access_token },
       });
       return { success: true, spaces: res.data.spaces || [] };
@@ -1180,7 +1185,11 @@ export class IntegrationsService {
 
       // 1. Folderless lists directly in space
       const listUrl = this.buildClickUpUrl(`space/${safeSpaceId}/list`);
-      const listsRes = await axios.get(listUrl, {
+      const parsedListUrl = new URL(listUrl);
+      if (parsedListUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
+      const listsRes = await axios.get(parsedListUrl.toString(), {
         headers: { Authorization: integration.access_token },
       });
       const folderlessLists = (listsRes.data.lists || []).map((l: any) => ({
@@ -1191,7 +1200,11 @@ export class IntegrationsService {
 
       // 2. Lists inside folders
       const folderUrl = this.buildClickUpUrl(`space/${safeSpaceId}/folder`);
-      const foldersRes = await axios.get(folderUrl, {
+      const parsedFolderUrl = new URL(folderUrl);
+      if (parsedFolderUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
+      const foldersRes = await axios.get(parsedFolderUrl.toString(), {
         headers: { Authorization: integration.access_token },
       });
       const folderLists: any[] = [];
@@ -1324,9 +1337,13 @@ export class IntegrationsService {
     try {
       const safeListId = this.sanitizeClickUpId(listId, 'listId');
       const targetUrl = this.buildClickUpUrl(`list/${safeListId}/task`);
+      const parsedTaskUrl = new URL(targetUrl);
+      if (parsedTaskUrl.hostname !== 'api.clickup.com') {
+        throw new BadRequestException('Untrusted host');
+      }
 
       const res = await axios.post(
-        targetUrl,
+        parsedTaskUrl.toString(),
         {
           name: taskData.name,
           description: taskData.description || 'Created by OriginBI',
@@ -1408,7 +1425,11 @@ export class IntegrationsService {
             include_closed: 'true',
             subtasks: 'true',
           });
-          const res = await axios.get(syncUrl, {
+          const parsedSyncUrl = new URL(syncUrl);
+          if (parsedSyncUrl.hostname !== 'api.clickup.com') {
+            throw new BadRequestException('Untrusted host');
+          }
+          const res = await axios.get(parsedSyncUrl.toString(), {
             headers: { Authorization: integration.access_token },
           });
           const pageTasks = res.data.tasks || [];
