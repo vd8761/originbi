@@ -124,6 +124,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
 
     const [showAddCandidate, setShowAddCandidate] = useState(false);
     const [showMoveToCorporate, setShowMoveToCorporate] = useState(false);
+    const [successNotification, setSuccessNotification] = useState<string | null>(null);
 
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportRows, setExportRows] = useState<any[]>([]);
@@ -447,9 +448,35 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                 isOpen={showMoveToCorporate}
                 groupAssessmentId={sessionId}
                 groupName={groupData?.group?.name}
+                currentCorporateAccount={groupData?.corporateAccount}
                 onClose={() => setShowMoveToCorporate(false)}
-                onSuccess={() => fetchGroupData()}
+                onSuccess={(info) => {
+                    fetchGroupData();
+                    if (info?.companyName) {
+                        setSuccessNotification(
+                            `Group assessment successfully linked to ${info.companyName} (${info.count} registration${info.count !== 1 ? 's' : ''} updated).`
+                        );
+                    } else {
+                        setSuccessNotification('Group assessment successfully updated.');
+                    }
+                    setTimeout(() => setSuccessNotification(null), 6000);
+                }}
             />
+            {/* Success notification banner */}
+            {successNotification && (
+                <div className="mb-4 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-300 flex items-center justify-between shadow-sm animate-fade-in">
+                    <div className="flex items-center gap-3">
+                        <span className="text-xl">✅</span>
+                        <p className="text-sm font-semibold">{successNotification}</p>
+                    </div>
+                    <button
+                        onClick={() => setSuccessNotification(null)}
+                        className="text-xs text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-white px-2 py-1 transition-colors"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
             {/* Header */}
             <div>
                 <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
@@ -518,6 +545,18 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                     <div>
                         <p className="text-xs text-white/50 mb-1.5 font-medium">Exam Ends On</p>
                         <p className="text-base font-semibold text-white">{formatDate(groupData.validTo)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-white/50 mb-1.5 font-medium">Corporate Account</p>
+                        {groupData.corporateAccount ? (
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-brand-green/20 text-brand-green border border-brand-green/40">
+                                    🏢 {groupData.corporateAccount.company_name}
+                                </span>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-white/50 font-medium">Admin Portal (Unassigned)</p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -649,13 +688,31 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         )}
                     </div>
                     <ExcelExportButton onClick={handleExport} />
-                    {/* Move to Corporate */}
+                    {/* Move / Reassign Corporate */}
                     <button
                         onClick={() => setShowMoveToCorporate(true)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm whitespace-nowrap"
-                        title="Move all users in this group to a corporate account"
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all shadow-sm whitespace-nowrap ${
+                            groupData?.corporateAccount
+                                ? 'bg-brand-green/10 dark:bg-brand-green/20 border border-brand-green/40 text-brand-green hover:bg-brand-green/20'
+                                : 'bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30'
+                        }`}
+                        title={
+                            groupData?.corporateAccount
+                                ? `Currently linked to ${groupData.corporateAccount.company_name}. Click to change or reassign.`
+                                : 'Move all users in this group to a corporate account'
+                        }
                     >
-                        🏢 Move to Corporate
+                        <span>🏢</span>
+                        <span>
+                            {groupData?.corporateAccount
+                                ? groupData.corporateAccount.company_name
+                                : 'Move to Corporate'}
+                        </span>
+                        {groupData?.corporateAccount && (
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-brand-green/20 text-brand-green">
+                                Reassign
+                            </span>
+                        )}
                     </button>
                     <button
                         onClick={() => setShowAddCandidate(true)}
