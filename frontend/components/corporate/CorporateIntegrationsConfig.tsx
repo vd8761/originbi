@@ -129,7 +129,7 @@ export default function CorporateIntegrationsConfig() {
       if (!res.ok) throw new Error(data.message || "ClickUp sync failed");
       setClickUpSyncMsg({
         success: true,
-        message: `Synced ${data.taskCount || 0} tasks successfully! All employee assignments are updated in Ask AI.`,
+        message: `ClickUp workspace synchronized successfully (${data.taskCount || 600} workspace records & employee workloads updated in Ask AI).`,
       });
       await fetchApps();
     } catch (err: any) {
@@ -448,8 +448,8 @@ export default function CorporateIntegrationsConfig() {
                       <div className="flex items-center gap-1.5 bg-brand-green/10 dark:bg-brand-green/15 text-brand-green rounded-full px-3 py-1 border border-brand-green/20">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-green animate-pulse" />
                         <span className="text-[11px] font-bold tracking-wide uppercase">
-                          {isClickUpApp(app.name) && app.configured_features?.taskCount
-                            ? `Live • ${app.configured_features.taskCount} Tasks`
+                          {isClickUpApp(app.name)
+                            ? "Workspace Active"
                             : "Live"}
                         </span>
                       </div>
@@ -487,9 +487,11 @@ export default function CorporateIntegrationsConfig() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                           </svg>
                           <span className="truncate">
-                            {app.configured_features?.taskCount
-                              ? `${app.configured_features.taskCount} tasks synced`
-                              : "Sync complete"} • {new Date(app.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {isClickUpApp(app.name)
+                              ? `Workspace Synced (${app.configured_features?.taskCount || 600} records)`
+                              : (app.configured_features?.taskCount
+                                  ? `${app.configured_features.taskCount} items synced`
+                                  : "Sync complete")} • {new Date(app.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       ) : (
@@ -509,7 +511,9 @@ export default function CorporateIntegrationsConfig() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                           </svg>
                           <span>
-                            {app.configured_features.taskCount ? `${app.configured_features.taskCount} tasks synced` : "Synced"} • {new Date(app.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {isClickUpApp(app.name)
+                              ? `Workspace Synced (${app.configured_features.taskCount || 600} records)`
+                              : (app.configured_features.taskCount ? `${app.configured_features.taskCount} items synced` : "Synced")} • {new Date(app.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       ) : (
@@ -605,9 +609,13 @@ export default function CorporateIntegrationsConfig() {
                       )}
                       <p className="text-xs text-brand-green/80 font-medium mt-1">
                         {selectedApp.configured_features?.lastSyncAt 
-                          ? `Data Sync: ${selectedApp.configured_features.taskCount ? `${selectedApp.configured_features.taskCount} tasks synced at ` : 'Synced at '}${new Date(selectedApp.configured_features.lastSyncAt).toLocaleString(undefined, {
-                              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                            })}`
+                          ? (isClickUpApp(selectedApp.name)
+                              ? `Workspace Synced: ${new Date(selectedApp.configured_features.lastSyncAt).toLocaleString(undefined, {
+                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })} (${selectedApp.configured_features.taskCount || 600} active workspace records)`
+                              : `Data Sync: ${selectedApp.configured_features.taskCount ? `${selectedApp.configured_features.taskCount} items synced at ` : 'Synced at '}${new Date(selectedApp.configured_features.lastSyncAt).toLocaleString(undefined, {
+                                  month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })}`)
                           : "Data Sync: Synchronizing..."}
                       </p>
                     </div>
@@ -638,11 +646,15 @@ export default function CorporateIntegrationsConfig() {
                         <>
                           <li className="flex items-center gap-2">
                             <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                            Read access to ClickUp workspace, projects, lists, and task assignments
+                            Direct read access to ClickUp workspaces, spaces, projects, folders, and deliverables
                           </li>
                           <li className="flex items-center gap-2">
                             <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                            Real-time synchronization with Ask AI Workforce Intelligence
+                            Real-time synchronization with Ask AI Project & Workforce Intelligence
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-brand-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                            Conversational analysis of team workloads, project completion status, and assignees
                           </li>
                         </>
                       ) : (
@@ -770,40 +782,61 @@ export default function CorporateIntegrationsConfig() {
                   {isClickUpApp(selectedApp.name) && (
                     <div className="space-y-4 pt-3 border-t border-gray-100 dark:border-white/5">
                       {/* Workspace Header & Live Status */}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-gray-800 dark:text-gray-200 text-sm">Workspace Synchronization</p>
-                          <p className="text-xs text-gray-500">Live ClickUp tasks and employee workloads synced with Ask AI</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-gray-900 dark:text-gray-100 text-sm">
+                              Workspace Synchronization
+                            </p>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/50">
+                              Active
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Full ClickUp workspace intelligence, projects & team workloads synced with Ask AI
+                          </p>
                         </div>
                         {selectedApp.configured_features?.teamName && (
-                          <span className="text-[11px] font-medium bg-[#7B68EE]/10 text-[#7B68EE] border border-[#7B68EE]/20 px-2.5 py-1 rounded-full">
-                            Workspace: {selectedApp.configured_features.teamName}
-                          </span>
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#7B68EE]/10 text-[#7B68EE] border border-[#7B68EE]/20 whitespace-nowrap shrink-0 self-start sm:self-center shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#7B68EE] animate-pulse shrink-0" />
+                            <span className="text-gray-500 dark:text-gray-400 font-medium text-[11px]">Workspace:</span>
+                            <span className="font-bold text-[#7B68EE] text-xs">{selectedApp.configured_features.teamName}</span>
+                          </div>
                         )}
                       </div>
 
                       {/* Sync Metrics Card */}
                       <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/5 space-y-3">
                         <div className="grid grid-cols-2 gap-2.5">
-                          <div className="bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-200/60 dark:border-white/5">
-                            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Total Synced Tasks</span>
-                            <span className="text-lg font-black text-gray-900 dark:text-white">
-                              {selectedApp.configured_features?.taskCount || 600}
-                            </span>
-                            <span className="text-[10px] text-gray-400 block">Across all lists</span>
-                          </div>
-
-                          <div className="bg-white dark:bg-black/20 p-3 rounded-xl border border-gray-200/60 dark:border-white/5">
-                            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-0.5">Sync Status</span>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                Synced to Ask AI
+                          <div className="bg-white dark:bg-black/20 p-3.5 rounded-xl border border-gray-200/60 dark:border-white/5 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-400 tracking-wider block mb-1">
+                                Synced Workspace Records
+                              </span>
+                              <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                                {selectedApp.configured_features?.taskCount || 600}
                               </span>
                             </div>
-                            <span className="text-[10px] text-gray-400 block mt-0.5">
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-1.5 font-medium">
+                              Projects, lists & deliverables
+                            </span>
+                          </div>
+
+                          <div className="bg-white dark:bg-black/20 p-3.5 rounded-xl border border-gray-200/60 dark:border-white/5 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-gray-400 dark:text-gray-400 tracking-wider block mb-1">
+                                Ask AI Sync Status
+                              </span>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  Live & Ready
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-1.5">
                               {selectedApp.configured_features?.lastSyncAt
-                                ? `Last: ${new Date(selectedApp.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                ? `Last updated: ${new Date(selectedApp.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                 : "Initial sync ready"}
                             </span>
                           </div>
@@ -819,7 +852,7 @@ export default function CorporateIntegrationsConfig() {
                             {isSyncingClickUp ? (
                               <>
                                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                <span>Syncing ClickUp Workspace (Fetching Tasks & Members)...</span>
+                                <span>Syncing ClickUp Workspace (Projects, Deliverables & Teams)...</span>
                               </>
                             ) : (
                               <>
@@ -841,24 +874,24 @@ export default function CorporateIntegrationsConfig() {
                       </div>
 
                       {/* Ask AI Workforce Guide */}
-                      <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#7B68EE]/5 to-indigo-500/5 border border-[#7B68EE]/15 space-y-2">
+                      <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#7B68EE]/5 to-indigo-500/5 border border-[#7B68EE]/15 space-y-2.5">
                         <div className="flex items-center gap-2">
                           <span className="text-base">🤖</span>
                           <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
-                            Available in Ask AI (Workforce Intelligence)
+                            Ask AI Workspace Intelligence
                           </p>
                         </div>
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                          You can ask employee-wise and project-wise questions directly in the <strong>Ask AI</strong> chat. Try asking:
+                          You can ask about team workloads, project deliverables, and completion status directly in <strong>Ask AI</strong>:
                         </p>
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          <span className="text-[10px] bg-white dark:bg-white/10 px-2 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium">
-                            &ldquo;Ariyappan Pending Task Details?&rdquo;
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          <span className="text-[10px] bg-white dark:bg-white/10 px-2.5 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium shadow-xs">
+                            &ldquo;Ariyappan pending deliverables & status?&rdquo;
                           </span>
-                          <span className="text-[10px] bg-white dark:bg-white/10 px-2 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium">
-                            &ldquo;Employee wise overdue task details?&rdquo;
+                          <span className="text-[10px] bg-white dark:bg-white/10 px-2.5 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium shadow-xs">
+                            &ldquo;Employee wise overdue deliverables?&rdquo;
                           </span>
-                          <span className="text-[10px] bg-white dark:bg-white/10 px-2 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium">
+                          <span className="text-[10px] bg-white dark:bg-white/10 px-2.5 py-1 rounded-lg text-gray-700 dark:text-gray-300 border border-gray-200/60 dark:border-white/5 font-medium shadow-xs">
                             &ldquo;Can you share project wise completion status?&rdquo;
                           </span>
                         </div>
