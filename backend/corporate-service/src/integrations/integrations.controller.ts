@@ -220,8 +220,16 @@ export class IntegrationsController {
     @Query('teamId') teamId: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    if (!teamId) throw new BadRequestException('Team ID is required');
-    return this.integrationsService.getClickUpSpaces(email, teamId);
+    if (
+      !teamId ||
+      typeof teamId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(teamId.trim())
+    ) {
+      throw new BadRequestException(
+        'Valid teamId is required (must be alphanumeric)',
+      );
+    }
+    return this.integrationsService.getClickUpSpaces(email, teamId.trim());
   }
 
   @Get('clickup/lists')
@@ -230,8 +238,16 @@ export class IntegrationsController {
     @Query('spaceId') spaceId: string,
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    if (!spaceId) throw new BadRequestException('Space ID is required');
-    return this.integrationsService.getClickUpLists(email, spaceId);
+    if (
+      !spaceId ||
+      typeof spaceId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(spaceId.trim())
+    ) {
+      throw new BadRequestException(
+        'Valid spaceId is required (must be alphanumeric)',
+      );
+    }
+    return this.integrationsService.getClickUpLists(email, spaceId.trim());
   }
 
   @Post('clickup/sync-list')
@@ -240,10 +256,18 @@ export class IntegrationsController {
     @Body() body: { listId: string; listName: string; spaceName?: string },
   ) {
     if (!email) throw new BadRequestException('Email is required');
-    if (!body.listId) throw new BadRequestException('List ID is required');
+    if (
+      !body?.listId ||
+      typeof body.listId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(body.listId.trim())
+    ) {
+      throw new BadRequestException(
+        'Valid listId is required (must be alphanumeric)',
+      );
+    }
     return this.integrationsService.saveClickUpSyncList(
       email,
-      body.listId,
+      body.listId.trim(),
       body.listName,
       body.spaceName,
     );
@@ -255,11 +279,20 @@ export class IntegrationsController {
     @Body() body?: { listId?: string },
   ) {
     if (!email) throw new BadRequestException('Email is required');
+    if (
+      body?.listId &&
+      (typeof body.listId !== 'string' ||
+        !/^[a-zA-Z0-9_-]+$/.test(body.listId.trim()))
+    ) {
+      throw new BadRequestException(
+        'Valid listId is required (must be alphanumeric)',
+      );
+    }
     return this.integrationsService.createClickUpTask(email, {
       name: `OriginBI Test Task - Connected Successfully (${new Date().toLocaleTimeString()})`,
       description:
         'This test task was created by OriginBI to verify that your ClickUp integration is working smoothly.\n\nStatus: Connected\nIntegration: OriginBI Candidate Sync',
-      listId: body?.listId,
+      listId: body?.listId ? body.listId.trim() : undefined,
     });
   }
 
@@ -289,10 +322,20 @@ export class IntegrationsController {
   ) {
     if (!email) throw new BadRequestException('Email is required');
     if (!body.name) throw new BadRequestException('Task name is required');
-    return this.integrationsService.createClickUpTask(email, body);
+    if (
+      body.listId &&
+      (typeof body.listId !== 'string' ||
+        !/^[a-zA-Z0-9_-]+$/.test(body.listId.trim()))
+    ) {
+      throw new BadRequestException(
+        'Valid listId is required (must be alphanumeric)',
+      );
+    }
+    return this.integrationsService.createClickUpTask(email, {
+      ...body,
+      listId: body.listId ? body.listId.trim() : undefined,
+    });
   }
-
-
 
   @Put(':appId')
   async updateIntegration(

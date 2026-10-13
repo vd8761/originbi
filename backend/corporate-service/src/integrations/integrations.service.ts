@@ -329,8 +329,7 @@ export class IntegrationsService {
             googleInt.metadata.connectedPicture ||
             configuredFeatures.connectedPicture,
           connectedAt:
-            googleInt.metadata.connectedAt ||
-            configuredFeatures.connectedAt,
+            googleInt.metadata.connectedAt || configuredFeatures.connectedAt,
           syncFolderId: googleInt.metadata.syncFolderId,
           syncFolderName: googleInt.metadata.syncFolderName,
           lastSyncAt: googleInt.metadata.syncedAt,
@@ -356,8 +355,7 @@ export class IntegrationsService {
             clickupInt.metadata.connectedPicture ||
             configuredFeatures.connectedPicture,
           connectedAt:
-            clickupInt.metadata.connectedAt ||
-            configuredFeatures.connectedAt,
+            clickupInt.metadata.connectedAt || configuredFeatures.connectedAt,
           teamName:
             clickupInt.metadata.defaultTeamName ||
             clickupInt.metadata.teamName ||
@@ -371,7 +369,8 @@ export class IntegrationsService {
           syncListName:
             clickupInt.metadata.syncListName || configuredFeatures.syncListName,
           syncSpaceName:
-            clickupInt.metadata.syncSpaceName || configuredFeatures.syncSpaceName,
+            clickupInt.metadata.syncSpaceName ||
+            configuredFeatures.syncSpaceName,
           lastSyncAt:
             clickupInt.metadata.lastSyncAt || configuredFeatures.lastSyncAt,
           taskCount:
@@ -929,14 +928,14 @@ export class IntegrationsService {
       accessToken = tokenRes.data.access_token;
     } catch (err: any) {
       const msg =
-        err.response?.data?.err ||
-        err.response?.data?.error ||
-        err.message;
+        err.response?.data?.err || err.response?.data?.error || err.message;
       throw new BadRequestException(`ClickUp token exchange failed: ${msg}`);
     }
 
     if (!accessToken) {
-      throw new BadRequestException('Did not receive access token from ClickUp');
+      throw new BadRequestException(
+        'Did not receive access token from ClickUp',
+      );
     }
 
     // Fetch ClickUp user profile
@@ -1057,7 +1056,9 @@ export class IntegrationsService {
       where: { corporateAccount: { id: account.id }, provider: 'clickup' },
     });
     if (!integration?.access_token) {
-      throw new BadRequestException('ClickUp is not connected or token is missing');
+      throw new BadRequestException(
+        'ClickUp is not connected or token is missing',
+      );
     }
 
     try {
@@ -1073,9 +1074,55 @@ export class IntegrationsService {
   }
 
   // ─────────────────────────────────────────────────────────
+  //  ClickUp Security & SSRF Protection
+  // ─────────────────────────────────────────────────────────
+  private sanitizeClickUpId(id: unknown, fieldName = 'id'): string {
+    if (!id || typeof id !== 'string') {
+      throw new BadRequestException(
+        `Invalid ${fieldName}: must be a non-empty string`,
+      );
+    }
+    const clean = id.trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(clean)) {
+      throw new BadRequestException(
+        `Invalid ${fieldName}: must be alphanumeric`,
+      );
+    }
+    return encodeURIComponent(clean);
+  }
+
+  private buildClickUpUrl(
+    path: string,
+    params?: Record<string, string>,
+  ): string {
+    const baseUrl = 'https://api.clickup.com/api/v2/';
+    const cleanPath = path.replace(/^\/+/, '');
+    const url = new URL(cleanPath, baseUrl);
+    if (url.origin !== 'https://api.clickup.com') {
+      throw new BadRequestException('Invalid target API origin');
+    }
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v !== undefined && v !== null) {
+          url.searchParams.set(k, String(v));
+        }
+      }
+    }
+    return url.toString();
+  }
+
+  // ─────────────────────────────────────────────────────────
   //  ClickUp: Get Spaces in a Team
   // ─────────────────────────────────────────────────────────
   async getClickUpSpaces(email: string, teamId: string) {
+    if (
+      !teamId ||
+      typeof teamId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(teamId.trim())
+    ) {
+      throw new BadRequestException('Invalid teamId: must be alphanumeric');
+    }
+
     const account = await this.corporateAccountRepo.findOne({
       where: { user: { email } },
       relations: ['user'],
@@ -1090,12 +1137,11 @@ export class IntegrationsService {
     }
 
     try {
-      const res = await axios.get(
-        `https://api.clickup.com/api/v2/team/${teamId}/space`,
-        {
-          headers: { Authorization: integration.access_token },
-        },
-      );
+      const safeTeamId = this.sanitizeClickUpId(teamId, 'teamId');
+      const targetUrl = this.buildClickUpUrl(`team/${safeTeamId}/space`);
+      const res = await axios.get(targetUrl, {
+        headers: { Authorization: integration.access_token },
+      });
       return { success: true, spaces: res.data.spaces || [] };
     } catch (err: any) {
       throw new BadRequestException(
@@ -1108,6 +1154,14 @@ export class IntegrationsService {
   //  ClickUp: Get Lists in a Space
   // ─────────────────────────────────────────────────────────
   async getClickUpLists(email: string, spaceId: string) {
+    if (
+      !spaceId ||
+      typeof spaceId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(spaceId.trim())
+    ) {
+      throw new BadRequestException('Invalid spaceId: must be alphanumeric');
+    }
+
     const account = await this.corporateAccountRepo.findOne({
       where: { user: { email } },
       relations: ['user'],
@@ -1122,13 +1176,13 @@ export class IntegrationsService {
     }
 
     try {
+      const safeSpaceId = this.sanitizeClickUpId(spaceId, 'spaceId');
+
       // 1. Folderless lists directly in space
-      const listsRes = await axios.get(
-        `https://api.clickup.com/api/v2/space/${spaceId}/list`,
-        {
-          headers: { Authorization: integration.access_token },
-        },
-      );
+      const listUrl = this.buildClickUpUrl(`space/${safeSpaceId}/list`);
+      const listsRes = await axios.get(listUrl, {
+        headers: { Authorization: integration.access_token },
+      });
       const folderlessLists = (listsRes.data.lists || []).map((l: any) => ({
         id: l.id,
         name: l.name,
@@ -1136,12 +1190,10 @@ export class IntegrationsService {
       }));
 
       // 2. Lists inside folders
-      const foldersRes = await axios.get(
-        `https://api.clickup.com/api/v2/space/${spaceId}/folder`,
-        {
-          headers: { Authorization: integration.access_token },
-        },
-      );
+      const folderUrl = this.buildClickUpUrl(`space/${safeSpaceId}/folder`);
+      const foldersRes = await axios.get(folderUrl, {
+        headers: { Authorization: integration.access_token },
+      });
       const folderLists: any[] = [];
       for (const folder of foldersRes.data.folders || []) {
         for (const l of folder.lists || []) {
@@ -1170,6 +1222,15 @@ export class IntegrationsService {
     listName: string,
     spaceName?: string,
   ) {
+    if (
+      !listId ||
+      typeof listId !== 'string' ||
+      !/^[a-zA-Z0-9_-]+$/.test(listId.trim())
+    ) {
+      throw new BadRequestException('Invalid listId: must be alphanumeric');
+    }
+    const safeListId = this.sanitizeClickUpId(listId, 'listId');
+
     const account = await this.corporateAccountRepo.findOne({
       where: { user: { email } },
       relations: ['user'],
@@ -1184,7 +1245,7 @@ export class IntegrationsService {
 
     integration.metadata = {
       ...(integration.metadata || {}),
-      syncListId: listId,
+      syncListId: safeListId,
       syncListName: listName,
       syncSpaceName: spaceName,
       lastSyncAt: new Date().toISOString(),
@@ -1209,7 +1270,7 @@ export class IntegrationsService {
       }
       config.configured_features = {
         ...(config.configured_features || {}),
-        syncListId: listId,
+        syncListId: safeListId,
         syncListName: listName,
         syncSpaceName: spaceName,
         lastSyncAt: new Date().toISOString(),
@@ -1218,7 +1279,7 @@ export class IntegrationsService {
       await this.tenantAppConfigRepo.save(config);
     }
 
-    return { success: true, syncListId: listId, syncListName: listName };
+    return { success: true, syncListId: safeListId, syncListName: listName };
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1244,19 +1305,28 @@ export class IntegrationsService {
       where: { corporateAccount: { id: account.id }, provider: 'clickup' },
     });
     if (!integration?.access_token) {
-      throw new BadRequestException('ClickUp is not connected or token is missing');
+      throw new BadRequestException(
+        'ClickUp is not connected or token is missing',
+      );
     }
 
-    const listId = taskData.listId || integration.metadata?.syncListId;
-    if (!listId) {
+    const rawListId = taskData.listId || integration.metadata?.syncListId;
+    if (!rawListId) {
       throw new BadRequestException(
         'No ClickUp List selected. Please select a destination list in ClickUp settings.',
       );
     }
+    const listId = String(rawListId).trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(listId)) {
+      throw new BadRequestException('Invalid listId: must be alphanumeric');
+    }
 
     try {
+      const safeListId = this.sanitizeClickUpId(listId, 'listId');
+      const targetUrl = this.buildClickUpUrl(`list/${safeListId}/task`);
+
       const res = await axios.post(
-        `https://api.clickup.com/api/v2/list/${listId}/task`,
+        targetUrl,
         {
           name: taskData.name,
           description: taskData.description || 'Created by OriginBI',
@@ -1309,33 +1379,47 @@ export class IntegrationsService {
       where: { corporateAccount: { id: account.id }, provider: 'clickup' },
     });
     if (!integration?.access_token) {
-      throw new BadRequestException('ClickUp is not connected or token is missing');
+      throw new BadRequestException(
+        'ClickUp is not connected or token is missing',
+      );
     }
 
-    const teamId =
+    const rawTeamId =
       integration.metadata?.defaultTeamId ||
       integration.metadata?.teams?.[0]?.id;
-    if (!teamId) {
+    if (!rawTeamId) {
       throw new BadRequestException('ClickUp workspace ID not found');
+    }
+    const teamId = String(rawTeamId).trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(teamId)) {
+      throw new BadRequestException(
+        'Invalid workspace ID: must be alphanumeric',
+      );
     }
 
     try {
+      const safeTeamId = this.sanitizeClickUpId(teamId, 'teamId');
       let rawTasks: any[] = [];
       let page = 0;
       while (page < 6) {
         try {
-          const res = await axios.get(
-            `https://api.clickup.com/api/v2/team/${teamId}/task?page=${page}&include_closed=true&subtasks=true`,
-            {
-              headers: { Authorization: integration.access_token },
-            },
-          );
+          const syncUrl = this.buildClickUpUrl(`team/${safeTeamId}/task`, {
+            page: String(page),
+            include_closed: 'true',
+            subtasks: 'true',
+          });
+          const res = await axios.get(syncUrl, {
+            headers: { Authorization: integration.access_token },
+          });
           const pageTasks = res.data.tasks || [];
           rawTasks = rawTasks.concat(pageTasks);
           if (pageTasks.length < 100) break;
           page++;
         } catch (pageErr: any) {
-          console.warn(`ClickUp task page ${page} fetch failed:`, pageErr.message);
+          console.warn(
+            `ClickUp task page ${page} fetch failed:`,
+            pageErr.message,
+          );
           break;
         }
       }
@@ -1549,7 +1633,10 @@ export class IntegrationsService {
         }
       }
       if (completedTasks.length > 0) {
-        context += `  - Recent Completed Tasks: ${completedTasks.slice(0, 6).map((t) => `"${t.name}"`).join(', ')}\n`;
+        context += `  - Recent Completed Tasks: ${completedTasks
+          .slice(0, 6)
+          .map((t) => `"${t.name}"`)
+          .join(', ')}\n`;
       }
     }
 
@@ -1570,7 +1657,10 @@ export class IntegrationsService {
       context += `- Project/List: "${project}" (Total: ${pTasks.length} tasks | Active: ${pOpen.length} | Completed: ${pCompleted.length})\n`;
       pOpen.slice(0, 5).forEach((t: any) => {
         const assignees =
-          t.assignees?.map((a: any) => a.username).join(', ') || 'Unassigned';
+          t.assignees
+            ?.map((a: any): string => String(a?.username || ''))
+            .filter(Boolean)
+            .join(', ') || 'Unassigned';
         context += `  * [${t.status.toUpperCase()}] "${t.name}" (Assignees: ${assignees}, Priority: ${t.priority}, Due: ${t.dueDate || 'None'})\n`;
       });
     }
@@ -1588,7 +1678,6 @@ export class IntegrationsService {
 
     return context;
   }
-
 
   // ─────────────────────────────────────────────────────────
   //  Disconnect an integration
@@ -1625,4 +1714,3 @@ export class IntegrationsService {
     return { success: true };
   }
 }
-

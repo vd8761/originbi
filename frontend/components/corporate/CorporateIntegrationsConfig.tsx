@@ -366,7 +366,7 @@ export default function CorporateIntegrationsConfig() {
       } else {
         setSelectedClickUpList(null);
       }
-      setClickUpTestResult(null);
+      setClickUpSyncMsg(null);
       if (selectedApp.status === "connected") {
         fetchClickUpHierarchy(selectedApp);
       }
