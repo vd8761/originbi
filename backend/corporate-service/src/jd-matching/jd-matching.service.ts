@@ -2096,16 +2096,22 @@ RESPONSE RULES:
       promises.push(Promise.resolve(null));
     }
 
-    const [candidatesResult, zenroResult, kbResult] = await Promise.allSettled(promises);
+    const [candidatesResult, zenroResult, kbResult] =
+      await Promise.allSettled(promises);
 
     const discCandidates =
       candidatesResult.status === 'fulfilled' ? candidatesResult.value : [];
     const zenroData =
       zenroResult.status === 'fulfilled' ? zenroResult.value : null;
-    
+
     let knowledgeBaseContext = frontendKbContext || '';
-    if (kbResult.status === 'fulfilled' && kbResult.value && kbResult.value.success) {
-      knowledgeBaseContext += (knowledgeBaseContext ? '\n' : '') + kbResult.value.content;
+    if (
+      kbResult.status === 'fulfilled' &&
+      kbResult.value &&
+      kbResult.value.success
+    ) {
+      knowledgeBaseContext +=
+        (knowledgeBaseContext ? '\n' : '') + kbResult.value.content;
     }
 
     const hasDisc = discCandidates.length > 0;
@@ -2350,9 +2356,10 @@ RESPONSE RULES:
         schemaStr += `"${row.column_name}"(${row.data_type}), `;
       }
 
-      const historyContext = history.length > 0 
-        ? `\nCONVERSATION HISTORY:\n${history.map(h => `${h.role}: ${h.content}`).join('\n')}\n` 
-        : '';
+      const historyContext =
+        history.length > 0
+          ? `\nCONVERSATION HISTORY:\n${history.map((h) => `${h.role}: ${h.content}`).join('\n')}\n`
+          : '';
 
       const sqlRes = await this.getOpenAIClient().chat.completions.create({
         model: 'gpt-4o-mini',
@@ -2396,22 +2403,24 @@ CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
           .replace(/\n?```$/i, '')
           .trim();
       }
-      
+
       this.logger.log(`[DEBUG Zenro Context SQL] Generates: ${sql}`);
 
       if (sql === 'SKIP' || !sql.toLowerCase().startsWith('select')) {
-        this.logger.warn(`[DEBUG Zenro Context] Skipped because sql was: ${sql}`);
+        this.logger.warn(
+          `[DEBUG Zenro Context] Skipped because sql was: ${sql}`,
+        );
         return null;
       }
 
       const rows = await this.dataSource.query(sql);
       this.logger.log(`[DEBUG Zenro Context Rows] Length: ${rows?.length}`);
-      
+
       if (!rows || rows.length === 0) {
         this.logger.warn(`[DEBUG Zenro Context] Rows were empty`);
         return null;
       }
-      
+
       // Limit result rows to 20 to prevent token overflow in unified query
       const limitedRows = rows.slice(0, 20);
       const jsonRes = JSON.stringify(limitedRows, null, 2);

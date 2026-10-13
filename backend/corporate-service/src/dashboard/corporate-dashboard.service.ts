@@ -1463,10 +1463,7 @@ export class CorporateDashboardService {
       this.configService.get('ADMIN_SERVICE_URL') || 'http://localhost:4001';
     try {
       await firstValueFrom(
-        this.httpService.post(
-          `${adminServiceUrl}/alerts/internal`,
-          data,
-        ),
+        this.httpService.post(`${adminServiceUrl}/alerts/internal`, data),
       );
     } catch (err: any) {
       console.error(
