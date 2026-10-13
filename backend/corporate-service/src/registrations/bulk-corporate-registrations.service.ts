@@ -1150,8 +1150,7 @@ export class BulkCorporateRegistrationsService {
 
     isCollege =
       isCollege || (!!pCode && pCode.toUpperCase().includes('COLLEGE'));
-    isSchool =
-      isSchool || (!!pCode && pCode.toUpperCase().includes('SCHOOL'));
+    isSchool = isSchool || (!!pCode && pCode.toUpperCase().includes('SCHOOL'));
     const isEmployee = !!pCode && !isCollege && !isSchool;
 
     // Resolve DepartmentDegreeId
@@ -1221,7 +1220,9 @@ export class BulkCorporateRegistrationsService {
       departmentId: departmentDegreeId ? String(departmentDegreeId) : undefined, // Corporate frontend dto expects departmentId as string which maps to departmentDegreeId in backend
       degreeId: undefined, // Not used in registration directly, inferred via DepartmentDegree
       currentYear:
-        (isCollege || isSchool) && currentYear ? String(currentYear) : undefined,
+        (isCollege || isSchool) && currentYear
+          ? String(currentYear)
+          : undefined,
       currentRole:
         this.getValue(rawData, [
           'CurrentRole',

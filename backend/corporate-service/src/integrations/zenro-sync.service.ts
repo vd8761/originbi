@@ -204,7 +204,7 @@ export class ZenroSyncService implements OnModuleInit {
             const rowPlaceholders: string[] = [];
             for (const colName of colNames) {
               let val = row[colName];
-              
+
               // Handle MySQL zero dates which strictly crash PostgreSQL
               if (
                 typeof val === 'string' &&

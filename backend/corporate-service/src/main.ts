@@ -18,28 +18,41 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       // Allow requests with no origin (curl, server-to-server, mobile apps)
-      if (!origin) return callback(null, true);
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
 
       // Allow *.originbi.com (any subdomain)
       if (/^https:\/\/([a-z0-9-]+\.)*originbi\.com$/.test(origin)) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
       // Allow Vercel deployments
       if (origin.endsWith('.vercel.app')) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
       // Allow localhost for development
-      if (/^http:\/\/localhost(:\d+)?$/.test(origin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
-        return callback(null, true);
+      if (
+        /^http:\/\/localhost(:\d+)?$/.test(origin) ||
+        /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)
+      ) {
+        callback(null, true);
+        return;
       }
 
       // Allow any extra origins from FRONTEND_URL env
       if (extraOrigins.includes(origin)) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
       console.warn(`[CORS] Blocked origin in corporate-service: ${origin}`);
