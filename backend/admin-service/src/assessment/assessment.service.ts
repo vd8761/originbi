@@ -705,6 +705,23 @@ export class AssessmentService {
         return null;
       }
 
+      const corpId =
+        groupAssessment.corporateAccountId ||
+        (groupAssessment.group as any)?.corporateAccountId;
+      let corporateAccount: { id: number; company_name: string } | null = null;
+      if (corpId) {
+        const corpRows = await this.groupAssessmentRepo.manager.query(
+          `SELECT id, company_name FROM corporate_accounts WHERE id = $1 LIMIT 1`,
+          [corpId],
+        );
+        if (corpRows?.length) {
+          corporateAccount = {
+            id: Number(corpRows[0].id),
+            company_name: corpRows[0].company_name,
+          };
+        }
+      }
+
       const sessions = await this.sessionRepo.find({
         where: { groupAssessmentId: id },
         relations: ['user', 'registration'],
@@ -713,6 +730,7 @@ export class AssessmentService {
 
       return {
         ...groupAssessment,
+        corporateAccount,
         sessions: sessions.map((s) => ({
           ...s,
           userFullName: s.registration?.fullName || 'N/A',
@@ -2258,9 +2276,11 @@ export class AssessmentService {
 
       const groupId = Number(ga.groupId);
 
-      // 3. Update group_assessments row.
-      ga.corporateAccountId = corporateAccountId;
-      await manager.save(ga);
+      // 3. Update all group_assessments rows for this group.
+      await manager.query(
+        `UPDATE group_assessments SET corporate_account_id = $1 WHERE group_id = $2`,
+        [corporateAccountId, groupId],
+      );
 
       // 4. Update the groups row.
       await manager.query(
