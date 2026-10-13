@@ -16,7 +16,6 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         'email',
         'profile',
         'https://www.googleapis.com/auth/drive.readonly',
-        'https://www.googleapis.com/auth/contacts.readonly',
       ],
       passReqToCallback: true,
     });

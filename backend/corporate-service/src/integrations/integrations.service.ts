@@ -114,7 +114,6 @@ export class IntegrationsService {
       'https://www.googleapis.com/auth/userinfo.email',
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/drive.readonly', // read access to list and read files
-      'https://www.googleapis.com/auth/contacts.readonly', // people API
     ];
 
     const url = oauth2Client.generateAuthUrl({
