@@ -12,7 +12,7 @@ interface MoveGroupToCorporateModalProps {
   /** Human-readable label shown in the title (e.g. "CMS-NAMAKKAL-2026") */
   groupName?: string;
   /** Current corporate account if already assigned */
-  currentCorporateAccount?: { id: number; company_name: string } | null;
+  currentCorporateAccount?: { id: number | string; company_name: string } | null;
   onClose: () => void;
   onSuccess: (info?: { companyName: string; count: number }) => void;
 }
@@ -77,7 +77,7 @@ const MoveGroupToCorporateModal: React.FC<MoveGroupToCorporateModalProps> = ({
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!selectedAccount) return setError("Please select a corporate account.");
-    if (currentCorporateAccount && selectedAccount.id === currentCorporateAccount.id) {
+    if (currentCorporateAccount && String(selectedAccount.id) === String(currentCorporateAccount.id)) {
       return setError("This group is already assigned to " + currentCorporateAccount.company_name + ".");
     }
 
@@ -116,8 +116,9 @@ const MoveGroupToCorporateModal: React.FC<MoveGroupToCorporateModalProps> = ({
     );
   });
 
-  const isCurrentSelection =
-    currentCorporateAccount && selectedAccount?.id === currentCorporateAccount.id;
+  const isCurrentSelection = Boolean(
+    currentCorporateAccount && String(selectedAccount?.id) === String(currentCorporateAccount.id)
+  );
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center px-4">
@@ -239,7 +240,9 @@ const MoveGroupToCorporateModal: React.FC<MoveGroupToCorporateModalProps> = ({
               )}
               {filtered.map((ca) => {
                 const isSelected = selectedAccount?.id === ca.id;
-                const isCurrent = currentCorporateAccount && ca.id === currentCorporateAccount.id;
+                const isCurrent = Boolean(
+                  currentCorporateAccount && String(ca.id) === String(currentCorporateAccount.id)
+                );
 
                 return (
                   <button
