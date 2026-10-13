@@ -713,4 +713,37 @@ export const assessmentService = {
         }
         return res.json();
     },
+
+    /**
+     * Move a group assessment (and ALL its member registrations) to a
+     * corporate account. Updates group_assessments, groups and registrations
+     * in one atomic transaction on the backend.
+     */
+    async moveGroupToCorporate(
+        groupAssessmentId: number | string,
+        corporateAccountId: number | string,
+    ): Promise<{
+        groupAssessmentId: number;
+        groupId: number;
+        corporateAccountId: number;
+        registrationsUpdated: number;
+    }> {
+        const token = AuthService.getToken();
+        const res = await fetch(
+            `${API_URL}/admin/assessments/group/${groupAssessmentId}/move-to-corporate`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: token ? `Bearer ${token}` : "",
+                },
+                body: JSON.stringify({ corporateAccountId: Number(corporateAccountId) }),
+            },
+        );
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.message || "Failed to move group to corporate account");
+        }
+        return res.json();
+    },
 };

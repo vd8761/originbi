@@ -5,6 +5,7 @@ import { ArrowLeftWithoutLineIcon, ArrowRightWithoutLineIcon, ChevronDownIcon, E
 import ExcelExportButton from '../ui/ExcelExportButton';
 import ExcelExportModal, { ExcelExportColumn } from '../ui/ExcelExportModal';
 import AddCandidateModal from './AddCandidateModal';
+import MoveGroupToCorporateModal from './MoveGroupToCorporateModal';
 
 interface GroupAssessmentPreviewProps {
     sessionId: string;
@@ -122,6 +123,7 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
     const [reportEmailSent, setReportEmailSent] = useState(false);
 
     const [showAddCandidate, setShowAddCandidate] = useState(false);
+    const [showMoveToCorporate, setShowMoveToCorporate] = useState(false);
 
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportRows, setExportRows] = useState<any[]>([]);
@@ -441,6 +443,13 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                 onClose={() => setShowAddCandidate(false)}
                 onSuccess={() => fetchGroupData()}
             />
+            <MoveGroupToCorporateModal
+                isOpen={showMoveToCorporate}
+                groupAssessmentId={sessionId}
+                groupName={groupData?.group?.name}
+                onClose={() => setShowMoveToCorporate(false)}
+                onSuccess={() => fetchGroupData()}
+            />
             {/* Header */}
             <div>
                 <div className="flex items-center text-xs text-black dark:text-white mb-1.5 font-normal flex-wrap">
@@ -640,6 +649,14 @@ const GroupAssessmentPreview: React.FC<GroupAssessmentPreviewProps> = ({ session
                         )}
                     </div>
                     <ExcelExportButton onClick={handleExport} />
+                    {/* Move to Corporate */}
+                    <button
+                        onClick={() => setShowMoveToCorporate(true)}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-[#FFFFFF1F] border border-gray-200 dark:border-[#FFFFFF1F] rounded-lg text-sm font-medium text-[#19211C] dark:text-white hover:bg-gray-50 dark:hover:bg-white/30 transition-all shadow-sm whitespace-nowrap"
+                        title="Move all users in this group to a corporate account"
+                    >
+                        🏢 Move to Corporate
+                    </button>
                     <button
                         onClick={() => setShowAddCandidate(true)}
                         className="flex items-center gap-1.5 px-4 py-2 bg-brand-green text-white rounded-lg text-sm font-medium hover:bg-brand-green/90 shadow-lg shadow-brand-green/20 transition-all whitespace-nowrap"

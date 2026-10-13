@@ -174,6 +174,22 @@ export class AssessmentController {
     return this.assessmentService.extendGroupAssessment(Number(id), newDate);
   }
 
+  /**
+   * Move a group assessment (and ALL its member registrations) to a given
+   * corporate account.  Updates group_assessments, groups, and registrations
+   * in a single atomic transaction.
+   */
+  @Post('group/:id/move-to-corporate')
+  async moveGroupToCorporate(
+    @Param('id') id: string,
+    @Body('corporateAccountId') corporateAccountId: number,
+  ) {
+    return this.assessmentService.moveGroupToCorporate(
+      Number(id),
+      Number(corporateAccountId),
+    );
+  }
+
   // Extend a single (individual) session window and reopen it.
   @Put('sessions/:id/extend')
   async extendSession(
