@@ -54,12 +54,14 @@ export class ZenroSyncService implements OnModuleInit {
 
   onModuleInit() {
     this.logger.log(
-      '🔥 TEST MODE: Running Zenro Sync in background on startup...',
+      '🔥 TEST MODE: Scheduled Zenro Sync on startup (starting in 10s warmup delay)...',
     );
-    // Run asynchronously so it doesn't block server startup
-    this.syncAllZenroTenants().catch((err) => {
-      this.logger.error('Failed to run background Zenro sync on startup', err);
-    });
+    // Delay 10s so server boot and network sockets initialize smoothly
+    setTimeout(() => {
+      this.syncAllZenroTenants().catch((err) => {
+        this.logger.error('Failed to run background Zenro sync on startup', err);
+      });
+    }, 10000);
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
@@ -90,7 +92,7 @@ export class ZenroSyncService implements OnModuleInit {
     }
   }
 
-  private async syncTenant(config: TenantAppConfig) {
+  async syncTenant(config: TenantAppConfig) {
     const features = config.configured_features || {};
     if (!features.db_host || !features.db_user || !features.db_pass) return;
 
@@ -98,160 +100,181 @@ export class ZenroSyncService implements OnModuleInit {
       `🔄 Syncing Zenro (Read-Only) for tenant ${config.tenant_id}...`,
     );
 
-    // 1. Connect strictly READ-ONLY to remote MySQL
+    // 1. Connect strictly READ-ONLY to remote MySQL with retries & timeout
     const password = decrypt(features.db_pass);
 
-    // DEBUG: Log connection parameters so the user can verify what is currently in the DB
-    this.logger.debug(`[DEBUG] Attempting connection with:
-      Host: ${features.db_host}
-      Port: ${features.db_port || '3306'}
-      User: ${features.db_user}
-      Database: ${features.db_name}
-      Password length: ${password?.length} characters (Starts with: ${password?.substring(0, 3)}...)
-    `);
+    let remoteDb: mysql.Connection | null = null;
+    const maxRetries = 3;
+    let attempt = 0;
 
-    const remoteDb = await mysql.createConnection({
-      host: features.db_host,
-      port: parseInt(features.db_port || '3306'),
-      user: features.db_user,
-      password: password,
-      database: features.db_name,
-    });
-
-    const schemaName = `zenro_tenant_${config.tenant_id}`;
-    const tempSchemaName = `${schemaName}_temp`;
-
-    // 2. Setup safe, isolated PostgreSQL schema in OriginBI
-    await this.dataSource.query(
-      `DROP SCHEMA IF EXISTS ${tempSchemaName} CASCADE;`,
-    );
-    await this.dataSource.query(`CREATE SCHEMA ${tempSchemaName};`);
-
-    // 3. Discover N Tables automatically
-    const [tablesRow] = await remoteDb.query('SHOW TABLES');
-    const tables = (tablesRow as any[])
-      .map((row) => Object.values(row)[0] as string)
-      .filter((t) => !t.endsWith('_log') && !t.includes('api_log'));
-
-    this.logger.log(
-      `📋 Discovered ${tables.length} tables (ignored massive logs). Mirroring to PostgreSQL schema: ${tempSchemaName}`,
-    );
-
-    // 4. Safely map MySQL types to Postgres types
-    for (const table of tables) {
-      const [columns] = await remoteDb.query(
-        `SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = ? AND table_name = ?`,
-        [features.db_name, table],
-      );
-
-      let createTableQuery = `CREATE TABLE ${tempSchemaName}.${table} (`;
-      const colDefs: string[] = [];
-      const colNames: string[] = [];
-
-      for (const col of columns as any[]) {
-        const type = col.DATA_TYPE.toLowerCase();
-        let pgType = 'TEXT';
-        if (type.includes('int')) pgType = 'INTEGER';
-        else if (
-          type.includes('decimal') ||
-          type.includes('float') ||
-          type.includes('double')
-        )
-          pgType = 'NUMERIC';
-        else if (type.includes('datetime') || type.includes('timestamp'))
-          pgType = 'TIMESTAMP';
-        else if (type.includes('date')) pgType = 'DATE';
-        else if (type.includes('time'))
-          pgType = 'TEXT'; // MySQL allows negative TIME (e.g. "-09:30:00"), PG TIME does not. Use TEXT.
-        else if (type.includes('bool') || type.includes('tinyint'))
-          pgType = 'BOOLEAN';
-
-        // Escape reserved words safely in quotes
-        colDefs.push(`"${col.COLUMN_NAME}" ${pgType}`);
-        colNames.push(col.COLUMN_NAME);
-      }
-      createTableQuery += colDefs.join(', ') + ');';
-
-      // Create PostgreSQL table
-      await this.dataSource.query(createTableQuery);
-
-      // 5. Safely copy rows in chunks to prevent Out of Memory errors
-      let offset = 0;
-      const fetchBatchSize = 10000;
-      let hasMore = true;
-      let totalRows = 0;
-
-      while (hasMore) {
-        const [rows] = await remoteDb.query(
-          `SELECT * FROM ${table} LIMIT ${fetchBatchSize} OFFSET ${offset}`,
+    while (attempt < maxRetries) {
+      try {
+        attempt++;
+        this.logger.log(
+          `🔌 Connecting to MySQL (${features.db_host}:${features.db_port || '3306'}) [Attempt ${attempt}/${maxRetries}]...`,
         );
-        const batchRows = rows as any[];
-
-        if (batchRows.length === 0) {
-          hasMore = false;
-          break;
+        remoteDb = await mysql.createConnection({
+          host: features.db_host,
+          port: parseInt(features.db_port || '3306'),
+          user: features.db_user,
+          password: password,
+          database: features.db_name,
+          connectTimeout: 20000,
+        });
+        break;
+      } catch (connErr: any) {
+        if (attempt >= maxRetries) {
+          throw connErr;
         }
-
-        totalRows += batchRows.length;
-        const BATCH_SIZE = 100;
-        for (let i = 0; i < batchRows.length; i += BATCH_SIZE) {
-          const insertBatch = batchRows.slice(i, i + BATCH_SIZE);
-          const values: any[] = [];
-          const placeholders: string[] = [];
-          let paramIndex = 1;
-
-          for (const row of insertBatch) {
-            const rowPlaceholders: string[] = [];
-            for (const colName of colNames) {
-              let val = row[colName];
-
-              // Handle MySQL zero dates which strictly crash PostgreSQL
-              if (
-                typeof val === 'string' &&
-                (val === '0000-00-00' || val.startsWith('0000-00-00'))
-              ) {
-                val = null;
-              }
-              if (val instanceof Date && isNaN(val.getTime())) {
-                val = null;
-              }
-
-              values.push(val ?? null);
-              rowPlaceholders.push(`$${paramIndex++}`);
-            }
-            placeholders.push(`(${rowPlaceholders.join(',')})`);
-          }
-
-          const insertQuery = `INSERT INTO ${tempSchemaName}.${table} ("${colNames.join('","')}") VALUES ${placeholders.join(',')}`;
-          await this.dataSource.query(insertQuery, values);
-        }
-
-        offset += fetchBatchSize;
-        if (batchRows.length < fetchBatchSize) {
-          hasMore = false;
-        }
+        this.logger.warn(
+          `⚠️ MySQL connection attempt ${attempt} failed: ${connErr.message}. Retrying in 5s...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
-      this.logger.log(`  -> Synced table: ${table} (${totalRows} rows)`);
     }
 
-    await remoteDb.end();
+    if (!remoteDb) {
+      throw new Error('Failed to establish connection to remote MySQL database');
+    }
 
-    // 6. Zero Downtime Swap: Safely replace the old schema with the new mirrored schema
-    await this.dataSource.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE;`);
-    await this.dataSource.query(
-      `ALTER SCHEMA ${tempSchemaName} RENAME TO ${schemaName};`,
-    );
+    try {
+      const schemaName = `zenro_tenant_${config.tenant_id}`;
+      const tempSchemaName = `${schemaName}_temp`;
 
-    // 7. Update Last Sync Time
-    const currentFeatures = config.configured_features || {};
-    config.configured_features = {
-      ...currentFeatures,
-      lastSyncAt: new Date().toISOString(),
-    };
-    await this.tenantAppConfigRepo.save(config);
+      // 2. Setup safe, isolated PostgreSQL schema in OriginBI
+      await this.dataSource.query(
+        `DROP SCHEMA IF EXISTS ${tempSchemaName} CASCADE;`,
+      );
+      await this.dataSource.query(`CREATE SCHEMA ${tempSchemaName};`);
 
-    this.logger.log(
-      `✅ Successfully securely mirrored Zenro DB into PostgreSQL Schema: ${schemaName}`,
-    );
+      // 3. Discover N Tables automatically
+      const [tablesRow] = await remoteDb.query('SHOW TABLES');
+      const tables = (tablesRow as any[])
+        .map((row) => Object.values(row)[0] as string)
+        .filter((t) => !t.endsWith('_log') && !t.includes('api_log'));
+
+      this.logger.log(
+        `📋 Discovered ${tables.length} tables (ignored massive logs). Mirroring to PostgreSQL schema: ${tempSchemaName}`,
+      );
+
+      // 4. Safely map MySQL types to Postgres types
+      for (const table of tables) {
+        const [columns] = await remoteDb.query(
+          `SELECT COLUMN_NAME, DATA_TYPE FROM information_schema.columns WHERE table_schema = ? AND table_name = ?`,
+          [features.db_name, table],
+        );
+
+        let createTableQuery = `CREATE TABLE ${tempSchemaName}."${table}" (`;
+        const colDefs: string[] = [];
+        const colNames: string[] = [];
+
+        for (const col of columns as any[]) {
+          const type = col.DATA_TYPE.toLowerCase();
+          let pgType = 'TEXT';
+          if (type.includes('int')) pgType = 'INTEGER';
+          else if (
+            type.includes('decimal') ||
+            type.includes('float') ||
+            type.includes('double')
+          )
+            pgType = 'NUMERIC';
+          else if (type.includes('datetime') || type.includes('timestamp'))
+            pgType = 'TIMESTAMP';
+          else if (type.includes('date')) pgType = 'DATE';
+          else if (type.includes('time'))
+            pgType = 'TEXT'; // MySQL allows negative TIME (e.g. "-09:30:00"), PG TIME does not. Use TEXT.
+          else if (type.includes('bool') || type.includes('tinyint'))
+            pgType = 'BOOLEAN';
+
+          // Escape reserved words safely in quotes
+          colDefs.push(`"${col.COLUMN_NAME}" ${pgType}`);
+          colNames.push(col.COLUMN_NAME);
+        }
+        createTableQuery += colDefs.join(', ') + ');';
+
+        // Create PostgreSQL table
+        await this.dataSource.query(createTableQuery);
+
+        // 5. Safely copy rows in chunks to prevent Out of Memory errors
+        let offset = 0;
+        const fetchBatchSize = 10000;
+        let hasMore = true;
+        let totalRows = 0;
+
+        while (hasMore) {
+          const [rows] = await remoteDb.query(
+            `SELECT * FROM \`${table}\` LIMIT ${fetchBatchSize} OFFSET ${offset}`,
+          );
+          const batchRows = rows as any[];
+
+          if (batchRows.length === 0) {
+            hasMore = false;
+            break;
+          }
+
+          totalRows += batchRows.length;
+          const BATCH_SIZE = 100;
+          for (let i = 0; i < batchRows.length; i += BATCH_SIZE) {
+            const insertBatch = batchRows.slice(i, i + BATCH_SIZE);
+            const values: any[] = [];
+            const placeholders: string[] = [];
+            let paramIndex = 1;
+
+            for (const row of insertBatch) {
+              const rowPlaceholders: string[] = [];
+              for (const colName of colNames) {
+                let val = row[colName];
+
+                // Handle MySQL zero dates which strictly crash PostgreSQL
+                if (
+                  typeof val === 'string' &&
+                  (val === '0000-00-00' || val.startsWith('0000-00-00'))
+                ) {
+                  val = null;
+                }
+                if (val instanceof Date && isNaN(val.getTime())) {
+                  val = null;
+                }
+
+                values.push(val ?? null);
+                rowPlaceholders.push(`$${paramIndex++}`);
+              }
+              placeholders.push(`(${rowPlaceholders.join(',')})`);
+            }
+
+            const insertQuery = `INSERT INTO ${tempSchemaName}."${table}" ("${colNames.join('","')}") VALUES ${placeholders.join(',')}`;
+            await this.dataSource.query(insertQuery, values);
+          }
+
+          offset += fetchBatchSize;
+          if (batchRows.length < fetchBatchSize) {
+            hasMore = false;
+          }
+        }
+        this.logger.log(`  -> Synced table: ${table} (${totalRows} rows)`);
+      }
+
+      // 6. Zero Downtime Swap: Safely replace the old schema with the new mirrored schema
+      await this.dataSource.query(`DROP SCHEMA IF EXISTS ${schemaName} CASCADE;`);
+      await this.dataSource.query(
+        `ALTER SCHEMA ${tempSchemaName} RENAME TO ${schemaName};`,
+      );
+
+      // 7. Update Last Sync Time
+      const currentFeatures = config.configured_features || {};
+      config.configured_features = {
+        ...currentFeatures,
+        lastSyncAt: new Date().toISOString(),
+      };
+      await this.tenantAppConfigRepo.save(config);
+
+      this.logger.log(
+        `✅ Successfully securely mirrored Zenro DB into PostgreSQL Schema: ${schemaName}`,
+      );
+    } finally {
+      if (remoteDb) {
+        await remoteDb.end().catch(() => {});
+      }
+    }
   }
 }

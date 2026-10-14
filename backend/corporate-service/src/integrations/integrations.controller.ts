@@ -302,6 +302,12 @@ export class IntegrationsController {
     return this.integrationsService.syncClickUpData(email);
   }
 
+  @Post('zenro/sync')
+  async syncZenro(@Query('email') email: string) {
+    if (!email) throw new BadRequestException('Email is required');
+    return this.integrationsService.syncZenroData(email);
+  }
+
   @Get('clickup/context')
   async getClickUpContext(@Query('email') email: string) {
     if (!email) throw new BadRequestException('Email is required');

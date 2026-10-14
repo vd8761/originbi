@@ -18,6 +18,7 @@ const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import * as crypto from 'crypto';
 import axios from 'axios';
+import { ZenroSyncService } from './zenro-sync.service';
 
 function getEncryptionKey(): string {
   let key =
@@ -85,6 +86,7 @@ export class IntegrationsService {
     private readonly corporateIntegrationRepo: Repository<CorporateIntegration>,
     @InjectRepository(MasterApp)
     private readonly masterAppRepo: Repository<MasterApp>,
+    private readonly zenroSyncService: ZenroSyncService,
   ) {}
 
   // ─────────────────────────────────────────────────────────
@@ -1697,6 +1699,37 @@ export class IntegrationsService {
     }
 
     return context;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  //  Zenro: Synchronize Database into OriginBI PostgreSQL
+  // ─────────────────────────────────────────────────────────
+  async syncZenroData(email: string) {
+    const account = await this.corporateAccountRepo.findOne({
+      where: { user: { email } },
+      relations: ['user'],
+    });
+    if (!account) throw new NotFoundException('Corporate account not found');
+
+    const config = await this.tenantAppConfigRepo
+      .createQueryBuilder('config')
+      .innerJoinAndSelect('config.app', 'masterApp')
+      .where('masterApp.name = :appName', { appName: 'zenro_payroll' })
+      .andWhere('config.tenant_id = :tenantId', { tenantId: String(account.id) })
+      .andWhere('config.status = :status', { status: 'connected' })
+      .getOne();
+
+    if (!config) {
+      throw new BadRequestException(
+        'Zenro Payroll is not connected for this corporate account',
+      );
+    }
+
+    await this.zenroSyncService.syncTenant(config);
+    return {
+      success: true,
+      message: 'Zenro Payroll schema and tables synchronized successfully',
+    };
   }
 
   // ─────────────────────────────────────────────────────────
