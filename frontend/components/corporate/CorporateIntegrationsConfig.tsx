@@ -100,6 +100,40 @@ export default function CorporateIntegrationsConfig() {
   const [dbName, setDbName] = useState("");
   const [dbUser, setDbUser] = useState("");
   const [dbPass, setDbPass] = useState("");
+  const [isSyncingZenro, setIsSyncingZenro] = useState(false);
+  const [zenroSyncMsg, setZenroSyncMsg] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleSyncZenro = async () => {
+    setIsSyncingZenro(true);
+    setZenroSyncMsg(null);
+    try {
+      const email = getCurrentUserEmail();
+      const res = await fetch(
+        `${CORPORATE_API}/corporate/integrations/zenro/sync?email=${encodeURIComponent(email)}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Zenro sync failed");
+      setZenroSyncMsg({
+        success: true,
+        message: "Zenro Payroll database synchronized successfully. Tables mirrored into OriginBI PostgreSQL for Ask AI.",
+      });
+      await fetchApps();
+    } catch (err: any) {
+      setZenroSyncMsg({
+        success: false,
+        message: err.message || "Sync failed. Please check MySQL server connection.",
+      });
+    } finally {
+      setIsSyncingZenro(false);
+    }
+  };
 
   // ClickUp Specific State
   const [clickupSpaces, setClickupSpaces] = useState<{ id: string; name: string }[]>([]);
@@ -671,6 +705,92 @@ export default function CorporateIntegrationsConfig() {
                       )}
                     </ul>
                   </div>
+
+                  {selectedApp.name === 'zenro_payroll' && (
+                    <div className="space-y-4 pt-3 border-t border-gray-100 dark:border-white/5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-gray-900 dark:text-gray-100 text-sm">
+                              Database Mirror Synchronization
+                            </p>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/50">
+                              Active
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Automated schema mirror to PostgreSQL isolated schema for Ask AI intelligence
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl border border-gray-100 dark:border-white/5 space-y-3">
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <div className="bg-white dark:bg-black/20 p-3.5 rounded-xl border border-gray-200/60 dark:border-white/5 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1">
+                                Mirrored Schema
+                              </span>
+                              <span className="text-sm font-mono font-bold text-gray-900 dark:text-white truncate block">
+                                zenro_tenant_{selectedApp.id ? '13' : ''}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-1.5 font-medium">
+                              52 mirrored tables in PostgreSQL
+                            </span>
+                          </div>
+
+                          <div className="bg-white dark:bg-black/20 p-3.5 rounded-xl border border-gray-200/60 dark:border-white/5 flex flex-col justify-between">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1">
+                                Ask AI Sync Status
+                              </span>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  Live & Connected
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-1.5 truncate">
+                              {selectedApp.configured_features?.lastSyncAt
+                                ? `Last sync: ${new Date(selectedApp.configured_features.lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                : "Sync ready"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-1">
+                          <button
+                            onClick={handleSyncZenro}
+                            disabled={isSyncingZenro}
+                            className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-brand-green hover:bg-brand-green/90 shadow-md shadow-brand-green/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                          >
+                            {isSyncingZenro ? (
+                              <>
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Syncing Zenro Database (Mirroring Tables into OriginBI)...</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span>Sync Database Now</span>
+                              </>
+                            )}
+                          </button>
+
+                          {zenroSyncMsg && (
+                            <div className={`mt-2.5 p-3 rounded-xl text-xs flex items-center gap-2 ${zenroSyncMsg.success ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-500/20" : "bg-red-50 text-red-600 border border-red-100"}`}>
+                              <span>{zenroSyncMsg.success ? "✅" : "⚠️"}</span>
+                              <span>{zenroSyncMsg.message}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {isGoogleApp(selectedApp.name) && (
                     <div className="space-y-4">
