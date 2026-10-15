@@ -38,10 +38,12 @@ const BEHAVIORAL_LEVEL_ID = 1;
 @Injectable()
 export class CampusSquareService {
   private readonly logger = new Logger(CampusSquareService.name);
-  private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
-  private campusSquareWebhookUrl =
-    process.env.CAMPUS_SQUARE_WEBHOOK_URL ||
-    'http://localhost:3000/api/webhooks/assessment-completed';
+  private get authServiceBaseUrl(): string {
+    return (process.env.AUTH_SERVICE_URL || '').trim();
+  }
+  private get campusSquareWebhookUrl(): string {
+    return (process.env.CAMPUS_SQUARE_WEBHOOK_URL || '').trim();
+  }
 
   constructor(
     @InjectRepository(CorporateAccount)
@@ -160,26 +162,34 @@ export class CampusSquareService {
       dto.password ||
       `${crypto.randomBytes(8).toString('hex')}A1!`;
 
-    // 4. Create Cognito User (with resilient fallback for local/dev)
+    // 4. Create Cognito User
     let sub: string;
-    if (this.authServiceBaseUrl) {
-      try {
-        const res = await firstValueFrom(
-          this.http.post(`${this.authServiceBaseUrl}/internal/cognito/users`, {
-            email,
-            password,
-            groupName: 'STUDENT',
-          }),
-        );
-        sub = (res as any)?.data?.sub || crypto.randomUUID();
-      } catch (err: any) {
-        this.logger.warn(
-          `Cognito creation failed via auth service (${err.message}). Using UUID fallback for registration.`,
-        );
-        sub = crypto.randomUUID();
+    const authUrl = this.authServiceBaseUrl;
+    if (!authUrl) {
+      throw new BadRequestException(
+        'Authentication service URL (AUTH_SERVICE_URL) is not configured',
+      );
+    }
+    try {
+      const res = await firstValueFrom(
+        this.http.post(`${authUrl}/internal/cognito/users`, {
+          email,
+          password,
+          groupName: 'STUDENT',
+        }),
+      );
+      sub = (res as any)?.data?.sub;
+      if (!sub) {
+        throw new Error('No user sub returned from auth service');
       }
-    } else {
-      sub = crypto.randomUUID();
+    } catch (err: any) {
+      this.logger.error(
+        `Cognito creation failed via auth service (${err.message}):`,
+        err?.response?.data || err,
+      );
+      throw new BadRequestException(
+        `Failed to provision student login credentials: ${err?.response?.data?.message || err.message}`,
+      );
     }
 
     // 5. Fetch Program (School Students - Program ID 1)
@@ -243,6 +253,7 @@ export class CampusSquareService {
         const board = dto.studentBoard?.trim().toUpperCase() || 'CBSE';
         const registration = manager.create(Registration, {
           userId: user.id,
+          programId: Number(program.id),
           registrationSource: 'CORPORATE',
           createdByUserId: corpUserId,
           corporateAccountId: corporateAccount.id,
@@ -289,6 +300,9 @@ export class CampusSquareService {
           },
         });
         await manager.save(session);
+
+        registration.assessmentSessionId = session.id;
+        await manager.save(registration);
 
         // E. Create Assessment Attempt for Level 1 (Behavioral) ONLY
         const attempt = manager.create(AssessmentAttempt, {
@@ -618,8 +632,16 @@ export class CampusSquareService {
             headers['x-webhook-secret'] = process.env.ORIGINBI_WEBHOOK_SECRET;
           }
 
+          const webhookUrl = this.campusSquareWebhookUrl;
+          if (!webhookUrl) {
+            this.logger.warn(
+              'CAMPUS_SQUARE_WEBHOOK_URL is not configured. Skipping webhook delivery.',
+            );
+            continue;
+          }
+
           const webhookRes = await firstValueFrom(
-            this.http.post(this.campusSquareWebhookUrl, payload, {
+            this.http.post(webhookUrl, payload, {
               headers,
               timeout: 10000,
             }),

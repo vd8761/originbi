@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -43,34 +43,22 @@ function decrypt(text: string): string {
 }
 
 @Injectable()
-export class ZenroSyncService implements OnModuleInit {
+export class ZenroSyncService {
   private readonly logger = new Logger(ZenroSyncService.name);
 
   constructor(
     @InjectRepository(TenantAppConfig)
     private tenantAppConfigRepo: Repository<TenantAppConfig>,
     private dataSource: DataSource, // OriginBI PostgreSQL connection
-  ) {}
-
-  onModuleInit() {
-    this.logger.log(
-      '🔥 TEST MODE: Scheduled Zenro Sync on startup (starting in 10s warmup delay)...',
-    );
-    // Delay 10s so server boot and network sockets initialize smoothly
-    setTimeout(() => {
-      this.syncAllZenroTenants().catch((err) => {
-        this.logger.error('Failed to run background Zenro sync on startup', err);
-      });
-    }, 10000);
-  }
+  ) { }
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async handleCron() {
-    this.logger.log('🚀 Starting Automated Schema Mirror for Zenro Payroll...');
-    await this.syncAllZenroTenants();
+    this.logger.log('🚀 Running Daily Scheduled Zenro Sync (Unsynced / Pending Only)...');
+    await this.syncAllZenroTenants({ onlyPending: true });
   }
 
-  async syncAllZenroTenants() {
+  async syncAllZenroTenants(options?: { onlyPending?: boolean }) {
     const configs = await this.tenantAppConfigRepo
       .createQueryBuilder('config')
       .innerJoinAndSelect('config.app', 'masterApp')
@@ -79,11 +67,11 @@ export class ZenroSyncService implements OnModuleInit {
       .getMany();
 
     this.logger.log(
-      `Found ${configs.length} active Zenro integrations to sync.`,
+      `Found ${configs.length} active Zenro integrations to evaluate.`,
     );
     for (const config of configs) {
       try {
-        await this.syncTenant(config);
+        await this.syncTenant(config, options);
       } catch (err: any) {
         this.logger.error(
           `Failed to sync Zenro for tenant ${config.tenant_id}: ${err.message}`,
@@ -92,9 +80,34 @@ export class ZenroSyncService implements OnModuleInit {
     }
   }
 
-  async syncTenant(config: TenantAppConfig) {
+  async syncTenant(
+    config: TenantAppConfig,
+    options?: { onlyPending?: boolean },
+  ) {
     const features = config.configured_features || {};
     if (!features.db_host || !features.db_user || !features.db_pass) return;
+
+    const schemaName = `zenro_tenant_${config.tenant_id}`;
+
+    // Avoid unnecessary hits: If daily cron, skip if schema exists and synced within 24h
+    if (options?.onlyPending) {
+      const lastSyncAt = features.lastSyncAt
+        ? new Date(features.lastSyncAt).getTime()
+        : 0;
+      const hoursSinceSync = (Date.now() - lastSyncAt) / (1000 * 60 * 60);
+
+      const existingSchema = await this.dataSource.query(
+        `SELECT schema_name FROM information_schema.schemata WHERE schema_name = $1`,
+        [schemaName],
+      );
+
+      if (existingSchema && existingSchema.length > 0 && hoursSinceSync < 24) {
+        this.logger.log(
+          `⏩ Skipping Zenro sync for tenant ${config.tenant_id}: Already synced (${hoursSinceSync.toFixed(1)}h ago) and schema is present.`,
+        );
+        return;
+      }
+    }
 
     this.logger.log(
       `🔄 Syncing Zenro (Read-Only) for tenant ${config.tenant_id}...`,
@@ -273,7 +286,7 @@ export class ZenroSyncService implements OnModuleInit {
       );
     } finally {
       if (remoteDb) {
-        await remoteDb.end().catch(() => {});
+        await remoteDb.end().catch(() => { });
       }
     }
   }
