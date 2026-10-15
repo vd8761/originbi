@@ -9,6 +9,7 @@ import { Repository, DataSource, EntityManager, In, Not } from 'typeorm';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import * as crypto from 'crypto';
 
 import {
   CorporateAccount,
@@ -196,12 +197,9 @@ export class CorporateRegistrationsService {
     }
 
     // 2. Auto-generate password if not provided
-    // 2. Auto-generate password if not provided
     const password =
       dto.password ||
-      Math.random().toString(36).slice(-8) +
-        Math.random().toString(36).slice(-4).toUpperCase() +
-        '1!';
+      `${crypto.randomBytes(8).toString('hex')}A1!`;
 
     // 3. Create Cognito User
     let sub: string;

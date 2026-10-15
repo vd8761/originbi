@@ -158,9 +158,7 @@ export class CampusSquareService {
     // 3. Auto-generate password if not provided
     const password =
       dto.password ||
-      Math.random().toString(36).slice(-8) +
-        Math.random().toString(36).slice(-4).toUpperCase() +
-        '1!';
+      `${crypto.randomBytes(8).toString('hex')}A1!`;
 
     // 4. Create Cognito User (with resilient fallback for local/dev)
     let sub: string;
