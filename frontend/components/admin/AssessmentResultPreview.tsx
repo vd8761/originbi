@@ -1114,7 +1114,7 @@ const AssessmentResultPreview: React.FC<AssessmentResultPreviewProps> = ({ sessi
         { value: 'Dominance', score: '30', note: 'Direct and decisive.' },
         { value: 'Influence', score: '28', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '22', note: 'Patient and reliable.' },
-        { value: 'Compliance', score: '20', note: 'Precise and analytical.' },
+        { value: 'Conscientiousness', score: '20', note: 'Precise and analytical.' },
     ];
     const _discCompatibilityData = {
         totalScore: '100 / 125',
@@ -1490,7 +1490,7 @@ const getDiscData = (attempt: any) => {
         { value: 'Dominance', score: '-', note: 'Direct and decisive.' },
         { value: 'Influence', score: '-', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '-', note: 'Patient and reliable.' },
-        { value: 'Compliance', score: '-', note: 'Precise and analytical.' },
+        { value: 'Conscientiousness', score: '-', note: 'Precise and analytical.' },
     ];
     let compatibility = {
         totalScore: '0 / 125',
@@ -1505,7 +1505,7 @@ const getDiscData = (attempt: any) => {
             { value: 'Dominance', score: scores['D'] || '-', note: 'Direct and decisive.' },
             { value: 'Influence', score: scores['I'] || '-', note: 'Enthusiastic and persuasive.' },
             { value: 'Steadiness', score: scores['S'] || '-', note: 'Patient and reliable.' },
-            { value: 'Compliance', score: scores['C'] || '-', note: 'Precise and analytical.' },
+            { value: 'Conscientiousness', score: scores['C'] || scores['Conscientiousness'] || scores['Compliance'] || '-', note: 'Precise and analytical.' },
         ];
 
         const rawTotal = attempt.totalScore || attempt.metadata.disc_scores?.total || scores['total'] || '0';

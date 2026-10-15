@@ -62,7 +62,7 @@ interface JDRequirements {
 }
 
 interface TraitRequirement {
-  traitName: string;           // e.g., "Dominance", "Influence", "Steadiness", "Compliance"
+  traitName: string;           // e.g., "Dominance", "Influence", "Steadiness", "Conscientiousness"
   importance: 'critical' | 'important' | 'nice_to_have';
   minLevel: 'low' | 'moderate' | 'high' | 'very_high';
   description: string;
@@ -231,21 +231,21 @@ const PERSONALITY_VECTORS: Record<string, {
     independence: 30, adaptability: 65, communication: 82, empathy: 92,
   },
   'Dependable Specialist': {
-    // DISC: SC - High Steadiness + High Compliance
+    // DISC: SC - High Steadiness + High Conscientiousness
     // "Systematic, detail-oriented, excels in structured environments, precision and reliability"
     dominance: 35, influence: 30, steadiness: 88, compliance: 92,
     leadership: 40, creativity: 28, analytical: 82, teamwork: 65,
     independence: 72, adaptability: 32, communication: 42, empathy: 55,
   },
   'Logical Innovator': {
-    // DISC: CI - High Compliance + High Influence
+    // DISC: CI - High Conscientiousness + High Influence
     // "Creative and structured, balances analytical thinking with engaging communication"
     dominance: 48, influence: 72, steadiness: 42, compliance: 88,
     leadership: 55, creativity: 78, analytical: 90, teamwork: 60,
     independence: 75, adaptability: 65, communication: 78, empathy: 55,
   },
   'Structured Supporter': {
-    // DISC: CS - High Compliance + High Steadiness
+    // DISC: CS - High Conscientiousness + High Steadiness
     // "Systematic, reliable, values harmony, consistency, and accuracy"
     dominance: 28, influence: 32, steadiness: 85, compliance: 92,
     leadership: 35, creativity: 28, analytical: 85, teamwork: 72,
@@ -454,7 +454,7 @@ Respond with ONLY valid JSON (no markdown, no explanation):
   "seniorityLevel": "entry|mid|senior|lead|executive",
   "requiredTraits": [
     {
-      "traitName": "Dominance|Influence|Steadiness|Compliance",
+      "traitName": "Dominance|Influence|Steadiness|Conscientiousness",
       "importance": "critical|important|nice_to_have",
       "minLevel": "low|moderate|high|very_high",
       "description": "why this trait matters for this role"
@@ -646,7 +646,7 @@ RULES:
     if (/\b(d|dominance|dominant|assertive|decisive|results[-\s]?driven|drive)\b/.test(value)) return 'Dominance';
     if (/\b(i|influence|influential|persuasive|communication|communicator|networking)\b/.test(value)) return 'Influence';
     if (/\b(s|steadiness|steady|supportive|patient|collaborative|stability)\b/.test(value)) return 'Steadiness';
-    if (/\b(c|compliance|compliant|analytical|detail[-\s]?oriented|precision|quality)\b/.test(value)) return 'Compliance';
+    if (/\b(c|compliance|conscientiousness|compliant|analytical|detail[-\s]?oriented|precision|quality)\b/.test(value)) return 'Conscientiousness';
 
     return null;
   }
@@ -681,7 +681,7 @@ RULES:
       traits.push({ traitName: 'Influence', importance: 'important', minLevel: 'moderate', description: 'Need to inspire and persuade teams' });
     }
     if (analyticalRequired) {
-      traits.push({ traitName: 'Compliance', importance: 'critical', minLevel: 'high', description: 'Role requires analytical precision' });
+      traits.push({ traitName: 'Conscientiousness', importance: 'critical', minLevel: 'high', description: 'Role requires analytical precision' });
     }
     if (customerFacing) {
       traits.push({ traitName: 'Influence', importance: 'important', minLevel: 'high', description: 'Customer-facing role needs strong communication' });
@@ -691,7 +691,7 @@ RULES:
     // If no traits detected, add balanced defaults
     if (traits.length === 0) {
       traits.push({ traitName: 'Steadiness', importance: 'important', minLevel: 'moderate', description: 'General role stability' });
-      traits.push({ traitName: 'Compliance', importance: 'important', minLevel: 'moderate', description: 'Quality and accuracy needed' });
+      traits.push({ traitName: 'Conscientiousness', importance: 'important', minLevel: 'moderate', description: 'Quality and accuracy needed' });
     }
 
     return {
@@ -1005,6 +1005,7 @@ RULES:
           ideal.teamwork = Math.round(scaledValue * 0.85);
           break;
         case 'compliance':
+        case 'conscientiousness':
           ideal.compliance = scaledValue;
           ideal.analytical = Math.round(scaledValue * 0.9);
           break;
@@ -1507,7 +1508,7 @@ RULES:
     if (trait.includes('dominance')) return vector.dominance;
     if (trait.includes('influence')) return vector.influence;
     if (trait.includes('steadiness')) return vector.steadiness;
-    if (trait.includes('compliance')) return vector.compliance;
+    if (trait.includes('compliance') || trait.includes('conscientiousness')) return vector.compliance;
     return 50; // Default neutral
   }
 
