@@ -566,7 +566,7 @@ Respond with ONLY valid JSON:
 {
   "roleTitle": "extracted role title",
   "seniorityLevel": "entry|mid|senior|lead|executive",
-  "requiredTraits": [{"traitName": "Dominance|Influence|Steadiness|Compliance", "importance": "critical|important|nice_to_have", "minLevel": "low|moderate|high|very_high", "description": "why"}],
+  "requiredTraits": [{"traitName": "Dominance|Influence|Steadiness|Conscientiousness", "importance": "critical|important|nice_to_have", "minLevel": "low|moderate|high|very_high", "description": "why"}],
   "behavioralPatterns": [{"pattern": "description", "weight": 0.0-1.0, "relevantStyles": ["styles"]}],
   "agileRequirement": {"minScore": 0-125, "idealScore": 0-125, "adaptabilityWeight": 0.0-1.0},
   "softSkills": [], "hardSkills": [],
@@ -651,7 +651,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     }
     if (analyticalRequired) {
       traits.push({
-        traitName: 'Compliance',
+        traitName: 'Conscientiousness',
         importance: 'critical',
         minLevel: 'high',
         description: 'Role requires analytical precision',
@@ -679,7 +679,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         description: 'General role stability',
       });
       traits.push({
-        traitName: 'Compliance',
+        traitName: 'Conscientiousness',
         importance: 'important',
         minLevel: 'moderate',
         description: 'Quality and accuracy needed',
@@ -999,6 +999,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
           ideal.teamwork = Math.round(scaledValue * 0.85);
           break;
         case 'compliance':
+        case 'conscientiousness':
           ideal.compliance = scaledValue;
           ideal.analytical = Math.round(scaledValue * 0.9);
           break;
@@ -1400,7 +1401,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
     if (trait.includes('dominance')) return vector.dominance;
     if (trait.includes('influence')) return vector.influence;
     if (trait.includes('steadiness')) return vector.steadiness;
-    if (trait.includes('compliance')) return vector.compliance;
+    if (trait.includes('compliance') || trait.includes('conscientiousness')) return vector.compliance;
     return 50;
   }
 
@@ -2026,7 +2027,7 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
 
         return `[${displayName}]
 ${contextLine || `Group: ${c.groupName || 'Unassigned'} | Gender: ${c.gender || 'N/A'}`}
-Behavioral Profile: Drive=${level(c.discScoreD)}, Influence=${level(c.discScoreI)}, Steadiness=${level(c.discScoreS)}, Compliance=${level(c.discScoreC)}`;
+Behavioral Profile: Drive=${level(c.discScoreD)}, Influence=${level(c.discScoreI)}, Steadiness=${level(c.discScoreS)}, Conscientiousness=${level(c.discScoreC)}`;
       })
       .join('\n\n');
   }
@@ -2038,14 +2039,14 @@ DISC MODEL (for your analysis only — never share raw scores):
 - Dominance (D): Results-driven, decisive, assertive, competitive
 - Influence (I): Persuasive, optimistic, collaborative, relationship-building
 - Steadiness (S): Consistent, patient, loyal, empathetic, stable
-- Compliance (C): Precise, analytical, quality-focused, systematic
+- Conscientiousness (C): Precise, analytical, quality-focused, systematic
 
 DATA AVAILABLE FOR EACH PERSON:
 - Full name, gender, group/institution, registration type (College Student / Employee / CXO)
 - For College Students: institution name, department/stream, year of study
 - For Employees: role/designation, department
 - For CXO: role/designation, department
-- Behavioral profile (Drive, Influence, Steadiness, Compliance levels)
+- Behavioral profile (Drive, Influence, Steadiness, Conscientiousness levels)
 
 RESPONSE RULES:
 1. NEVER reveal raw scores, numbers, or DISC codes — speak in behavioral language only.
@@ -2768,7 +2769,7 @@ The leader wants to identify future leaders and build a succession pipeline from
 BEHAVIORAL INDICATORS OF LEADERSHIP POTENTIAL:
 - Natural authority and decisiveness (High Dominance behavioral character)
 - Ability to inspire, persuade, and rally others (High Influence behavioral character)
-- Strategic and quality thinking for structured leadership (High Compliance paired with D)
+- Strategic and quality thinking for structured leadership (High Conscientiousness paired with D)
 - Emotional intelligence and team cohesion for people-led leadership (High Steadiness paired with I)
 
 LEADERSHIP ARCHETYPES TO IDENTIFY:
@@ -2837,7 +2838,7 @@ ${employeeData}`;
 • Results-Drivers (High Dominance): ${highD} employees (${Math.round((highD / total) * 100)}%)
 • Relationship-Builders (High Influence): ${highI} employees (${Math.round((highI / total) * 100)}%)
 • Stability-Anchors (High Steadiness): ${highS} employees (${Math.round((highS / total) * 100)}%)
-• Precision-Thinkers (High Compliance): ${highC} employees (${Math.round((highC / total) * 100)}%)
+• Precision-Thinkers (High Conscientiousness): ${highC} employees (${Math.round((highC / total) * 100)}%)
 
 ━━━ Top Behavioral Archetypes ━━━
 ${topStyles}

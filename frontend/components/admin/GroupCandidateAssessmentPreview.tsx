@@ -248,18 +248,18 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
 
             const studentId = session.userId;
             const startData = await assessmentService.generateStudentReport(studentId, variant === 'full' ? undefined : variant);
-            
+
             if (!startData.success || !startData.jobId) {
                 throw new Error("Failed to start report generation");
             }
-            
+
             const jobId = startData.jobId;
-            
+
             let isComplete = false;
             while (!isComplete && isDownloadingRef.current) {
                 try {
                     const statusData = await assessmentService.getDownloadStatus(jobId);
-                    
+
                     if (statusData.status === 'PROCESSING') {
                         setDownloadProgress(statusData.progress || 'Processing...');
                         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -270,14 +270,14 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                         if (!statusData.downloadUrl) {
                             throw new Error('Download URL missing from report status.');
                         }
-                        
+
                         const extendedData = statusData as any;
                         if (extendedData.password) {
                             setGeneratedPassword(extendedData.password);
                         }
 
                         window.location.href = buildReportApiUrl(statusData.downloadUrl);
-                        
+
                         setTimeout(() => {
                             setDownloading(false);
                             setDownloadProgress('');
@@ -293,7 +293,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
                     alert("Failed to download report. Please try again.");
                 }
             }
-            
+
         } catch (error) {
             console.error("Download failed", error);
             setDownloading(false);
@@ -445,154 +445,147 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
             <div className="bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-2xl p-6 flex flex-col gap-4">
                 <div className="flex justify-between items-center border-b border-gray-200 dark:border-white/10 pb-4 mb-2">
                     <h3 className="text-sm font-semibold">Candidate & Report</h3>
-                <div className="flex items-center gap-2">
-                    {/* Download Report Button */}
-                    {downloading ? (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
-                            <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress || 'Generating...'}</span>
-                        </div>
-                    ) : isShortReportAvailable ? (
-                        <div className="relative" ref={downloadDropdownRef}>
-                            <button
-                                onClick={() => canOpenDownloadMenu && setShowDownloadDropdown(!showDownloadDropdown)}
-                                disabled={!canOpenDownloadMenu}
-                                title={!canOpenDownloadMenu ? 'Complete Level 1 to download the Level 1 report' : ''}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                    canOpenDownloadMenu
-                                    ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
-                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
-                                }`}
-                            >
-                                <DownloadIcon className="w-3 h-3" />
-                                Download Report
-                                <svg className={`w-3 h-3 transition-transform ${showDownloadDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                            </button>
-                            {showDownloadDropdown && (
-                                <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
-                                    <button
-                                        onClick={() => handleDownloadReport('full')}
-                                        disabled={!isSessionComplete}
-                                        title={!isSessionComplete ? 'Complete all assigned levels to download the full report' : ''}
-                                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${
-                                            isSessionComplete
-                                            ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
-                                            : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                    <div className="flex items-center gap-2">
+                        {/* Download Report Button */}
+                        {downloading ? (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
+                                <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{downloadProgress || 'Generating...'}</span>
+                            </div>
+                        ) : isShortReportAvailable ? (
+                            <div className="relative" ref={downloadDropdownRef}>
+                                <button
+                                    onClick={() => canOpenDownloadMenu && setShowDownloadDropdown(!showDownloadDropdown)}
+                                    disabled={!canOpenDownloadMenu}
+                                    title={!canOpenDownloadMenu ? 'Complete Level 1 to download the Level 1 report' : ''}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${canOpenDownloadMenu
+                                            ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
+                                            : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
                                         }`}
-                                    >
-                                        <DownloadIcon className="w-3 h-3 text-brand-green" />
-                                        Full Report
-                                    </button>
-                                    <div className="border-t border-gray-100 dark:border-white/5" />
-                                    <button
-                                        onClick={() => handleDownloadReport('short')}
-                                        disabled={!isSessionComplete}
-                                        title={!isSessionComplete ? 'Complete all assigned levels to download the short report' : ''}
-                                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${
-                                            isSessionComplete
-                                            ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
-                                            : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
-                                        }`}
-                                    >
-                                        <DownloadIcon className="w-3 h-3 text-blue-500" />
-                                        Short Report
-                                    </button>
-                                    {isLevel1ReportAvailable && (
-                                        <>
-                                            <div className="border-t border-gray-100 dark:border-white/5" />
-                                            <button
-                                                onClick={() => handleDownloadReport('level1')}
-                                                disabled={!isSessionComplete && !isLevel1Completed}
-                                                title={!isSessionComplete && !isLevel1Completed ? 'Complete Level 1 to download the Level 1 report' : ''}
-                                                className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${
-                                                    isSessionComplete || isLevel1Completed
+                                >
+                                    <DownloadIcon className="w-3 h-3" />
+                                    Download Report
+                                    <svg className={`w-3 h-3 transition-transform ${showDownloadDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                {showDownloadDropdown && (
+                                    <div className="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-[#19211C] border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                                        <button
+                                            onClick={() => handleDownloadReport('full')}
+                                            disabled={!isSessionComplete}
+                                            title={!isSessionComplete ? 'Complete all assigned levels to download the full report' : ''}
+                                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${isSessionComplete
                                                     ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
                                                     : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
                                                 }`}
-                                            >
-                                                <DownloadIcon className="w-3 h-3 text-purple-500" />
-                                                Level 1 Report
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => handleDownloadReport('full')}
-                            disabled={!canDownloadFull}
-                            title={!canDownloadFull ? (isEmployeeProgram ? 'Complete Level 1 to download the report' : 'Exam must be completed to download report') : ''}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                                canDownloadFull
-                                ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
-                                : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
-                            }`}
-                        >
-                            <DownloadIcon className="w-3 h-3" />
-                            Download Report
-                        </button>
-                    )}
+                                        >
+                                            <DownloadIcon className="w-3 h-3 text-brand-green" />
+                                            Full Report
+                                        </button>
+                                        <div className="border-t border-gray-100 dark:border-white/5" />
+                                        <button
+                                            onClick={() => handleDownloadReport('short')}
+                                            disabled={!isSessionComplete}
+                                            title={!isSessionComplete ? 'Complete all assigned levels to download the short report' : ''}
+                                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${isSessionComplete
+                                                    ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
+                                                    : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                                }`}
+                                        >
+                                            <DownloadIcon className="w-3 h-3 text-blue-500" />
+                                            Short Report
+                                        </button>
+                                        {isLevel1ReportAvailable && (
+                                            <>
+                                                <div className="border-t border-gray-100 dark:border-white/5" />
+                                                <button
+                                                    onClick={() => handleDownloadReport('level1')}
+                                                    disabled={!isSessionComplete && !isLevel1Completed}
+                                                    title={!isSessionComplete && !isLevel1Completed ? 'Complete Level 1 to download the Level 1 report' : ''}
+                                                    className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors flex items-center gap-2 ${isSessionComplete || isLevel1Completed
+                                                            ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5'
+                                                            : 'text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                                        }`}
+                                                >
+                                                    <DownloadIcon className="w-3 h-3 text-purple-500" />
+                                                    Level 1 Report
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <button
+                                onClick={() => handleDownloadReport('full')}
+                                disabled={!canDownloadFull}
+                                title={!canDownloadFull ? (isEmployeeProgram ? 'Complete Level 1 to download the report' : 'Exam must be completed to download report') : ''}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${canDownloadFull
+                                        ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
+                                        : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                    }`}
+                            >
+                                <DownloadIcon className="w-3 h-3" />
+                                Download Report
+                            </button>
+                        )}
 
-                    {/* Send Email Split Button */}
-                    {sendingEmail ? (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
-                            <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
-                            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Sending...</span>
-                        </div>
-                    ) : emailSent ? (
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 rounded-lg border border-brand-green/20">
-                            <CheckIcon className="w-3 h-3 text-brand-green" />
-                            <span className="text-xs font-medium text-brand-green">Email Queued</span>
-                        </div>
-                    ) : (
-                        <div className="flex items-stretch gap-px">
-                            <button
-                                onClick={async () => {
-                                    if (!session?.userId) {
-                                        alert("User ID not found for this session.");
-                                        return;
-                                    }
-                                    try {
-                                        setSendingEmail(true);
-                                        await assessmentService.sendReportEmail(session.userId);
-                                        setEmailSent(true);
-                                        setTimeout(() => setEmailSent(false), 5000);
-                                    } catch (error) {
-                                        console.error("Send email failed", error);
-                                        alert("Failed to send email. Please try again.");
-                                    } finally {
-                                        setSendingEmail(false);
-                                    }
-                                }}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-l-lg text-xs font-medium transition-colors ${
-                                    status === 'COMPLETED'
-                                    ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
-                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
-                                }`}
-                                disabled={status !== 'COMPLETED'}
-                                title={status !== 'COMPLETED' ? 'Exam must be completed to send email' : 'Send report to student email'}
-                            >
-                                <EmailIcon className="w-3 h-3" />
-                                Send Email
-                            </button>
-                            <button
-                                onClick={() => setShowEmailPopup(true)}
-                                className={`flex items-center px-2 py-1.5 rounded-r-lg text-xs font-medium transition-colors ${
-                                    status === 'COMPLETED'
-                                    ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green border-brand-green/20 cursor-pointer'
-                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-white/10 cursor-not-allowed opacity-60'
-                                }`}
-                                disabled={status !== 'COMPLETED'}
-                                title="Send to a different email"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                </svg>
-                            </button>
-                        </div>
-                    )}
-                </div>
+                        {/* Send Email Split Button */}
+                        {sendingEmail ? (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10">
+                                <LoadingIcon className="w-3 h-3 text-brand-green animate-spin" />
+                                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Sending...</span>
+                            </div>
+                        ) : emailSent ? (
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-brand-green/10 rounded-lg border border-brand-green/20">
+                                <CheckIcon className="w-3 h-3 text-brand-green" />
+                                <span className="text-xs font-medium text-brand-green">Email Queued</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-stretch gap-px">
+                                <button
+                                    onClick={async () => {
+                                        if (!session?.userId) {
+                                            alert("User ID not found for this session.");
+                                            return;
+                                        }
+                                        try {
+                                            setSendingEmail(true);
+                                            await assessmentService.sendReportEmail(session.userId);
+                                            setEmailSent(true);
+                                            setTimeout(() => setEmailSent(false), 5000);
+                                        } catch (error) {
+                                            console.error("Send email failed", error);
+                                            alert("Failed to send email. Please try again.");
+                                        } finally {
+                                            setSendingEmail(false);
+                                        }
+                                    }}
+                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-l-lg text-xs font-medium transition-colors ${status === 'COMPLETED'
+                                            ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green cursor-pointer'
+                                            : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60'
+                                        }`}
+                                    disabled={status !== 'COMPLETED'}
+                                    title={status !== 'COMPLETED' ? 'Exam must be completed to send email' : 'Send report to student email'}
+                                >
+                                    <EmailIcon className="w-3 h-3" />
+                                    Send Email
+                                </button>
+                                <button
+                                    onClick={() => setShowEmailPopup(true)}
+                                    className={`flex items-center px-2 py-1.5 rounded-r-lg text-xs font-medium transition-colors ${status === 'COMPLETED'
+                                            ? 'bg-brand-green/10 hover:bg-brand-green/20 text-brand-green border-brand-green/20 cursor-pointer'
+                                            : 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-white/10 cursor-not-allowed opacity-60'
+                                        }`}
+                                    disabled={status !== 'COMPLETED'}
+                                    title="Send to a different email"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -896,7 +889,7 @@ const GroupCandidateAssessmentPreview: React.FC<AssessmentResultPreviewProps> = 
         { value: 'Dominance', score: '30', note: 'Direct and decisive.' },
         { value: 'Influence', score: '28', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '22', note: 'Patient and reliable.' },
-        { value: 'Compliance', score: '20', note: 'Precise and analytical.' },
+        { value: 'Conscientiousness', score: '20', note: 'Precise and analytical.' },
     ];
     const _aciCompatibilityData = {
         totalScore: '106 / 125',
@@ -1240,7 +1233,7 @@ const getDiscData = (attempt: any) => {
         { value: 'Dominance', score: '-', note: 'Direct and decisive.' },
         { value: 'Influence', score: '-', note: 'Enthusiastic and persuasive.' },
         { value: 'Steadiness', score: '-', note: 'Patient and reliable.' },
-        { value: 'Compliance', score: '-', note: 'Precise and analytical.' },
+        { value: 'Conscientiousness', score: '-', note: 'Precise and analytical.' },
     ];
     let compatibility = {
         totalScore: '0 / 125',
@@ -1255,7 +1248,7 @@ const getDiscData = (attempt: any) => {
             { value: 'Dominance', score: scores['D'] || '-', note: 'Direct and decisive.' },
             { value: 'Influence', score: scores['I'] || '-', note: 'Enthusiastic and persuasive.' },
             { value: 'Steadiness', score: scores['S'] || '-', note: 'Patient and reliable.' },
-            { value: 'Compliance', score: scores['C'] || '-', note: 'Precise and analytical.' },
+            { value: 'Conscientiousness', score: scores['C'] || scores['Conscientiousness'] || scores['Compliance'] || '-', note: 'Precise and analytical.' },
         ];
 
         const rawTotal = attempt.totalScore || attempt.metadata.disc_scores?.total || scores['total'] || '0';
