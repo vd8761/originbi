@@ -999,6 +999,15 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
   const [iatData, setIatData] = useState<any>(null);
   const [iatLoading, setIatLoading] = useState(false);
 
+  const [isCampusSquare, setIsCampusSquare] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('isCampusSquare') === 'true';
+  });
+  const [campusEventName, setCampusEventName] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return sessionStorage.getItem('campusSquareEventName') || '';
+  });
+
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString('en-GB', {
@@ -1080,6 +1089,14 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
           }
           if (profileData && profileData.showIatMetaphorToStudent !== undefined) {
             setShowIatMetaphorToStudent(profileData.showIatMetaphorToStudent);
+          }
+          if (profileData?.isCampusSquare) {
+            setIsCampusSquare(true);
+            sessionStorage.setItem('isCampusSquare', 'true');
+          }
+          if (profileData?.eventName) {
+            setCampusEventName(profileData.eventName);
+            sessionStorage.setItem('campusSquareEventName', profileData.eventName);
           }
         } catch (err) {
           console.error("Error fetching assessment data:", err);
@@ -1172,7 +1189,9 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       if (reportReady) {
         sessionStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
         localStorage.setItem(REPORT_READY_STORAGE_KEY, 'true');
-        sessionStorage.removeItem('isAssessmentMode');
+        if (sessionStorage.getItem('isCampusSquare') !== 'true') {
+          sessionStorage.removeItem('isAssessmentMode');
+        }
       } else {
         sessionStorage.removeItem(REPORT_READY_STORAGE_KEY);
         localStorage.removeItem(REPORT_READY_STORAGE_KEY);
@@ -1831,6 +1850,126 @@ const AssessmentScreen: React.FC<AssessmentScreenProps> = ({
       <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
         <div className="w-full max-w-[2000px] mx-auto">
           <div className="p-20 text-center text-brand-text-light-primary dark:text-white text-lg">{t.noAssessments}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const isAllAssessmentsCompleted =
+    (assessments.length > 0 && completedAssessmentCount >= assessments.length) ||
+    forceReportPageMode;
+
+  if (isCampusSquare && isAllAssessmentsCompleted) {
+    const eventTitle = campusEventName || 'University Fair 2026';
+    return (
+      <div className="relative min-h-screen bg-transparent font-sans transition-colors duration-300 overflow-x-hidden py-4 sm:py-6 lg:py-8">
+        <div className="flex flex-col gap-6 w-full max-w-[1200px] mx-auto px-4 sm:px-6">
+          {/* Breadcrumb - No Dashboard link for campus candidates */}
+          <div className="flex items-center text-xs text-black dark:text-white font-normal flex-wrap">
+            <span className="text-gray-500 dark:text-gray-400">Assessments</span>
+            <span className="mx-2 text-gray-400 dark:text-gray-600">
+              <ArrowRightWithoutLineIcon className="w-3 h-3 text-black dark:text-white" />
+            </span>
+            <span className="text-brand-green font-semibold">Completed</span>
+          </div>
+
+          {/* Celebratory Hero Card */}
+          <div className="relative overflow-hidden rounded-3xl bg-white dark:bg-[#1A1D21] border border-gray-200 dark:border-white/10 p-8 sm:p-12 shadow-xl flex flex-col items-center text-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-brand-green/10 flex items-center justify-center border border-brand-green/30 shadow-lg shadow-brand-green/20">
+              <svg className="w-10 h-10 text-brand-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold bg-brand-green/10 text-brand-green border border-brand-green/20 uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse"></span>
+              {eventTitle}
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white tracking-tight">
+              Assessment Completed! 🎉
+            </h1>
+
+            <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 max-w-2xl leading-relaxed">
+              Congratulations, <span className="font-semibold text-gray-900 dark:text-white">{userName || 'Candidate'}</span>! You have successfully completed your personality &amp; behavioral assessment.
+            </p>
+          </div>
+
+          {/* Spot PDF Download Highlight Notice */}
+          <div className="rounded-3xl bg-gradient-to-r from-emerald-500/15 via-brand-green/10 to-teal-500/15 border-2 border-brand-green/40 dark:border-brand-green/50 p-6 sm:p-10 shadow-xl flex flex-col md:flex-row items-center gap-6 sm:gap-8 relative overflow-hidden">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-brand-green text-white flex items-center justify-center shrink-0 shadow-lg shadow-brand-green/30">
+              <svg className="w-8 h-8 sm:w-10 sm:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+
+            <div className="flex-1 text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse"></span>
+                <span className="text-xs uppercase font-bold text-brand-green tracking-widest">SPOT RESULT DISTRIBUTION</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white leading-snug">
+                Download your personalised single-page result PDF on the <span className="text-brand-green underline decoration-brand-green/30 underline-offset-4">{eventTitle}</span> day spot
+              </h2>
+              <p className="mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-300 leading-relaxed">
+                Your assessment responses have been recorded and evaluated by OriginBI. Please visit our help desk / registration counter during the event to download and collect your verified single-page result document.
+              </p>
+            </div>
+          </div>
+
+          {/* Details Summary Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="rounded-2xl bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">Event Title</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white">{eventTitle}</p>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-white/5 pt-3">
+                Registration Source: <span className="font-semibold text-gray-700 dark:text-gray-300">Campus Square</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">Candidate</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white truncate">{userName || 'Student'}</p>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-white/5 pt-3 truncate">
+                Email: <span className="font-semibold text-gray-700 dark:text-gray-300">{activeUserEmail || '-'}</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 p-6 shadow-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">Assessment Status</p>
+                  <p className="text-base font-bold text-brand-green">Completed (Verified)</p>
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-white/5 pt-3">
+                Module: <span className="font-semibold text-gray-700 dark:text-gray-300">Level 1 - Behavioral Insight (DISC)</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

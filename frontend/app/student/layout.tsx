@@ -22,6 +22,7 @@ export default function StudentLayout({
     const router = useRouter();
     const [checkingStatus, setCheckingStatus] = useState(true);
     const [isAssessmentModeFlag, setIsAssessmentModeFlag] = useState(false);
+    const [isCampusSquareFlag, setIsCampusSquareFlag] = useState(false);
     const [isReportReady, setIsReportReady] = useState(false);
 
     // Define public routes that do NOT require authentication or Header
@@ -38,11 +39,13 @@ export default function StudentLayout({
         if (typeof window === 'undefined') return;
 
         const assessmentMode = sessionStorage.getItem('isAssessmentMode') === 'true';
+        const campusSquare = sessionStorage.getItem('isCampusSquare') === 'true';
         const reportReady =
             sessionStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true' ||
             localStorage.getItem(REPORT_READY_STORAGE_KEY) === 'true';
 
-        setIsAssessmentModeFlag(assessmentMode);
+        setIsAssessmentModeFlag(assessmentMode || campusSquare);
+        setIsCampusSquareFlag(campusSquare);
         setIsReportReady(reportReady);
     };
 
@@ -55,7 +58,7 @@ export default function StudentLayout({
 
         const intervalId = window.setInterval(syncModeFlags, 1000);
         const handleStorage = (event: StorageEvent) => {
-            if (event.key === 'isAssessmentMode' || event.key === REPORT_READY_STORAGE_KEY || event.key === null) {
+            if (event.key === 'isAssessmentMode' || event.key === 'isCampusSquare' || event.key === REPORT_READY_STORAGE_KEY || event.key === null) {
                 syncModeFlags();
             }
         };
@@ -81,7 +84,7 @@ export default function StudentLayout({
             }
 
             // 1. Check Session Storage Flag (Fastest)
-            if (sessionStorage.getItem('isAssessmentMode') === 'true') {
+            if (sessionStorage.getItem('isAssessmentMode') === 'true' || sessionStorage.getItem('isCampusSquare') === 'true') {
                 if (!pathname?.includes('/student/assessment') && !pathname?.includes('/student/metaphor') && !pathname?.includes('/student/iat')) {
                     router.push('/student/assessment');
                     return;
@@ -102,14 +105,34 @@ export default function StudentLayout({
                         return;
                     }
 
-                    if (status?.isAssessmentMode) {
+                    if (status?.status === 'FIRST_LOGIN' && status?.redirectUrl) {
+                        if (status?.isCampusSquare || status?.isAssessmentMode) {
+                            sessionStorage.setItem('isAssessmentMode', 'true');
+                            sessionStorage.setItem('isCampusSquare', 'true');
+                            if (status?.eventName) {
+                                sessionStorage.setItem('campusSquareEventName', status.eventName);
+                            }
+                        }
+                        syncModeFlags();
+                        if (!pathname?.includes('/student/first-time-reset')) {
+                            router.push(status.redirectUrl);
+                            return;
+                        }
+                    } else if (status?.isAssessmentMode || status?.isCampusSquare) {
                         sessionStorage.setItem('isAssessmentMode', 'true');
+                        if (status?.isCampusSquare) {
+                            sessionStorage.setItem('isCampusSquare', 'true');
+                            if (status?.eventName) {
+                                sessionStorage.setItem('campusSquareEventName', status.eventName);
+                            }
+                        }
                         syncModeFlags();
                         if (!pathname?.includes('/student/assessment') && !pathname?.includes('/student/metaphor') && !pathname?.includes('/student/iat')) {
                             router.push('/student/assessment');
                         }
                     } else {
                         sessionStorage.removeItem('isAssessmentMode');
+                        sessionStorage.removeItem('isCampusSquare');
                         syncModeFlags();
                     }
                 } catch (e) {
@@ -124,7 +147,11 @@ export default function StudentLayout({
 
     const handleNavigate = (view: 'dashboard' | 'assessment') => {
         if (view === 'dashboard') {
-            router.push('/student/dashboard');
+            if (sessionStorage.getItem('isCampusSquare') === 'true') {
+                router.push('/student/assessment');
+            } else {
+                router.push('/student/dashboard');
+            }
         } else if (view === 'assessment') {
             router.push('/student/assessment');
         }
@@ -167,7 +194,7 @@ export default function StudentLayout({
     const isAssessmentPage = isStandardAssessmentPage || pathname?.includes('/student/metaphor') || pathname?.includes('/student/iat');
     const isUpgradePage = pathname?.includes('/student/upgrade');
     const hideNav = (isAssessmentPage && !isReportReady) || isUpgradePage;
-    const showAssessmentOnly = isAssessmentModeFlag && !isReportReady;
+    const showAssessmentOnly = isCampusSquareFlag || (isAssessmentModeFlag && !isReportReady);
     const shouldApplyZoom = !isPublic && (!isAssessmentPage || isReportReady);
     const shouldRenderHeader = isStandardAssessmentPage || !isAssessmentPage || isReportReady;
     const pageBaseBackgroundClass = (isAssessmentPage && !isReportReady)
