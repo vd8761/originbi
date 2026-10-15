@@ -77,52 +77,59 @@ const SuccessModal: React.FC<{
   /** True only when this was the LAST mandatory level. Drives the "report by
    *  email" copy - otherwise we tell the student they still have more to do. */
   isFinal?: boolean;
-}> = ({ onBack, onDashboard, showDashboard = false, isFinal = false }) => (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
-    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
-    <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center animate-notice-pop">
-      <div className="relative w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
-        <div className="notice-sparkles" aria-hidden="true">
-          <span className="notice-sparkle-dot" />
-          <span className="notice-sparkle-dot" />
-          <span className="notice-sparkle-dot" />
-          <span className="notice-sparkle-dot" />
+}> = ({ onBack, onDashboard, showDashboard = false, isFinal = false }) => {
+  const isCampus = typeof window !== 'undefined' && sessionStorage.getItem('isCampusSquare') === 'true';
+  const campusEvent = (typeof window !== 'undefined' && sessionStorage.getItem('campusSquareEventName')) || 'Campus Square Event';
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 animate-fade-in">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" />
+      <div className="relative bg-white dark:bg-[#1A1D21] rounded-3xl p-8 max-w-md w-full shadow-2xl border border-brand-light-tertiary dark:border-white/10 text-center flex flex-col items-center animate-notice-pop">
+        <div className="relative w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6 border border-brand-green/20">
+          <div className="notice-sparkles" aria-hidden="true">
+            <span className="notice-sparkle-dot" />
+            <span className="notice-sparkle-dot" />
+            <span className="notice-sparkle-dot" />
+            <span className="notice-sparkle-dot" />
+          </div>
+
+          <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30 animate-notice-icon-pop">
+            <CheckCircleIcon className="w-6 h-6 text-white" />
+          </div>
         </div>
 
-        <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center shadow-lg shadow-brand-green/30 animate-notice-icon-pop">
-          <CheckCircleIcon className="w-6 h-6 text-white" />
+        <h2 className="text-2xl font-bold text-brand-text-light-primary dark:text-white mb-2">
+          {isCampus ? "Assessment Completed!" : (isFinal ? "Assessment Completed!" : "Level Completed!")}
+        </h2>
+        <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm leading-relaxed">
+          {isCampus
+            ? `You have successfully completed the assessment! Download your personalised single-page result PDF on the ${campusEvent} day spot.`
+            : (isFinal
+              ? "You've successfully completed all assessments. Your report is being processed and will be shared to your registered mail ID."
+              : "Great work - your responses have been saved. Head back to the assessments screen to continue with the next level.")}
+        </p>
+
+        <div className="flex flex-col gap-3 w-full">
+          {showDashboard || isCampus ? (
+            <button
+              onClick={onDashboard}
+              className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
+            >
+              {isCampus ? "View Result Information" : "Continue"}
+            </button>
+          ) : (
+            <button
+              onClick={onBack}
+              className="w-full py-3.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+            >
+              Back to Assessments
+            </button>
+          )}
         </div>
-      </div>
-
-      <h2 className="text-2xl font-bold text-brand-text-light-primary dark:text-white mb-2">
-        {isFinal ? "Assessment Completed!" : "Level Completed!"}
-      </h2>
-      <p className="text-brand-text-light-secondary dark:text-gray-400 mb-8 text-sm leading-relaxed">
-        {isFinal
-          ? "You've successfully completed all assessments. Your report is being processed and will be shared to your registered mail ID."
-          : "Great work - your responses have been saved. Head back to the assessments screen to continue with the next level."}
-      </p>
-
-      <div className="flex flex-col gap-3 w-full">
-        {showDashboard ? (
-          <button
-            onClick={onDashboard}
-            className="w-full py-3.5 rounded-full bg-brand-green text-white font-bold text-sm hover:bg-brand-green/90 transition-colors shadow-lg shadow-brand-green/20"
-          >
-            Continue
-          </button>
-        ) : (
-          <button
-            onClick={onBack}
-            className="w-full py-3.5 rounded-full border border-brand-light-tertiary dark:border-white/20 text-brand-text-light-primary dark:text-white font-bold text-sm hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
-          >
-            Back to Assessments
-          </button>
-        )}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 
 // --- VerticalStepper Component ---

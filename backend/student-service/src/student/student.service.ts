@@ -279,23 +279,6 @@ export class StudentService {
       };
     }
 
-    // First Login Logic (No DB Schema Identity)
-    // If loginCount is low (<=1) and we haven't recorded a password change yet.
-    const isFirstLogin =
-      user.loginCount <= 1 && !user.metadata?.hasChangedPassword;
-
-    if (isFirstLogin) {
-      this.logger.log(
-        `User ${email} requires mandatory password reset (First Login).`,
-      );
-      return {
-        redirectUrl: '/student/first-time-reset',
-        isAssessmentMode: false,
-        status: 'FIRST_LOGIN',
-        debug: { step: 'Check First Login', result: 'Mandatory Reset' },
-      };
-    }
-
     // Find if user has a main app registration (isTechAssessment is 0 or 2)
     const originBiRegistration = await this.registrationRepo.findOne({
       where: {
@@ -305,6 +288,37 @@ export class StudentService {
       },
       order: { createdAt: 'DESC' },
     });
+
+    const isCampusSquare =
+      user.metadata?.source === 'CAMPUS_SQUARE' ||
+      originBiRegistration?.metadata?.source === 'CAMPUS_SQUARE' ||
+      (originBiRegistration?.corporateAccountId != null && user.metadata?.source === 'CAMPUS_SQUARE') ||
+      Boolean(user.metadata?.eventSlug);
+
+    const eventName =
+      originBiRegistration?.metadata?.eventName ||
+      user.metadata?.eventName ||
+      null;
+
+    // First Login Logic (No DB Schema Identity)
+    // If user has not changed password yet, force first-time reset
+    const isFirstLogin = isCampusSquare
+      ? !user.metadata?.hasChangedPassword
+      : user.loginCount <= 1 && !user.metadata?.hasChangedPassword;
+
+    if (isFirstLogin) {
+      this.logger.log(
+        `User ${email} requires mandatory password reset (First Login).`,
+      );
+      return {
+        redirectUrl: '/student/first-time-reset',
+        isAssessmentMode: true,
+        isCampusSquare: isCampusSquare,
+        eventName: isCampusSquare ? eventName : undefined,
+        status: 'FIRST_LOGIN',
+        debug: { step: 'Check First Login', result: 'Mandatory Reset' },
+      };
+    }
 
     if (!originBiRegistration) {
       const techOnlyRegistration = await this.registrationRepo.findOne({
@@ -385,6 +399,7 @@ export class StudentService {
         return {
           redirectUrl: '/student/assessment',
           isAssessmentMode: true,
+          isCampusSquare: isCampusSquare,
           status: incompleteSession.status,
           debug: {
             step: 'Check Sessions',
@@ -399,6 +414,22 @@ export class StudentService {
     }
 
     this.logger.log(`No Incomplete Sessions found for User ${user.id}.`);
+
+    // Campus Square candidates are strictly limited to the assessment module
+    if (isCampusSquare) {
+      return {
+        redirectUrl: '/student/assessment',
+        isAssessmentMode: true,
+        isCampusSquare: true,
+        eventName: eventName || undefined,
+        status: incompleteSession ? (incompleteSession as any).status : 'COMPLETED',
+        debug: {
+          step: 'Check Sessions',
+          userId: user.id,
+          reason: 'Campus Square candidates are restricted to assessment module only.',
+        },
+      };
+    }
 
     // --- DEMO MODE LOGIC ---
     if (email.toLowerCase() === 'demo@originbi.com') {
@@ -607,6 +638,14 @@ export class StudentService {
       academicDetails,
       showReportPreviewAfterExam,
       showIatMetaphorToStudent,
+      eventName:
+        programResult?.[0]?.metadata?.eventName ||
+        user.metadata?.eventName ||
+        null,
+      isCampusSquare:
+        user.metadata?.source === 'CAMPUS_SQUARE' ||
+        programResult?.[0]?.metadata?.source === 'CAMPUS_SQUARE' ||
+        Boolean(user.metadata?.eventSlug),
       ...(impactData || {}),
     };
   }

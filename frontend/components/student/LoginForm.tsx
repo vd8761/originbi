@@ -176,14 +176,32 @@ const LoginForm: React.FC<LoginFormProps> = ({
           if (data.isAssessmentMode && data.redirectUrl) {
             // Set flag for Layout to hide menus
             sessionStorage.setItem('isAssessmentMode', 'true');
+            if (data.isCampusSquare) {
+              sessionStorage.setItem('isCampusSquare', 'true');
+              if (data.eventName) {
+                sessionStorage.setItem('campusSquareEventName', data.eventName);
+              }
+            }
             router.push(data.redirectUrl);
             return; // Early exit, do not call default success
           } else if (data.status === 'FIRST_LOGIN' && data.redirectUrl) {
-            sessionStorage.removeItem('isAssessmentMode');
+            if (data.isCampusSquare || data.isAssessmentMode) {
+              sessionStorage.setItem('isAssessmentMode', 'true');
+              sessionStorage.setItem('isCampusSquare', 'true');
+              if (data.eventName) {
+                sessionStorage.setItem('campusSquareEventName', data.eventName);
+              }
+            } else {
+              sessionStorage.removeItem('isAssessmentMode');
+              sessionStorage.removeItem('isCampusSquare');
+              sessionStorage.removeItem('campusSquareEventName');
+            }
             router.push(data.redirectUrl);
             return;
           } else {
             sessionStorage.removeItem('isAssessmentMode');
+            sessionStorage.removeItem('isCampusSquare');
+            sessionStorage.removeItem('campusSquareEventName');
           }
         }
       } catch (statusError) {
