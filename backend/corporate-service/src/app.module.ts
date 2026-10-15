@@ -10,6 +10,7 @@ import { AssessmentModule } from './assessment/assessment.module';
 import { JDMatchingModule } from './jd-matching/jd-matching.module';
 import { JobsModule } from './jobs/jobs.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { CampusSquareModule } from './campus-square/campus-square.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     }),
     CorporateDashboardModule,
     CorporateRegistrationsModule,
+    CampusSquareModule,
     AssessmentModule,
     JDMatchingModule,
     JobsModule,
