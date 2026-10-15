@@ -33,9 +33,9 @@ import { LevelEligibilityService } from '../levels/level-eligibility.service';
 @Injectable()
 export class CorporateRegistrationsService {
   private readonly logger = new Logger(CorporateRegistrationsService.name);
-  private authServiceBaseUrl = process.env.AUTH_SERVICE_URL;
-  private adminServiceBaseUrl =
-    process.env.ADMIN_SERVICE_URL || 'http://localhost:4001';
+  private get authServiceBaseUrl(): string {
+    return (process.env.AUTH_SERVICE_URL || '').trim();
+  }
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -203,10 +203,16 @@ export class CorporateRegistrationsService {
 
     // 3. Create Cognito User
     let sub: string;
+    const authUrl = this.authServiceBaseUrl;
+    if (!authUrl) {
+      throw new InternalServerErrorException(
+        'Authentication service URL (AUTH_SERVICE_URL) is not configured',
+      );
+    }
     try {
       const res = await this.withRetry(() =>
         firstValueFrom(
-          this.http.post(`${this.authServiceBaseUrl}/internal/cognito/users`, {
+          this.http.post(`${authUrl}/internal/cognito/users`, {
             email,
             password,
             groupName: 'STUDENT',
