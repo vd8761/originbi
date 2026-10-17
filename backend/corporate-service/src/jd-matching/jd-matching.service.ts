@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import OpenAI from 'openai';
 import { IntegrationsService } from '../integrations/integrations.service';
@@ -386,6 +386,41 @@ export class CorporateJDMatchingService {
     return this.openaiClient;
   }
 
+  private getCompletionParams(
+    model: string,
+    options: {
+      messages: any[];
+      maxTokens?: number;
+      temperature?: number;
+    },
+  ) {
+    const isNextGen =
+      model.startsWith('gpt-6') ||
+      model.startsWith('o1') ||
+      model.startsWith('o3');
+
+    const params: any = {
+      model,
+      messages: options.messages,
+    };
+
+    if (isNextGen) {
+      if (options.maxTokens) {
+        params.max_completion_tokens = options.maxTokens;
+      }
+      // Next-gen models like gpt-6-luna and o1/o3 only support default temperature
+    } else {
+      if (options.maxTokens) {
+        params.max_tokens = options.maxTokens;
+      }
+      if (options.temperature !== undefined) {
+        params.temperature = options.temperature;
+      }
+    }
+
+    return params;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // MAIN ENTRY POINT: Corporate JD → Candidate Match
   // corporateId is MANDATORY - enforces corporate scoping
@@ -514,7 +549,7 @@ export class CorporateJDMatchingService {
       [email],
     );
     if (!user || user.length === 0) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     // Strategy A: User has corporateId directly
@@ -531,7 +566,7 @@ export class CorporateJDMatchingService {
       return parseInt(corp[0].id);
     }
 
-    throw new Error('Corporate account not found for this user');
+    throw new NotFoundException('Corporate account not found for this user');
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -579,18 +614,19 @@ Respond with ONLY valid JSON:
 RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with weights summing ~1.0.`;
 
     try {
-      const completion = await this.getOpenAIClient().chat.completions.create({
-        model: process.env.OPENAI_MINI_MODEL!,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: `JOB DESCRIPTION:\n"""\n${jd}\n"""\n\nParse the job description above.`,
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 2000,
-      });
+      const completion = await this.getOpenAIClient().chat.completions.create(
+        this.getCompletionParams(process.env.OPENAI_MINI_MODEL!, {
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `JOB DESCRIPTION:\n"""\n${jd}\n"""\n\nParse the job description above.`,
+            },
+          ],
+          temperature: 0.1,
+          maxTokens: 2000,
+        }),
+      );
 
       const jsonStr = (completion.choices[0]?.message?.content || '').trim();
       const cleanJson = jsonStr
@@ -770,7 +806,14 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
         AND aa.status = 'COMPLETED'
         AND aa.id = (
           SELECT id FROM assessment_attempts 
-          WHERE registration_id = r.id AND status = 'COMPLETED'
+          WHERE registration_id = r.id 
+            AND status = 'COMPLETED'
+            AND (
+              dominant_trait_id IS NOT NULL 
+              OR metadata ? 'disc_scores' 
+              OR metadata ? 'discScores'
+              OR assessment_level_id = 1
+            )
           ORDER BY completed_at DESC NULLS LAST
           LIMIT 1
         )
@@ -1541,12 +1584,13 @@ Output ONLY a JSON array:
 [{"rank": 1, "insight": "...", "recommendation": "..."}, ...]`;
 
     try {
-      const completion = await this.getOpenAIClient().chat.completions.create({
-        model: process.env.OPENAI_MINI_MODEL!,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1500,
-      });
+      const completion = await this.getOpenAIClient().chat.completions.create(
+        this.getCompletionParams(process.env.OPENAI_MINI_MODEL!, {
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          maxTokens: 1500,
+        }),
+      );
 
       const jsonStr = (completion.choices[0]?.message?.content || '').trim();
       const cleanJson = jsonStr
@@ -1952,12 +1996,13 @@ INTENT KEYS:
 USER QUERY: "${query.replace(/"/g, "'")}"`;
 
     try {
-      const res = await this.getOpenAIClient().chat.completions.create({
-        model: process.env.OPENAI_MINI_MODEL!,
-        messages: [{ role: 'user', content: classificationPrompt }],
-        temperature: 0,
-        max_tokens: 30,
-      });
+      const res = await this.getOpenAIClient().chat.completions.create(
+        this.getCompletionParams(process.env.OPENAI_MINI_MODEL!, {
+          messages: [{ role: 'user', content: classificationPrompt }],
+          temperature: 0,
+          maxTokens: 30,
+        }),
+      );
       const intent = (res.choices[0]?.message?.content || 'general')
         .trim()
         .toLowerCase()
@@ -2207,17 +2252,26 @@ RESPONSE RULES:
       'disc_trait_filter',
     ];
 
+    let finalIntent = intent;
     if (
-      discOnlyIntents.includes(intent) &&
+      lowerQuery.includes('trait') ||
+      lowerQuery.includes('disc code') ||
+      lowerQuery.includes('disc profile')
+    ) {
+      finalIntent = 'disc_trait_filter';
+    }
+
+    if (
+      discOnlyIntents.includes(finalIntent) &&
       hasDisc &&
       !hasZenro &&
       !hasKB &&
       !isClickUpQuery
     ) {
       const employeeData = this.buildEmployeeDataStr(discCandidates);
-      this.logger.log(`🔀 Specialized DISC handler: ${intent}`);
+      this.logger.log(`🔀 Specialized DISC handler: ${finalIntent}`);
       let answer: string;
-      switch (intent) {
+      switch (finalIntent) {
         case 'individual_profile':
           answer = await this.handleIndividualProfile(
             query,
@@ -2441,12 +2495,12 @@ RESPONSE RULES:
           ? `\nCONVERSATION HISTORY:\n${history.map((h) => `${h.role}: ${h.content}`).join('\n')}\n`
           : '';
 
-      const sqlRes = await this.getOpenAIClient().chat.completions.create({
-        model: process.env.OPENAI_MINI_MODEL!,
-        messages: [
-          {
-            role: 'user',
-            content: `You are a PostgreSQL expert. Write a read-only SELECT query for the Zenro HR database.
+      const sqlRes = await this.getOpenAIClient().chat.completions.create(
+        this.getCompletionParams(process.env.OPENAI_MINI_MODEL!, {
+          messages: [
+            {
+              role: 'user',
+              content: `You are a PostgreSQL expert. Write a read-only SELECT query for the Zenro HR database.
 Schema: "${schemaName}". Always prefix tables: "${schemaName}"."tablename"
 Return ONLY raw SQL. If the query is completely unrelated to HR, payroll, attendance, leave, or employees, return: SKIP
 
@@ -2467,11 +2521,12 @@ SCHEMA:
 ${schemaStr}
 ${historyContext}
 CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
-          },
-        ],
-        temperature: 0,
-        max_tokens: 350,
-      });
+            },
+          ],
+          temperature: 0,
+          maxTokens: 350,
+        }),
+      );
 
       let sql = sqlRes.choices[0]?.message?.content?.trim() || '';
       const sqlMatch = sql.match(/```(?:sql)?\n([\s\S]*?)\n```/i);
@@ -2531,7 +2586,7 @@ CURRENT QUERY: "${query.replace(/"/g, "'")}"`,
 
     // When asking about numbers/payroll/attendance, skip DISC to save tokens
     if (ctx.discCandidates.length > 0 && !isZenroQuery) {
-      const discSlice = ctx.discCandidates.slice(0, 20);
+      const discSlice = ctx.discCandidates.slice(0, 100);
       sections.push(
         `## 📊 DISC Behavioral Intelligence (${discSlice.length} of ${ctx.discCandidates.length} employees)\n${this.buildEmployeeDataStr(discSlice)}`,
       );
@@ -2583,20 +2638,21 @@ RULES FOR SYNTHESIS & EMPLOYEE-WISE QUERIES:
     const dataContext = `[SYSTEM PROVIDED DATA CONTEXT]
 ${sections.join('\n\n---\n\n')}`;
 
-    const res = await this.getOpenAIClient().chat.completions.create({
-      model: process.env.OPENAI_FLAGSHIP_MODEL!,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: dataContext },
-        ...ctx.history.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        { role: 'user', content: query },
-      ],
-      temperature: 0.3,
-      max_tokens: 2000,
-    });
+    const res = await this.getOpenAIClient().chat.completions.create(
+      this.getCompletionParams(process.env.OPENAI_FLAGSHIP_MODEL!, {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: dataContext },
+          ...ctx.history.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+          { role: 'user', content: query },
+        ],
+        temperature: 0.3,
+        maxTokens: 2000,
+      }),
+    );
     return (
       res.choices[0]?.message?.content ||
       'I could not process your request at this time.'
@@ -3469,11 +3525,12 @@ ${schemaStr}
 
 USER QUESTION: "${query}"`;
 
-      const sqlRes = await this.getOpenAIClient().chat.completions.create({
-        model: process.env.OPENAI_MINI_MODEL!,
-        messages: [{ role: 'user', content: sqlPrompt }],
-        temperature: 0,
-      });
+      const sqlRes = await this.getOpenAIClient().chat.completions.create(
+        this.getCompletionParams(process.env.OPENAI_MINI_MODEL!, {
+          messages: [{ role: 'user', content: sqlPrompt }],
+          temperature: 0,
+        }),
+      );
 
       let rawSql = sqlRes.choices[0]?.message?.content?.trim() || '';
       rawSql = rawSql
@@ -3500,11 +3557,12 @@ ${JSON.stringify(queryResults, null, 2)}
 
 (End with: "Sources: @zenro_db")`;
 
-      const finalRes = await this.getOpenAIClient().chat.completions.create({
-        model: process.env.OPENAI_FLAGSHIP_MODEL!,
-        messages: [...history, { role: 'user', content: answerPrompt }],
-        temperature: 0.2,
-      });
+      const finalRes = await this.getOpenAIClient().chat.completions.create(
+        this.getCompletionParams(process.env.OPENAI_FLAGSHIP_MODEL!, {
+          messages: [...history, { role: 'user', content: answerPrompt }],
+          temperature: 0.2,
+        }),
+      );
 
       return (
         finalRes.choices[0]?.message?.content ||
@@ -3528,16 +3586,17 @@ ${JSON.stringify(queryResults, null, 2)}
         content: m.content,
       }));
 
-      const completion = await this.getOpenAIClient().chat.completions.create({
-        model: process.env.OPENAI_FLAGSHIP_MODEL!,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...historyMessages, // inject prior conversation turns
-          { role: 'user', content: userQuery },
-        ],
-        temperature: 0.3,
-        max_tokens: maxTokens,
-      });
+      const completion = await this.getOpenAIClient().chat.completions.create(
+        this.getCompletionParams(process.env.OPENAI_FLAGSHIP_MODEL!, {
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...historyMessages, // inject prior conversation turns
+            { role: 'user', content: userQuery },
+          ],
+          temperature: 0.3,
+          maxTokens,
+        }),
+      );
       return (
         completion.choices[0]?.message?.content ||
         'I could not process your request at this time.'

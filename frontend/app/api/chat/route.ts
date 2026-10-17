@@ -75,9 +75,11 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify(requestBody),
         });
 
+        const resData = await res.json().catch(() => null);
         const hrAnswer = res.ok
-          ? (await res.json()).answer
-          : 'The Corporate AI Brain is currently unavailable. Please ensure the corporate service is running on port 4003.';
+          ? resData?.answer
+          : resData?.message ||
+            'The Corporate AI Brain is currently unavailable. Please ensure the corporate service is running on port 4003.';
 
         await sql`
           INSERT INTO chat_messages (session_id, role, content)
@@ -164,17 +166,25 @@ export async function POST(req: NextRequest) {
       { role: 'user', content: prompt }
     ];
 
+    const chatModel = process.env.OPENAI_CHAT_MODEL!;
+    const isNextGen = chatModel.startsWith('gpt-6') || chatModel.startsWith('o1') || chatModel.startsWith('o3');
+    const openAiPayload: any = {
+      model: chatModel,
+      messages: apiMessages,
+    };
+    if (isNextGen) {
+      openAiPayload.max_completion_tokens = 600;
+    } else {
+      openAiPayload.temperature = 0.3;
+      openAiPayload.top_p = 0.9;
+      openAiPayload.max_tokens = 600;
+      openAiPayload.frequency_penalty = 0.2;
+    }
+
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiApiKey}` },
-      body: JSON.stringify({
-        model: process.env.OPENAI_CHAT_MODEL!,
-        messages: apiMessages,
-        temperature: 0.3,
-        top_p: 0.9,
-        max_tokens: 600,
-        frequency_penalty: 0.2,
-      }),
+      body: JSON.stringify(openAiPayload),
     });
 
     if (!openaiRes.ok) {
