@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiApiKey}` },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_CHAT_MODEL!,
         messages: apiMessages,
         temperature: 0.3,
         top_p: 0.9,
