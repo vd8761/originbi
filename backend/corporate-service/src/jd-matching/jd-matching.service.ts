@@ -580,7 +580,7 @@ RULES: Always include 2-4 requiredTraits. Include 2-5 behavioralPatterns with we
 
     try {
       const completion = await this.getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_MINI_MODEL!,
         messages: [
           { role: 'system', content: systemPrompt },
           {
@@ -1542,7 +1542,7 @@ Output ONLY a JSON array:
 
     try {
       const completion = await this.getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_MINI_MODEL!,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 1500,
@@ -1944,6 +1944,7 @@ INTENT KEYS:
 - workforce_planning    → Can we launch X, do we have enough capability, strategic people planning
 - recruitment_intel     → What to look for when hiring, what traits our top performers share
 - people_strategy       → HR policy, communication frameworks, org-wide people practices
+- disc_trait_filter     → Questions filtering, listing, or counting people by DISC trait code or combination (e.g. "list DI students", "who has SC profile", "show me D type employees", "how many DS candidates", "give me students with high D and I", "DIS profiles", "DISC code summary", "breakdown by DISC type")
 - zenro_data            → Questions about numbers, payroll, attendance, leave, salaries, counts, or Zenro integration
 - clickup_tasks         → Questions about tasks, projects, ClickUp, work assignments, deadlines, progress, to-do items, or workload
 - general               → Anything else workforce-related that doesn't fit above categories
@@ -1952,7 +1953,7 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
 
     try {
       const res = await this.getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_MINI_MODEL!,
         messages: [{ role: 'user', content: classificationPrompt }],
         temperature: 0,
         max_tokens: 30,
@@ -1969,8 +1970,38 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
   }
 
   /**
+   * Compute a 1–4 letter DISC trait code from raw scores.
+   * Letters are ordered D→I→S→C and only included when that dimension is "High" (>= 18).
+   * If no dimension is High, the dominant (highest) dimension letter is returned.
+   * Examples: D=22,I=20,S=10,C=8  → "DI"
+   *           D=8, I=8, S=22,C=19 → "SC"
+   *           D=10,I=9, S=9, C=8  → "D"  (dominant only)
+   */
+  private computeDISCTraitCode(c: CandidateProfile): string {
+    // If the personality_code column already has a value, use it directly
+    if (c.personalityCode && c.personalityCode.trim().length > 0) {
+      return c.personalityCode.trim().toUpperCase();
+    }
+    const scores: { letter: string; score: number }[] = [
+      { letter: 'D', score: c.discScoreD ?? 0 },
+      { letter: 'I', score: c.discScoreI ?? 0 },
+      { letter: 'S', score: c.discScoreS ?? 0 },
+      { letter: 'C', score: c.discScoreC ?? 0 },
+    ];
+    const HIGH_THRESHOLD = 18;
+    const highLetters = scores
+      .filter((s) => s.score >= HIGH_THRESHOLD)
+      .map((s) => s.letter)
+      .join('');
+    if (highLetters.length > 0) return highLetters;
+    // Fall back to dominant dimension
+    const dominant = scores.reduce((a, b) => (a.score >= b.score ? a : b));
+    return dominant.score > 0 ? dominant.letter : 'N/A';
+  }
+
+  /**
    * Build a compact employee data string for use in AI prompts.
-   * Behaviorally rich but no raw numeric scores are exposed.
+   * Includes DISC trait code so AI can filter/list by code combinations.
    */
   private buildEmployeeDataStr(candidates: CandidateProfile[]): string {
     const firstNames = candidates.map((c) =>
@@ -1990,6 +2021,8 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
               : v >= 12
                 ? 'Moderate'
                 : 'Low';
+
+        const traitCode = this.computeDISCTraitCode(c);
 
         const displayName = isDuplicate(c.fullName)
           ? `${c.fullName} [${c.groupName || 'No Group'} | ${c.currentRole || 'No Designation'}]`
@@ -2027,6 +2060,7 @@ USER QUERY: "${query.replace(/"/g, "'")}"`;
 
         return `[${displayName}]
 ${contextLine || `Group: ${c.groupName || 'Unassigned'} | Gender: ${c.gender || 'N/A'}`}
+DISC Code: ${traitCode} | Style: ${c.personalityStyle || 'Not assessed'}
 Behavioral Profile: Drive=${level(c.discScoreD)}, Influence=${level(c.discScoreI)}, Steadiness=${level(c.discScoreS)}, Conscientiousness=${level(c.discScoreC)}`;
       })
       .join('\n\n');
@@ -2049,7 +2083,7 @@ DATA AVAILABLE FOR EACH PERSON:
 - Behavioral profile (Drive, Influence, Steadiness, Conscientiousness levels)
 
 RESPONSE RULES:
-1. NEVER reveal raw scores, numbers, or DISC codes — speak in behavioral language only.
+1. NEVER reveal raw numeric scores. However, you MAY reference DISC trait codes (D, I, S, C and combinations like DI, SC, DIS, etc.) when the user explicitly asks about them — use them as a behavioral shorthand, not as numbers.
 2. Maintain formal, boardroom-level tone. No casual phrasing.
 3. Reference actual names from the data below.
 4. ALWAYS close with a "Strategic Recommendation" the leader can act on (UNLESS the answer is simply that a value is zero or an event did not happen, in which case omit the recommendation).
@@ -2170,6 +2204,7 @@ RESPONSE RULES:
       'recruitment_intel',
       'people_strategy',
       'jd_filter',
+      'disc_trait_filter',
     ];
 
     if (
@@ -2277,6 +2312,13 @@ RESPONSE RULES:
             query,
             discCandidates,
             employeeData,
+            history,
+          );
+          break;
+        case 'disc_trait_filter':
+          answer = await this.handleDISCTraitFilter(
+            query,
+            discCandidates,
             history,
           );
           break;
@@ -2400,7 +2442,7 @@ RESPONSE RULES:
           : '';
 
       const sqlRes = await this.getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_MINI_MODEL!,
         messages: [
           {
             role: 'user',
@@ -2542,7 +2584,7 @@ RULES FOR SYNTHESIS & EMPLOYEE-WISE QUERIES:
 ${sections.join('\n\n---\n\n')}`;
 
     const res = await this.getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
+      model: process.env.OPENAI_FLAGSHIP_MODEL!,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: dataContext },
@@ -3121,6 +3163,112 @@ ${employeeData}`;
     return this.callGPT(systemPrompt, query, 1800, history);
   }
 
+  // ─── DISC TRAIT FILTER: filter / list / count by DISC code combinations ─────
+
+  private async handleDISCTraitFilter(
+    query: string,
+    candidates: CandidateProfile[],
+    history: { role: 'user' | 'assistant'; content: string }[] = [],
+  ): Promise<string> {
+    // ── Pre-compute trait codes for every candidate in TypeScript ──
+    // This gives the AI a clean, structured dataset so it never has to guess.
+    const ALL_DISC_CODES = ['D', 'I', 'S', 'C', 'DI', 'DS', 'DC', 'IS', 'IC', 'SC',
+      'DIS', 'DIC', 'DSC', 'ISC', 'DISC'];
+
+    // Build a map: traitCode → list of people
+    const codeMap: Record<string, { name: string; group: string; role: string; style: string; gender: string }[]> = {};
+    ALL_DISC_CODES.forEach(code => { codeMap[code] = []; });
+
+    // Also collect all unique codes actually present in data
+    const allCodesPresent = new Set<string>();
+
+    for (const c of candidates) {
+      const code = this.computeDISCTraitCode(c);
+      allCodesPresent.add(code);
+      if (codeMap[code]) {
+        codeMap[code].push({
+          name: c.fullName,
+          group: c.groupName || 'N/A',
+          role: c.currentRole || c.personalityStyle || 'N/A',
+          style: c.personalityStyle || 'N/A',
+          gender: c.gender || 'N/A',
+        });
+      } else {
+        // Non-standard code (e.g., only one dimension high) — still track it
+        if (!codeMap[code]) codeMap[code] = [];
+        codeMap[code].push({
+          name: c.fullName,
+          group: c.groupName || 'N/A',
+          role: c.currentRole || c.personalityStyle || 'N/A',
+          style: c.personalityStyle || 'N/A',
+          gender: c.gender || 'N/A',
+        });
+      }
+    }
+
+    // Build a structured summary string for the AI
+    const discSummaryLines: string[] = [];
+    for (const code of [...ALL_DISC_CODES, ...Array.from(allCodesPresent).filter(c => !ALL_DISC_CODES.includes(c))]) {
+      const people = codeMap[code];
+      if (!people || people.length === 0) continue;
+      discSummaryLines.push(
+        `\n## DISC Code: ${code} (${people.length} person${people.length > 1 ? 's' : ''})`,
+      );
+      people.forEach(p => {
+        discSummaryLines.push(`  - ${p.name} | Group: ${p.group} | Role: ${p.role} | Style: ${p.style} | Gender: ${p.gender}`);
+      });
+    }
+
+    // Build overall distribution summary
+    const totalAssessed = candidates.filter(
+      c => c.discScoreD !== null || c.discScoreI !== null || c.discScoreS !== null || c.discScoreC !== null
+    ).length;
+    const distributionLines = [...ALL_DISC_CODES, ...Array.from(allCodesPresent).filter(c => !ALL_DISC_CODES.includes(c))]
+      .filter(code => (codeMap[code]?.length ?? 0) > 0)
+      .map(code => `  ${code}: ${codeMap[code].length} (${Math.round((codeMap[code].length / (totalAssessed || 1)) * 100)}%)`)
+      .join('\n');
+
+    const systemPrompt = `${this.SYSTEM_ROLE_PREFIX}
+
+━━━ YOUR TASK: DISC TRAIT CODE INTELLIGENCE ━━━
+The leader is asking about specific DISC trait code(s) — either to list people with that code, get a summary, or understand what the code means.
+
+DISC TRAIT CODE REFERENCE (use this to explain codes when asked):
+- D  (Dominance only)        → Highly results-driven, direct, competitive, decisive. Natural pace-setter.
+- I  (Influence only)        → Highly persuasive, enthusiastic, optimistic. Natural relationship-builder.
+- S  (Steadiness only)       → Highly patient, consistent, loyal, empathetic. Natural team stabilizer.
+- C  (Conscientiousness only)→ Highly precise, analytical, systematic. Natural quality-keeper.
+- DI (Dominance + Influence) → Ambitious, charismatic, entrepreneurial. Drives results through people.
+- DS (Dominance + Steadiness)→ Firm yet reliable. Strategic executor who delivers under pressure.
+- DC (Dominance + Conscient.)→ Demanding and exacting. High-standards leader, data-driven decisions.
+- IS (Influence + Steadiness)→ Warm, collaborative communicator. Builds bridges and team morale.
+- IC (Influence + Conscient.)→ Creative but structured. Persuasive and methodical.
+- SC (Steadiness + Conscient.)→ Careful, detail-oriented, procedural. Excellent in compliance/ops roles.
+- DIS (D+I+S)                → Versatile leader: drives results, inspires people, maintains harmony.
+- DIC (D+I+C)                → Strategic visionary: decisive, persuasive, and analytically rigorous.
+- DSC (D+S+C)                → Disciplined executor: delivers results with precision and stability.
+- ISC (I+S+C)                → People-centered analyst: collaborative, reliable, and detail-focused.
+- DISC (All four high)       → Rare, highly adaptive profile. Can flex across all behavioral modes.
+
+RULES FOR THIS TASK:
+1. You MUST use and reference the DISC Code shown for each person in the data below.
+2. When the user asks to list people with a specific code (e.g., "DI"), list EVERY person who has that exact DISC Code.
+3. When the user asks for a "summary" or "breakdown", show ALL codes present with their counts and names.
+4. You MAY use DISC codes freely in your response — do NOT hide them.
+5. Always explain what the DISC code means in behavioral terms.
+6. FORMAT: Use bold headers per code, numbered name lists, and a closing behavioral insight.
+7. CRITICAL: Do NOT say "I cannot identify", "data not available", or refuse to list names. The data is below.
+
+━━━ DISC DISTRIBUTION SUMMARY ━━━
+Total assessed: ${totalAssessed} of ${candidates.length} total
+${distributionLines}
+
+━━━ FULL DISC CODE BREAKDOWN (ALL PEOPLE) ━━━
+${discSummaryLines.join('\n')}`;
+
+    return this.callGPT(systemPrompt, query, 2500, history);
+  }
+
   // ─── GENERAL FALLBACK ────────────────────────────────────────────────────────
 
   private async handleGeneralHRQuery(
@@ -3322,7 +3470,7 @@ ${schemaStr}
 USER QUESTION: "${query}"`;
 
       const sqlRes = await this.getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_MINI_MODEL!,
         messages: [{ role: 'user', content: sqlPrompt }],
         temperature: 0,
       });
@@ -3353,7 +3501,7 @@ ${JSON.stringify(queryResults, null, 2)}
 (End with: "Sources: @zenro_db")`;
 
       const finalRes = await this.getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o',
+        model: process.env.OPENAI_FLAGSHIP_MODEL!,
         messages: [...history, { role: 'user', content: answerPrompt }],
         temperature: 0.2,
       });
@@ -3381,7 +3529,7 @@ ${JSON.stringify(queryResults, null, 2)}
       }));
 
       const completion = await this.getOpenAIClient().chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_FLAGSHIP_MODEL!,
         messages: [
           { role: 'system', content: systemPrompt },
           ...historyMessages, // inject prior conversation turns
