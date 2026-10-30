@@ -45,6 +45,8 @@ docs/apis/*.json
 docs/apis/*.md
 frontend/public/api-docs/*.json
 frontend/public/api-docs/*.md
+frontend/public/docs/apis/*.json
+frontend/public/docs/apis/*.md
 scripts/endpoints_data.js
 
 # vercel

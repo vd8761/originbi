@@ -37,6 +37,8 @@ yarn-error.log*
 # API documentation raw files (only encrypted index.html and documentation.html are public)
 public/api-docs/*.json
 public/api-docs/*.md
+public/docs/apis/*.json
+public/docs/apis/*.md
 
 # vercel
 .vercel
