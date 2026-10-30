@@ -36,6 +36,16 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env
 .env.local
+.env.*
+**/.env*
+*.env*
+
+# API documentation raw files (only encrypted index.html and documentation.html are public)
+docs/apis/*.json
+docs/apis/*.md
+frontend/public/api-docs/*.json
+frontend/public/api-docs/*.md
+scripts/endpoints_data.js
 
 # vercel
 .vercel
@@ -83,3 +93,5 @@ act.exe
 /bin
 
 .claude/
+
+scripts/

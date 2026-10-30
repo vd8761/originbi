@@ -34,6 +34,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# API documentation raw files (only encrypted index.html and documentation.html are public)
+public/api-docs/*.json
+public/api-docs/*.md
+
 # vercel
 .vercel
 
