@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "db:migrate": "ts-node ./database/tools/run-migrations.ts"
+    "db:migrate": "ts-node ./database/tools/run-migrations.ts",
+    "docs:build": "node ./scripts/build_encrypted_api_docs.js"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.948.0",
